@@ -40,7 +40,7 @@ jobs:
     name: Push Release-As commit
     runs-on: ubuntu-latest        # git-only; the packaging happens in Release Please
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           token: ${{ secrets.PAT }}   # PAT so the push re-triggers Release Please (GITHUB_TOKEN would not)
