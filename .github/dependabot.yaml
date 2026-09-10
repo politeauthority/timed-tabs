@@ -1,0 +1,36 @@
+# Dependabot had no config, so every advisory opened its own PR and its own
+# updater job — four PRs for two real bumps, and a failing job per advisory it
+# could not fix alone. Grouping makes it open ONE batched PR instead, which is
+# what we ended up assembling by hand in #8.
+#
+# `prefix: deps` puts these commits in the "Dependencies" changelog section
+# configured in release-please-config.json. `deps:` is not a version-bumping
+# type, so a dependency batch rides along with the next real release rather
+# than cutting one of its own.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps"
+    groups:
+      npm-deps:
+        applies-to: version-updates
+        patterns: ["*"]
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        applies-to: version-updates
+        patterns: ["*"]
