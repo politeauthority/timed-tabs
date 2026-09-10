@@ -1,0 +1,94 @@
+name: Force Release
+run-name: "Force Release — ${{ inputs.version != '' && inputs.version || format('{0} bump', inputs.bump) }}"
+
+# Manually force a release through release-please when nothing on `main` would
+# trigger one on its own (e.g. only chore/docs/ci commits since the last release),
+# or to cut an exact version.
+#
+# It pushes an empty `Release-As: X.Y.Z` commit to `main` using the PAT. That push
+# re-triggers the **Release Please** workflow, which opens + auto-merges the release
+# PR, tags `vX.Y.Z` and packages the zips. So this workflow does the *trigger*; the
+# existing release pipeline does the packaging.
+#
+# Requires the same setup as a normal release: the `PAT` secret and the release-PR
+# auto-merge step in release-please.yaml. A PAT (not GITHUB_TOKEN) is mandatory —
+# GITHUB_TOKEN-caused pushes do not trigger workflows, so the release would never
+# fire.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact version to release, e.g. 1.4.0 (leave blank to bump from the current version)"
+        required: false
+        default: ""
+      bump:
+        description: "Bump to apply when 'version' is left blank"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-please-main      # don't race a real Release Please run
+  cancel-in-progress: false
+
+jobs:
+  force-release:
+    name: Push Release-As commit
+    runs-on: ubuntu-latest        # git-only; the packaging happens in Release Please
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.PAT }}   # PAT so the push re-triggers Release Please (GITHUB_TOKEN would not)
+
+      - name: Compute target version
+        id: ver
+        run: |
+          set -euo pipefail
+          IN="${{ inputs.version }}"
+          if [ -n "$IN" ]; then
+            echo "$IN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::'$IN' is not a valid X.Y.Z version"; exit 1; }
+            NEXT="$IN"
+            echo "::notice::Forcing exact version ${NEXT}"
+          else
+            CUR=$(jq -r '."."' .release-please-manifest.json)
+            IFS=. read -r MA MI PA <<< "$CUR"
+            case "${{ inputs.bump }}" in
+              patch) PA=$((PA+1));;
+              minor) MI=$((MI+1)); PA=0;;
+              major) MA=$((MA+1)); MI=0; PA=0;;
+            esac
+            NEXT="${MA}.${MI}.${PA}"
+            echo "::notice::Current ${CUR} -> ${{ inputs.bump }} -> ${NEXT}"
+          fi
+          echo "next=${NEXT}" >> "$GITHUB_OUTPUT"
+
+      - name: Push empty Release-As commit to main
+        env:
+          NEXT: ${{ steps.ver.outputs.next }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # `chore:` keeps this out of the changelog; `Release-As:` forces release-please
+          # to cut exactly this version even with no other releasable commits.
+          git commit --allow-empty -m "chore: force release v${NEXT}" -m "Release-As: ${NEXT}"
+          git push origin HEAD:main
+
+      - name: 📋 Summary
+        if: always()
+        env:
+          NEXT: ${{ steps.ver.outputs.next }}
+        run: |
+          {
+            echo "# 🔧 Force Release — \`v${NEXT}\`"
+            echo ""
+            echo "Pushed an empty \`Release-As: ${NEXT}\` commit to \`main\`."
+            echo "➡️ **Release Please** now opens + auto-merges the release PR, tags \`v${NEXT}\` and attaches the extension zips."
+            echo ""
+            echo "Follow it in the **Release Please** workflow runs."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -37,6 +37,12 @@ for (const target of targets) {
 
 function adaptManifest(base, target) {
   const m = structuredClone(base);
+  if (target === "dev") {
+    // A distinct id keeps the dev build's storage separate and is what the
+    // background checks before reading dev.json.
+    m.browser_specific_settings.gecko.id = "timed-tabs-dev@alixfullerton";
+    m.name = "Timed Tabs (dev)";
+  }
   if (target === "chrome") {
     // Chrome MV3 requires a service worker and has no dynamic theme API.
     m.background = { service_worker: "background/index.js", type: "module" };
