@@ -1,0 +1,639 @@
+/* Timed Tabs panel: shared by the toolbar popup and the preferences pane. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Defaults mirror Firefox's built-in light theme; panel.js overrides
+     these from the live theme so the panel matches the browser chrome. */
+  --ground: #f9f9fb;
+  --ink: #15141a;
+  --ink-2: color-mix(in srgb, var(--ink) 62%, var(--ground));
+  --line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --control: color-mix(in srgb, var(--ink) 7%, transparent);
+  --control-hover: color-mix(in srgb, var(--ink) 12%, transparent);
+  --focus: #0060df;
+
+  --green: #2ecc71;
+  --yellow: #f1c40f;
+  --red: #e74c3c;
+
+  --font: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #2b2a33;
+    --ink: #fbfbfe;
+    --control: color-mix(in srgb, var(--ink) 9%, transparent);
+    --control-hover: color-mix(in srgb, var(--ink) 15%, transparent);
+    --focus: #00ddff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Keep the hidden attribute authoritative even where display is set. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 13px/1.45 var(--font);
+}
+
+body[data-context="popup"] {
+  width: 320px;
+}
+
+body[data-context="options"] #app {
+  max-width: 560px;
+  padding: 8px 4px 24px;
+}
+
+/* Full-page view: wider, centred, overview gets all the room it wants. */
+body[data-context="page"] #app {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+body[data-context="page"] .overview-list {
+  max-height: none;
+}
+
+/* Only the popup has a "this tab"; the page view has no page of its own. */
+body[data-context="options"] .tab,
+body[data-context="page"] .tab,
+body[data-context="page"] .topbar-link {
+  display: none;
+}
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 16px 0;
+  color: var(--ink-2);
+}
+
+body[data-context="page"] .topbar {
+  padding-bottom: 8px;
+}
+
+body[data-context="page"] .topbar-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.topbar-link {
+  padding: 2px 6px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.topbar-link:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+/* The popup's own "Timed Tabs" title is carried by the topbar now. */
+body[data-context="popup"] .tab {
+  padding-top: 8px;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+section + section,
+.notice + section,
+section + details {
+  border-top: 1px solid var(--line);
+}
+
+/* ---- This tab ---------------------------------------------------------- */
+
+.tab {
+  padding: 16px 16px 14px;
+}
+
+.tab-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  color: var(--ink-2);
+}
+
+.tab-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.tab-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.readout {
+  margin: 10px 0 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.readout-time {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.readout-note {
+  color: var(--ink-2);
+}
+
+/* The fuse: the full ramp is always visible, the marker shows where this
+   tab sits on it, and the burnt part behind the marker fades out. */
+.fuse {
+  position: relative;
+  height: 10px;
+  margin: 6px 0 14px;
+}
+
+.fuse-track {
+  position: absolute;
+  inset: 3px 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
+}
+
+.fuse-burnt {
+  position: absolute;
+  inset: 3px auto 3px 0;
+  width: 0;
+  border-radius: 2px 0 0 2px;
+  background: var(--ground);
+  opacity: 0.72;
+  transition: width 0.4s ease-out;
+}
+
+.fuse-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 10px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: left 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fuse-burnt,
+  .fuse-marker {
+    transition: none;
+  }
+}
+
+.tab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tab-never {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.tab-paused p {
+  margin: 0 0 10px;
+  color: var(--ink-2);
+}
+
+/* ---- Controls ---------------------------------------------------------- */
+
+button {
+  font: inherit;
+  color: inherit;
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--control);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--control-hover);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+input[type="number"],
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--control);
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+input[type="number"] {
+  width: 4.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Switch built on a native checkbox so keyboard and screen readers work. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--control-hover);
+  transition: background 0.15s;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ground);
+  transition: transform 0.15s;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--green);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(12px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.switch input:disabled ~ * {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- All tabs ---------------------------------------------------------- */
+
+.settings {
+  padding: 12px 16px 8px;
+}
+
+.settings-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.field:first-child,
+.field[hidden] + .field:not([hidden]):nth-child(2) {
+  border-top: 0;
+}
+
+.field-label {
+  flex: 1 1 auto;
+}
+
+.field-help {
+  display: block;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.field-control {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.field-indicators {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.field-indicators .field-control {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.status {
+  min-height: 1.4em;
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--yellow) 22%, transparent);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.notice p {
+  margin: 0;
+}
+
+/* ---- Diagnostics ------------------------------------------------------- */
+
+.diagnostics {
+  padding: 8px 16px 12px;
+  color: var(--ink-2);
+}
+
+.diagnostics summary {
+  cursor: pointer;
+}
+
+.diagnostics[open] summary {
+  margin-bottom: 8px;
+}
+
+.diag-actions {
+  margin: 0 0 8px;
+  display: flex;
+  gap: 8px;
+}
+
+#diag-summary {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+#diag-tabs {
+  border-collapse: collapse;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+#diag-tabs th,
+#diag-tabs td {
+  text-align: left;
+  padding: 2px 8px 2px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- All open tabs ----------------------------------------------------- */
+
+.overview {
+  padding: 0 16px;
+  border-top: 1px solid var(--line);
+}
+
+.overview summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink-2);
+  list-style: none;
+}
+
+.overview summary::-webkit-details-marker {
+  display: none;
+}
+
+.overview summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--ink-2);
+}
+
+.overview[open] summary::before {
+  content: "▾";
+}
+
+.overview summary > span:first-of-type {
+  flex: 1;
+}
+
+.overview-count {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-legend {
+  margin: 0 0 6px;
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.legend-icon {
+  display: inline-block;
+  width: 1.2em;
+  text-align: center;
+}
+
+.overview-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0 -16px;
+  padding: 0 16px 8px;
+}
+
+.window-title {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.trow {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto auto;
+  grid-template-areas:
+    "icon title time timer focus"
+    "icon fuse  fuse timer focus";
+  column-gap: 8px;
+  row-gap: 3px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.trow:first-of-type {
+  border-top: 0;
+}
+
+.trow.is-active .trow-title {
+  font-weight: 600;
+}
+
+.trow.is-off .trow-time,
+.trow.is-off .trow-fuse {
+  opacity: 0.4;
+}
+
+.trow-icon {
+  grid-area: icon;
+  width: 16px;
+  height: 16px;
+}
+
+.trow-icon:not([src]) {
+  visibility: hidden;
+}
+
+.trow-title {
+  grid-area: title;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  border-radius: 2px;
+}
+
+.trow-title:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.trow-time {
+  grid-area: time;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trow-fuse {
+  grid-area: fuse;
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
+}
+
+.trow-fuse::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--pct, 0%);
+  border-radius: 2px;
+  background: var(--ground);
+  opacity: 0.72;
+}
+
+.qtoggle {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-2);
+  background: transparent;
+}
+
+.qtoggle:hover {
+  background: var(--control);
+}
+
+.qtoggle[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--control-hover);
+}
+
+.qtoggle.is-inherited[aria-pressed="true"] {
+  background: var(--control);
+}
+
+.qtoggle-timer {
+  grid-area: timer;
+}
+
+.qtoggle-focus {
+  grid-area: focus;
+}
+
+.overview-empty {
+  margin: 4px 0 8px;
+  color: var(--ink-2);
+}

@@ -1,0 +1,25 @@
+{
+  "name": "timed-tabs",
+  "version": "0.1.0",
+  "description": "Browser extension that puts an expiry timer on tabs and visually signals how close each tab is to expiring.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "web-ext run --source-dir src",
+    "start:firefox": "web-ext run --source-dir src",
+    "start:chrome": "npm run build:chrome && web-ext run --target chromium --source-dir dist/chrome",
+    "build": "node scripts/build.mjs",
+    "build:firefox": "node scripts/build.mjs firefox",
+    "build:chrome": "node scripts/build.mjs chrome",
+    "package": "npm run build:firefox && web-ext build --source-dir dist/firefox --overwrite-dest",
+    "lint": "eslint . && web-ext lint --source-dir src",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "vitest": "^2.0.0",
+    "web-ext": "^8.0.0"
+  }
+}

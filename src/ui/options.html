@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Timed Tabs</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body data-context="options">
+    <main id="app">
+      <header class="topbar">
+        <span class="topbar-title">Timed Tabs</span>
+        <button type="button" id="open-page" class="topbar-link">Open in a tab</button>
+      </header>
+
+      <section id="tab" class="tab" hidden>
+        <header class="tab-head">
+          <img id="tab-icon" class="tab-icon" alt="" hidden />
+          <span id="tab-title" class="tab-title"></span>
+        </header>
+
+        <p class="readout">
+          <span id="remaining" class="readout-time">–</span>
+          <span id="remaining-note" class="readout-note"></span>
+        </p>
+
+        <div id="fuse" class="fuse" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="fuse-track"></div>
+          <div id="fuse-burnt" class="fuse-burnt"></div>
+          <div id="fuse-marker" class="fuse-marker"></div>
+        </div>
+
+        <div class="tab-actions">
+          <button type="button" id="act-reset">Restart timer</button>
+          <button type="button" id="act-snooze">Snooze</button>
+          <label class="switch tab-never">
+            <input type="checkbox" id="act-never" />
+            <span class="switch-track"></span>
+            <span>Never expire this tab</span>
+          </label>
+        </div>
+      </section>
+
+      <section id="tab-paused" class="tab tab-paused" hidden>
+        <p>This tab's timer only runs while it is in the background, and restarts when you come back.</p>
+        <label class="switch">
+          <input type="checkbox" id="act-never-paused" />
+          <span class="switch-track"></span>
+          <span>Never expire this tab</span>
+        </label>
+      </section>
+
+      <details id="overview" class="overview">
+        <summary>
+          <span>All open tabs</span>
+          <span id="overview-count" class="overview-count"></span>
+        </summary>
+        <p class="overview-legend">
+          <span class="legend-key"><span class="legend-icon">⏱</span> timer on</span>
+          <span class="legend-key"><span class="legend-icon">↻</span> restart on focus</span>
+        </p>
+        <div id="overview-list" class="overview-list"></div>
+      </details>
+
+      <div id="permission-warning" class="notice" hidden>
+        <p>Site access is off, so favicons cannot be coloured.</p>
+        <button type="button" id="grant-permission">Allow access to all sites</button>
+      </div>
+
+      <section id="settings" class="settings">
+        <h2 class="settings-title">All tabs</h2>
+        <div id="fields" class="fields"></div>
+        <p id="status" class="status" role="status"></p>
+      </section>
+
+      <details id="diagnostics" class="diagnostics">
+        <summary>Diagnostics</summary>
+        <p class="diag-actions">
+          <button type="button" id="diag-refresh">Refresh</button>
+          <button type="button" id="diag-tick">Force tick</button>
+        </p>
+        <pre id="diag-summary"></pre>
+        <div class="table-wrap">
+          <table id="diag-tabs">
+            <thead>
+              <tr><th>Tab</th><th>Active</th><th>State</th><th>Progress</th><th>Favicon</th><th>Adopted</th><th>URL</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+    </main>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>
