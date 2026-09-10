@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/politeauthority/timed-tabs/compare/v0.2.0...v0.3.0) (2026-09-10)
+
+
+### Features
+
+* Checking back in for now ([11c509c](https://github.com/politeauthority/timed-tabs/commit/11c509c5f31dfb63707ba197882eaaba705c5a64))
+
 ## [0.2.0](https://github.com/politeauthority/timed-tabs/compare/v0.1.0...v0.2.0) (2026-09-10)
 
 
