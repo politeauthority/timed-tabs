@@ -1,0 +1,55 @@
+name: CI
+run-name: "CI — ${{ github.ref_name }}"
+
+# 🧪 Lint, test and build the extension on every PR and every push to main. This is
+# the gate that keeps main releasable; the Release Please pipeline re-runs it on the
+# tag before it packages, so a green release is never assumed from a stale run.
+#
+# No infra: GitHub-hosted runners, plain `npm ci`. `npm run lint` covers both eslint
+# and `web-ext lint`, so manifest/WebExtension problems are caught here rather than
+# at AMO submission time.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: Lint, test & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        id: lint
+        run: npm run lint
+      - name: Test
+        id: test
+        run: npm test
+      - name: Build (firefox + chrome)
+        id: build
+        run: npm run build
+      - name: 📋 Summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then head="### ✅ 🧪 Lint, test & build passed"; else head="### ❌ 🧪 Lint, test & build failed"; fi
+          {
+            echo "$head"
+            echo ""
+            echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`."
+            echo ""
+            echo "🔬 \`npm run lint\`: \`${{ steps.lint.outcome }}\` · 🧪 \`npm test\`: \`${{ steps.test.outcome }}\` · 🏗️ \`npm run build\`: \`${{ steps.build.outcome }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

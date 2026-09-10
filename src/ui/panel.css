@@ -1,0 +1,1372 @@
+/* Timed Tabs panel: shared by the toolbar popup and the preferences pane. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Defaults mirror Firefox's built-in light theme; panel.js overrides
+     these from the live theme so the panel matches the browser chrome. */
+  --ground: #f9f9fb;
+  --ink: #15141a;
+  --ink-2: color-mix(in srgb, var(--ink) 62%, var(--ground));
+  --line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --control: color-mix(in srgb, var(--ink) 7%, transparent);
+  --control-hover: color-mix(in srgb, var(--ink) 12%, transparent);
+  --focus: #0060df;
+
+  --green: #2ecc71;
+  --yellow: #f1c40f;
+  --red: #e74c3c;
+
+  --font: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #2b2a33;
+    --ink: #fbfbfe;
+    --control: color-mix(in srgb, var(--ink) 9%, transparent);
+    --control-hover: color-mix(in srgb, var(--ink) 15%, transparent);
+    --focus: #00ddff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Keep the hidden attribute authoritative even where display is set. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 13px/1.45 var(--font);
+}
+
+body[data-context="popup"] {
+  width: 320px;
+}
+
+body[data-context="options"] #app {
+  max-width: 560px;
+  padding: 8px 4px 24px;
+}
+
+/* Full-page view: wider, centred, overview gets all the room it wants. */
+body[data-context="page"] #app {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+body[data-context="page"] .overview-list {
+  max-height: none;
+}
+
+/* Only the popup has a "this tab"; the page views have no page of their own. */
+body[data-context="options"] .tab,
+body[data-context="page"] .tab,
+body[data-context="page"] .topbar-link,
+body[data-context="options"] .topbar-link {
+  display: none;
+}
+
+/* ---- Pages: the full page and preferences pane show one page at a time. ---- */
+
+body:not([data-context="popup"]) [data-pages] {
+  display: none;
+}
+
+body[data-page="tabs"]:not([data-context="popup"]) [data-pages="tabs"],
+body[data-page="rules"]:not([data-context="popup"]) [data-pages="rules"],
+body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"] {
+  display: block;
+}
+
+body[data-page="settings"]:not([data-context="popup"]) #permission-warning:not([hidden]),
+body[data-page="settings"]:not([data-context="popup"]) .jump {
+  display: flex;
+}
+
+/* The mini UI only carries the current tab and the open-tabs list. */
+body[data-context="popup"] [data-page-only] {
+  display: none;
+}
+
+.pages {
+  display: none;
+  gap: 4px;
+}
+
+body:not([data-context="popup"]) .pages {
+  display: flex;
+}
+
+.pages a {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.pages a:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.pages a[aria-current="page"] {
+  background: var(--control-hover);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.mini-nav {
+  display: none;
+  gap: 4px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--line);
+}
+
+body[data-context="popup"] .mini-nav {
+  display: flex;
+}
+
+.mini-nav button {
+  flex: 1 1 auto;
+  padding: 6px 4px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.mini-nav button:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+body:not([data-context="popup"]) #overview .overview-list {
+  max-height: none;
+}
+
+/* Window groups inside the open-tabs list fold independently. */
+.window-group {
+  margin-top: 8px;
+}
+
+.window-group > summary.window-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  margin: 0 0 2px;
+  padding: 6px 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.window-group > summary .window-name {
+  flex: 1 1 auto;
+}
+
+.window-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.window-group > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+}
+
+.window-group[open] > summary::before {
+  content: "▾";
+}
+
+/* Expired but still open: unmistakably faded. */
+.trow.is-expired .trow-title,
+.trow.is-expired .trow-time,
+.trow.is-expired .trow-icon,
+.trow.is-expired .trow-fuse,
+.trow.is-expired .trow-rules {
+  opacity: 0.3;
+}
+
+
+.recent-actions {
+  margin: 8px 0 4px;
+}
+
+.recent .trow {
+  grid-template-columns: 16px 1fr auto auto auto;
+  grid-template-areas:
+    "icon title when reopen remove"
+    "icon url   url  reopen remove";
+}
+
+.trow-remove {
+  grid-area: remove;
+}
+
+.trow-remove:hover {
+  color: var(--red);
+}
+
+.trow-when {
+  grid-area: when;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.trow-url {
+  grid-area: url;
+  font-size: 11px;
+  color: var(--ink-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trow-reopen {
+  grid-area: reopen;
+}
+
+.rules-filter {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.rules-filter input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  background: var(--control);
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+
+.rule.is-filtered-out {
+  display: none;
+}
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px 0;
+  color: var(--ink-2);
+}
+
+body:not([data-context="popup"]) .topbar {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+body[data-context="page"] .topbar {
+  padding-bottom: 8px;
+}
+
+body[data-context="page"] .topbar-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.topbar-link {
+  padding: 2px 6px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.topbar-link:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+/* The popup's own "Timed Tabs" title is carried by the topbar now. */
+body[data-context="popup"] .tab {
+  padding-top: 8px;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+section + section,
+.notice + section,
+section + details {
+  border-top: 1px solid var(--line);
+}
+
+/* ---- This tab ---------------------------------------------------------- */
+
+.tab {
+  padding: 16px 16px 18px;
+}
+
+.tab-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  color: var(--ink-2);
+}
+
+.tab-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.tab-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.readout {
+  margin: 10px 0 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.readout-time {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.readout-note {
+  color: var(--ink-2);
+}
+
+/* The fuse: the full ramp is always visible, the marker shows where this
+   tab sits on it, and the burnt part behind the marker fades out. */
+.fuse {
+  position: relative;
+  height: 10px;
+  margin: 6px 0 14px;
+}
+
+.fuse-track {
+  position: absolute;
+  inset: 3px 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
+}
+
+.fuse-burnt {
+  position: absolute;
+  inset: 3px auto 3px 0;
+  width: 0;
+  border-radius: 2px 0 0 2px;
+  background: var(--ground);
+  opacity: 0.72;
+  transition: width 0.4s ease-out;
+}
+
+.fuse-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 10px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: left 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fuse-burnt,
+  .fuse-marker {
+    transition: none;
+  }
+}
+
+.tab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tab-never {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.tab-paused p {
+  margin: 0 0 10px;
+  color: var(--ink-2);
+}
+
+/* ---- Controls ---------------------------------------------------------- */
+
+button {
+  font: inherit;
+  color: inherit;
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--control);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--control-hover);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+input[type="number"],
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--control);
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+input[type="number"] {
+  width: 4.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Switch built on a native checkbox so keyboard and screen readers work. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--control-hover);
+  transition: background 0.15s;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ground);
+  transition: transform 0.15s;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--green);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(12px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.switch input:disabled ~ * {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- All tabs ---------------------------------------------------------- */
+
+.settings {
+  padding: 16px 16px 12px;
+}
+
+.settings-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+body[data-context="page"] .settings-title,
+body[data-context="page"] .rules-head .settings-title {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+body[data-context="page"] .field {
+  padding: 14px 0;
+}
+
+.field:first-child,
+.field[hidden] + .field:not([hidden]):nth-child(2) {
+  border-top: 0;
+}
+
+.field-label {
+  flex: 1 1 14em;
+  min-width: 0;
+}
+
+.field-help {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 46em;
+}
+
+.field-control {
+  flex: none;
+  margin-left: auto;
+  max-width: 100%;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.field-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding-bottom: 0;
+}
+
+.field-group > .field-label {
+  flex: none;
+}
+
+.field-group-rows .field {
+  padding-left: 12px;
+}
+
+.status {
+  min-height: 1.4em;
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--yellow) 22%, transparent);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.notice p {
+  margin: 0;
+}
+
+/* ---- Diagnostics ------------------------------------------------------- */
+
+.diagnostics {
+  padding: 12px 16px 16px;
+  color: var(--ink-2);
+}
+
+.diagnostics summary {
+  cursor: pointer;
+}
+
+.diagnostics[open] summary {
+  margin-bottom: 8px;
+}
+
+.diag-actions {
+  margin: 0 0 8px;
+  display: flex;
+  gap: 8px;
+}
+
+#diag-summary {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+#diag-tabs {
+  border-collapse: collapse;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+#diag-tabs th,
+#diag-tabs td {
+  text-align: left;
+  padding: 2px 8px 2px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- All open tabs ----------------------------------------------------- */
+
+.overview {
+  padding: 0 16px;
+  border-top: 1px solid var(--line);
+}
+
+.overview summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink-2);
+  list-style: none;
+}
+
+.overview summary::-webkit-details-marker {
+  display: none;
+}
+
+.overview summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--ink-2);
+}
+
+.overview[open] summary::before {
+  content: "▾";
+}
+
+.overview summary > span:first-of-type {
+  flex: 1;
+}
+
+.overview-count {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-legend {
+  margin: 0 0 6px;
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.legend-icon {
+  display: inline-block;
+  width: 1.2em;
+  text-align: center;
+}
+
+.overview-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0 -16px;
+  padding: 0 16px 12px;
+}
+
+.window-title {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.trow {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto auto auto auto;
+  grid-template-areas:
+    "icon title rules time timer focus close"
+    "icon fuse  fuse  fuse timer focus close";
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+body[data-context="page"] .trow {
+  padding: 10px 0;
+}
+
+.trow:first-of-type {
+  border-top: 0;
+}
+
+.trow.is-active .trow-title {
+  font-weight: 600;
+}
+
+.trow.is-off .trow-time,
+.trow.is-off .trow-fuse {
+  opacity: 0.4;
+}
+
+.trow-icon {
+  grid-area: icon;
+  width: 16px;
+  height: 16px;
+}
+
+.trow-icon:not([src]) {
+  visibility: hidden;
+}
+
+.trow-title {
+  grid-area: title;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  border-radius: 2px;
+}
+
+.trow-title:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.trow-time {
+  grid-area: time;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trow-fuse {
+  grid-area: fuse;
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
+}
+
+.trow-fuse::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--pct, 0%);
+  border-radius: 2px;
+  background: var(--ground);
+  opacity: 0.72;
+}
+
+.qtoggle {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-2);
+  background: transparent;
+}
+
+.qtoggle:hover {
+  background: var(--control);
+}
+
+.qtoggle[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--control-hover);
+}
+
+.qtoggle.is-inherited[aria-pressed="true"] {
+  background: var(--control);
+}
+
+.qtoggle-timer {
+  grid-area: timer;
+}
+
+.qtoggle-focus {
+  grid-area: focus;
+}
+
+.overview-empty {
+  margin: 4px 0 8px;
+  color: var(--ink-2);
+}
+
+/* ---- Rules ---------------------------------------------------------------- */
+
+.tab-rules-section {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.tab-rules-section .settings-title {
+  margin-bottom: 2px;
+}
+
+.tab-rules-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-rule {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.tab-rule:first-child {
+  border-top: 0;
+}
+
+.tab-rule .switch-track {
+  margin-top: 1px;
+}
+
+.tab-rule-name {
+  font-weight: 600;
+}
+
+.tab-rule-name small {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.tab-rule-sets {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.tab-rule.is-ignored .tab-rule-name,
+.tab-rule.is-ignored .tab-rule-sets {
+  color: var(--ink-2);
+  text-decoration: line-through;
+}
+
+.tab-rule.is-masked {
+  opacity: 0.55;
+}
+
+.tab-rules-empty {
+  margin: 6px 0 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.tab-rules-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.tab-rules-section .tab-never {
+  margin-top: 8px;
+}
+
+.tab-add-rule {
+  margin-top: 4px;
+}
+
+.rules {
+  padding: 16px 16px 12px;
+}
+
+.rules-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rules-help {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 60em;
+}
+
+.rules-help code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--control);
+}
+
+.rules-empty {
+  margin: 8px 0;
+  color: var(--ink-2);
+}
+
+.rules-list {
+  display: grid;
+  gap: 20px;
+}
+
+/* Each rule is its own bordered group, so its rows read as one unit. */
+.rule {
+  padding: 4px 16px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.rule.is-target {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.rule.is-disabled {
+  opacity: 0.6;
+}
+
+.rule-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.rule-pattern {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  color: inherit;
+  background: var(--control);
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+
+.rule-delete {
+  color: var(--ink-2);
+  flex: none;
+}
+
+.rule-description {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: -4px 0 10px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  border-radius: 0;
+  padding: 4px 2px;
+}
+
+.rule-description::placeholder {
+  color: var(--ink-2);
+}
+
+.rule-description:focus-visible {
+  outline: none;
+  border-bottom-color: var(--focus);
+}
+
+.rule .field {
+  padding: 12px 0;
+}
+
+.rule-overrides {
+  border-top: 1px solid var(--line);
+}
+
+.rule-overrides-title {
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.rule-overrides .field:first-of-type {
+  border-top: 0;
+}
+
+.override .field-label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: start;
+}
+
+.override .field-label input[type="checkbox"] {
+  margin: 3px 0 0;
+}
+
+.override .field-help {
+  grid-column: 2;
+}
+
+/* Until an override is switched on, its control stays out of the way. */
+.override:not(.is-on) .override-control {
+  display: none;
+}
+
+.override:not(.is-on) .field-label {
+  color: var(--ink-2);
+}
+
+.override-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trow-rules {
+  grid-area: rules;
+  justify-self: end;
+  font-size: 11px;
+  color: var(--ink-2);
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--control);
+  cursor: default;
+}
+
+/* ---- Backup --------------------------------------------------------------- */
+
+.backup {
+  padding: 16px 16px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.backup-file input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.button-like {
+  display: inline-block;
+  padding: 5px 11px;
+  border-radius: 6px;
+  background: var(--control);
+  cursor: pointer;
+}
+
+.button-like:hover {
+  background: var(--control-hover);
+}
+
+.backup-file input:focus-visible + .button-like {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.backup-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: 12px/1.45 ui-monospace, Menlo, monospace;
+  color: inherit;
+  background: var(--control);
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.trow-rules.is-ignored {
+  text-decoration: line-through;
+}
+
+.field-suffix {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+/* ---- Settings page sections ---------------------------------------------- */
+
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 12px 16px 4px;
+}
+
+.jump a {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ink-2);
+  text-decoration: none;
+  background: var(--control);
+}
+
+.jump a:hover {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+.group {
+  padding: 20px 16px 8px;
+  scroll-margin-top: 12px;
+}
+
+.group + .group,
+.settings + .backup,
+.backup + .diagnostics {
+  border-top: 1px solid var(--line);
+}
+
+.group .settings-title {
+  margin-bottom: 2px;
+}
+
+.group-help {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+/* The rows container owns the dividers; the fields section only wraps groups. */
+.settings {
+  padding: 0;
+}
+
+.group-rows .field:first-child {
+  border-top: 0;
+}
+
+.diagnostics {
+  scroll-margin-top: 12px;
+}
+
+/* ---- Saved confirmation --------------------------------------------------- */
+
+.saved-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--green);
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.saved-mark::before {
+  content: "✓";
+  font-weight: 700;
+}
+
+.saved-mark.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+/* Rule cards: the mark sits inline in whichever row changed. */
+.rule-head > .saved-mark {
+  flex: none;
+}
+
+.rule-description-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-description-wrap .rule-description {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+
+.rule-description-wrap {
+  margin: -4px 0 10px;
+}
+
+.rule-delete.is-armed {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 20%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saved-mark {
+    transition: none;
+    transform: none;
+  }
+}
+
+button.danger {
+  color: var(--red);
+}
+
+button.danger.is-armed {
+  background: color-mix(in srgb, var(--red) 20%, transparent);
+}
+
+/* ---- Collapsible rule cards ----------------------------------------------- */
+
+.rule-toggle {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.rule-toggle::before {
+  content: "▾";
+  display: inline-block;
+  transition: transform 0.15s;
+}
+
+.rule.is-collapsed .rule-toggle::before {
+  transform: rotate(-90deg);
+}
+
+.rule-summary {
+  display: none;
+  width: 100%;
+  margin: -4px 0 8px;
+  padding: 4px 2px 8px;
+  text-align: left;
+  background: none;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 4px;
+}
+
+.rule-summary:hover {
+  background: none;
+  color: var(--ink);
+}
+
+.rule.is-collapsed .rule-summary {
+  display: block;
+}
+
+.rule.is-collapsed .rule-body {
+  display: none;
+}
+
+.rule.is-collapsed {
+  padding-bottom: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rule-toggle::before {
+    transition: none;
+  }
+}
+
+.rules-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.rule-pattern::placeholder {
+  color: var(--ink-2);
+  opacity: 0.8;
+  font-family: var(--font);
+  font-style: italic;
+}
+
+.qtoggle-close {
+  grid-area: close;
+  width: auto;
+  min-width: 24px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.qtoggle-close:hover {
+  color: var(--red);
+}
+
+.qtoggle-close.is-armed {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 20%, transparent);
+}
+
+/* Saved marks inside the mini UI's inline controls. */
+.tab-actions button + .saved-mark,
+.tab-never > .saved-mark,
+.tab-rule > .saved-mark {
+  margin-left: 6px;
+}
+
+.tab-rule > .saved-mark {
+  grid-column: 2;
+}

@@ -1,0 +1,154 @@
+name: Release Please
+run-name: "Release Please — ${{ github.ref_name }}"
+
+# Mirrors quigley-web: release-please maintains a release PR from Conventional
+# Commits; merging it tags the version and (package) builds the Firefox + Chrome
+# zips and attaches them to the GitHub Release.
+#
+# timed-tabs is NOT containerized, so there is no image build, no Harbor login and
+# no kubectl deploy. The whole pipeline runs on GitHub-hosted `ubuntu-latest` —
+# there is no self-hosted ARC runner to provision, and no CICD_VERSION gate.
+#
+# The release PR is auto-merged (no human click): after release-please maintains
+# the PR, the "Auto-merge" step rebase-merges it. That merge is a push to main that
+# must re-trigger THIS workflow so the second run cuts the tag + publishes the
+# zips — and GITHUB_TOKEN-caused pushes do NOT trigger workflows, so the action
+# token + the merge use a PAT (`secrets.PAT`, contents+pull-requests write).
+#
+# ⚠️ PREREQ: the `PAT` secret must exist, and the repo must allow rebase merging
+# (Settings → General → Pull Requests). Without the PAT the release PR is opened
+# but never merges itself.
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: release-please-main
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release PR / tag
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+      version: ${{ steps.rp.outputs.version }}
+    steps:
+      - name: Run release-please
+        id: rp
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.PAT }}      # PAT (not github.token): the auto-merge below must re-trigger this workflow
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # Auto-merge the release PR so releases need no human click. Rebase-merge with
+      # the PAT so the resulting push to main re-triggers this workflow, whose second
+      # run cuts the tag + packages. (quigley-web does this with curl because its
+      # self-hosted runner has no `gh`; ubuntu-latest ships `gh`, so we use it.)
+      - name: Auto-merge the release PR
+        if: ${{ steps.rp.outputs.prs_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+          PRS: ${{ steps.rp.outputs.prs }}
+        run: |
+          set -euo pipefail
+          echo "$PRS" | jq -r '.[].number' | while read -r pr; do
+            echo "::notice::Auto-merging release PR #${pr}"
+            # A 403 here almost always means the PAT can write contents/PRs but isn't
+            # allowed to merge — regenerate it as a classic PAT with `repo` (+`workflow`)
+            # scope, or fine-grained with Contents + Pull requests R/W.
+            gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --rebase \
+              || { echo "::error::Failed to merge release PR #${pr}"; exit 1; }
+            echo "::notice::Merged release PR #${pr}"
+          done
+
+      - name: 📋 Summary
+        if: always()
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then WHY="a manual dispatch"; else WHY="a push to \`main\`"; fi
+          if [ "${{ steps.rp.outputs.release_created }}" = "true" ]; then
+            {
+              echo "# 🚀 Release Please — released \`${{ steps.rp.outputs.tag_name }}\`"
+              echo ""
+              echo "> ▶️ **Why this ran:** ${WHY} — release-please maintains the release PR from Conventional Commits."
+              echo ""
+              echo "A release PR was merged, so the tag + GitHub Release were created."
+              echo "➡️ The **Package extension** job is running now to build and attach the Firefox + Chrome zips."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "# 🧾 Release Please — release PR maintained (nothing released)"
+              echo ""
+              echo "> ▶️ **Why this ran:** ${WHY} — release-please maintains the release PR from Conventional Commits."
+              echo ""
+              echo "This push was a normal commit, **not** a merged release PR, so no version was cut —"
+              echo "release-please just opened/updated the pending release PR."
+              echo ""
+              echo "⏭️ **Package extension was skipped** (gated on \`release_created == true\`)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  package:
+    name: Package extension
+    needs: release-please
+    # Runs only on a release PR merge. This is where quigley-web builds + pushes its
+    # image and deploys; timed-tabs has nothing to deploy, so it builds the two
+    # browser zips and attaches them to the GitHub Release instead.
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # gh release upload
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Build zips
+        run: npm run package     # -> web-ext-artifacts/timed-tabs-{firefox,chrome}-<version>.zip
+      - name: Attach zips to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          ls -la web-ext-artifacts
+          gh release upload "$TAG" web-ext-artifacts/*.zip --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Upload zips as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: timed-tabs-${{ needs.release-please.outputs.version }}
+          path: web-ext-artifacts/*.zip
+      - name: 📋 Release summary
+        if: always()
+        run: |
+          VERSION="${{ needs.release-please.outputs.version }}"
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          if [ "${{ job.status }}" = "success" ]; then s="✅ packaged"; else s="❌ failed"; fi
+          {
+            echo "# 🚀 Released v${VERSION} ${s}"
+            echo ""
+            echo "> ▶️ **Why this ran:** a release PR was merged (\`release_created == true\`), cutting \`${TAG}\` — so the extension zips are built and attached to the release."
+            echo ""
+            echo "| 🏷️ Version | 🦊 Firefox | 🌐 Chrome |"
+            echo "| --- | --- | --- |"
+            echo "| \`v${VERSION}\` | \`timed-tabs-firefox-${VERSION}.zip\` | \`timed-tabs-chrome-${VERSION}.zip\` |"
+            echo ""
+            echo "📦 Attached to the [GitHub Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${TAG}). Unsigned — AMO submission is still manual."
+          } >> "$GITHUB_STEP_SUMMARY"

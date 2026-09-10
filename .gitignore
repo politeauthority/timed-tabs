@@ -1,0 +1,8 @@
+node_modules/
+dist/
+web-ext-artifacts/
+*.log
+.DS_Store
+.env
+src/dev.json   # must never exist; test seeding lives in dist/dev
+backups/

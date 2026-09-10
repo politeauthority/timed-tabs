@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Timed Tabs",
+    "description": "Name of the extension."
+  },
+  "extensionDescription": {
+    "message": "Put an expiry timer on tabs and see how close each one is to running out.",
+    "description": "Short description shown in the add-ons manager."
+  }
+}
