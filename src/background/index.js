@@ -360,8 +360,10 @@ async function tick() {
         tracker.lifetimeFor(tab.id, eff.tabLifetimeSeconds) - tracker.elapsedSeconds(tab.id, now),
       );
       // quiet: the user asked for no visible change while a tab is still green.
+      // quiet: show nothing for this tab. Always for tabs that cannot expire
+      // (pinned, timer off), and while still green if the user asked for that.
       const quietUntil = Math.min(0.99, Math.max(0.01, (settings.quietUntilPercent ?? 40) / 100));
-      const quiet = settings.hideWhileGreen && (exempt || progress < quietUntil);
+      const quiet = exempt || (settings.hideWhileGreen && progress < quietUntil);
       snapshot.push({
         exempt,
         quiet,
