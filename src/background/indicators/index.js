@@ -13,7 +13,8 @@
  *     configure?(settings): void,      // optional: settings changed while running
  *     update(tabs): Promise<void>,     // tabs: [{ tabId, windowId, url, status, discarded,
  *                                      //          active, exempt, quiet, progress, remainingSeconds }]
- *                                      // quiet: show nothing for this tab (user setting)
+ *                                      // quiet: show nothing for this tab (timer off, pinned,
+ *                                      //        or still green with hideWhileGreen)
  *     stop(): Promise<void>,           // must undo any visible changes
  *   }
  */

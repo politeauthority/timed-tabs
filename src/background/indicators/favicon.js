@@ -64,7 +64,7 @@ export async function update(tabs) {
       if (r.skipped) {
         if (r.skipped !== "unreachable") lastOutcome.set(t.tabId, `skipped: ${r.skipped}`);
       } else if (r.failed) lastOutcome.set(t.tabId, `failed: ${r.failed}`);
-      else if (t.quiet) lastOutcome.set(t.tabId, "quiet (still green)");
+      else if (t.quiet) lastOutcome.set(t.tabId, t.exempt ? "quiet (timer off)" : "quiet (still green)");
       else lastOutcome.set(t.tabId, `${r.injectedNow ? "injected and " : ""}painted (${r.reply ?? "no reply"})`);
     }),
   );
