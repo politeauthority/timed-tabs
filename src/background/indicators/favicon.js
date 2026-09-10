@@ -13,6 +13,7 @@ import { createInjector } from "./inject.js";
 
 export const id = "favicon";
 export const label = "Colour every tab's favicon";
+export const description = "The tab's icon gets a coloured square, ring or dot. Works on every tab.";
 
 /** tabId -> short human-readable outcome of the last attempt, for diagnostics. */
 export const lastOutcome = new Map();

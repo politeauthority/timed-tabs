@@ -7,6 +7,8 @@
  *  - extraSeconds    snooze: extra lifetime granted to this tab
  *  - neverExpire     user opted this tab out of expiry
  *  - resetOnActivate per-tab override of the global setting, or null
+ *  - ignoreRules     skip all URL rules for this tab (lasts as long as the tab)
+ *  - ignoredRules    ids of individual rules skipped for this tab
  *
  * State is persisted per tab with `sessions.setTabValue` on Firefox
  * (survives extension reloads and, via session restore, browser restarts).
@@ -17,7 +19,15 @@ import { api } from "../shared/browser.js";
 const KEY = "timedTabs";
 
 function fresh(now) {
-  return { openedAt: now, pausedAt: null, extraSeconds: 0, neverExpire: false, resetOnActivate: null };
+  return {
+    openedAt: now,
+    pausedAt: null,
+    extraSeconds: 0,
+    neverExpire: false,
+    resetOnActivate: null,
+    ignoreRules: false,
+    ignoredRules: [],
+  };
 }
 
 export function createTabTracker() {
@@ -105,6 +115,27 @@ export function createTabTracker() {
       now,
     );
 
+  const setIgnoreRules = (tabId, value, now) =>
+    mutate(
+      tabId,
+      (s) => {
+        s.ignoreRules = Boolean(value);
+      },
+      now,
+    );
+
+  const setRuleIgnored = (tabId, ruleId, ignored, now) =>
+    mutate(
+      tabId,
+      (s) => {
+        const set = new Set(s.ignoredRules ?? []);
+        if (ignored) set.add(ruleId);
+        else set.delete(ruleId);
+        s.ignoredRules = [...set];
+      },
+      now,
+    );
+
   async function forget(tabId) {
     state.delete(tabId);
     await store.remove(tabId);
@@ -139,6 +170,8 @@ export function createTabTracker() {
     snooze,
     setNeverExpire,
     setResetOnActivate,
+    setIgnoreRules,
+    setRuleIgnored,
     forget,
     get,
     elapsedSeconds,

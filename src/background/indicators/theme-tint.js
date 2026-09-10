@@ -18,6 +18,7 @@ import { BASE_THEMES, rampColor, toHex } from "../../shared/color.js";
 
 export const id = "theme-tint";
 export const label = "Tint the active tab (Firefox)";
+export const description = "The background of the tab you are viewing takes the colour. Firefox only.";
 
 const touchedWindows = new Set();
 let baseColors = null;

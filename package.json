@@ -11,6 +11,7 @@
     "build": "node scripts/build.mjs",
     "build:firefox": "node scripts/build.mjs firefox",
     "build:chrome": "node scripts/build.mjs chrome",
+    "build:dev": "node scripts/build.mjs dev",
     "package": "npm run build:firefox && web-ext build --source-dir dist/firefox --overwrite-dest",
     "lint": "eslint . && web-ext lint --source-dir src",
     "test": "vitest run",

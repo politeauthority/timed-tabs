@@ -9,6 +9,7 @@ import { rampColor, toHex } from "../../shared/color.js";
 
 export const id = "badge";
 export const label = "Minutes left on the toolbar button";
+export const description = "The Timed Tabs toolbar button shows the minutes left for the current tab.";
 
 const action = () => api.action ?? api.browserAction;
 const touched = new Set();

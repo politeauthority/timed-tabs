@@ -11,6 +11,7 @@ import { createInjector } from "./inject.js";
 
 export const id = "title-prefix";
 export const label = "Coloured dot in the tab title";
+export const description = "A 🟢 🟡 🟠 🔴 dot in front of the page title, on every tab. History entries show it too.";
 
 const injector = createInjector("content/title.js");
 

@@ -1,7 +1,7 @@
 export default {
   sourceDir: "src",
   artifactsDir: "web-ext-artifacts",
-  ignoreFiles: ["**/*.test.js", "dev.json"],
+  ignoreFiles: ["**/*.test.js"],
   run: {
     // Keep the browser console open while developing.
     browserConsole: false,

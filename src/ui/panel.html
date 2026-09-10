@@ -5,13 +5,19 @@
     <title>Timed Tabs</title>
     <link rel="stylesheet" href="panel.css" />
   </head>
-  <body data-context="popup">
+  <body data-context="popup" data-page="tabs">
     <main id="app">
       <header class="topbar">
         <span class="topbar-title">Timed Tabs</span>
+        <nav class="pages" aria-label="Pages">
+          <a href="#tabs" data-page-link="tabs">Tabs</a>
+          <a href="#rules" data-page-link="rules">Rules</a>
+          <a href="#settings" data-page-link="settings">Settings</a>
+        </nav>
         <button type="button" id="open-page" class="topbar-link">Open in a tab</button>
       </header>
 
+      <!-- Mini UI only: the current tab -->
       <section id="tab" class="tab" hidden>
         <header class="tab-head">
           <img id="tab-icon" class="tab-icon" alt="" hidden />
@@ -32,12 +38,23 @@
         <div class="tab-actions">
           <button type="button" id="act-reset">Restart timer</button>
           <button type="button" id="act-snooze">Snooze</button>
-          <label class="switch tab-never">
+          <label class="switch tab-never" data-saved-key="never">
             <input type="checkbox" id="act-never" />
             <span class="switch-track"></span>
             <span>Never expire this tab</span>
           </label>
         </div>
+      </section>
+
+      <section id="tab-rules" class="tab tab-rules-section" hidden>
+        <h2 class="settings-title">Rules for this page</h2>
+        <div id="tab-rules-list" class="tab-rules-list"></div>
+        <label class="switch tab-never" id="act-ignore-wrap" data-saved-key="ignore-all">
+          <input type="checkbox" id="act-ignore" />
+          <span class="switch-track"></span>
+          <span>Ignore all rules for this tab</span>
+        </label>
+        <p class="tab-rules-note">Changes here last until the tab is closed.</p>
       </section>
 
       <section id="tab-paused" class="tab tab-paused" hidden>
@@ -49,7 +66,8 @@
         </label>
       </section>
 
-      <details id="overview" class="overview">
+      <!-- Tabs page -->
+      <details id="overview" class="overview" data-pages="tabs" data-page-only>
         <summary>
           <span>All open tabs</span>
           <span id="overview-count" class="overview-count"></span>
@@ -57,22 +75,87 @@
         <p class="overview-legend">
           <span class="legend-key"><span class="legend-icon">⏱</span> timer on</span>
           <span class="legend-key"><span class="legend-icon">↻</span> restart on focus</span>
+          <span class="legend-key"><span class="legend-icon">✕</span> close tab</span>
         </p>
         <div id="overview-list" class="overview-list"></div>
       </details>
 
-      <div id="permission-warning" class="notice" hidden>
+      <details id="recent" class="overview recent" data-pages="tabs" data-page-only>
+        <summary>
+          <span>Recently expired</span>
+          <span id="recent-count" class="overview-count"></span>
+        </summary>
+        <p class="overview-legend">Tabs that Timed Tabs closed when they ran out of time. Reopen them from here.</p>
+        <div id="recent-list" class="overview-list"></div>
+        <p class="recent-actions">
+          <button type="button" id="recent-clear">Clear list</button>
+        </p>
+      </details>
+
+      <!-- Mini UI footer -->
+      <nav class="mini-nav" aria-label="More">
+        <button type="button" data-open="tabs">All tabs</button>
+        <button type="button" data-open="rules-for-site">Rules for this site</button>
+        <button type="button" data-open="settings">Settings</button>
+      </nav>
+
+      <!-- Rules page -->
+      <section id="rules" class="rules" data-pages="rules" data-page-only>
+        <header class="rules-head">
+          <h2 class="settings-title">Rules</h2>
+          <span class="rules-head-actions">
+            <button type="button" id="rules-remove-empty" class="danger" hidden>Remove empty rules</button>
+            <button type="button" id="rule-add">Add rule</button>
+          </span>
+        </header>
+        <p class="rules-help">
+          Rules change settings for tabs whose address matches. Use <code>*</code> as a wildcard;
+          a pattern without <code>https://</code> matches any scheme. Higher priority wins, 0 disables a rule.
+        </p>
+        <div class="rules-filter">
+          <input type="url" id="rules-filter" placeholder="Show rules matching an address, e.g. https://github.com/foo" aria-label="Show rules matching an address" />
+          <button type="button" id="rules-filter-clear" hidden>Show all</button>
+        </div>
+        <p id="rules-filter-note" class="rules-help" hidden></p>
+        <div id="rules-list" class="rules-list"></div>
+      </section>
+
+      <!-- Settings page -->
+      <div id="permission-warning" class="notice" data-pages="settings" hidden>
         <p>Site access is off, so favicons cannot be coloured.</p>
         <button type="button" id="grant-permission">Allow access to all sites</button>
       </div>
 
-      <section id="settings" class="settings">
-        <h2 class="settings-title">All tabs</h2>
+      <nav id="settings-jump" class="jump" data-pages="settings" data-page-only aria-label="Sections"></nav>
+
+      <section id="settings" class="settings" data-pages="settings" data-page-only>
         <div id="fields" class="fields"></div>
-        <p id="status" class="status" role="status"></p>
       </section>
 
-      <details id="diagnostics" class="diagnostics">
+      <section id="backup" class="backup group" data-pages="settings" data-page-only>
+        <h2 class="settings-title">Backup</h2>
+        <p class="rules-help">
+          Everything above, including rules, as one JSON document. Copy or download it to keep,
+          and paste or choose a file to restore. Loading replaces all current settings and rules.
+        </p>
+        <div class="backup-actions">
+          <button type="button" id="backup-copy">Copy to clipboard</button>
+          <button type="button" id="backup-download">Download file</button>
+          <label class="backup-file">
+            <input type="file" id="backup-file" accept="application/json,.json" />
+            <span class="button-like">Choose file…</span>
+          </label>
+        </div>
+        <textarea id="backup-text" class="backup-text" rows="8" spellcheck="false" aria-label="Settings JSON"></textarea>
+        <div class="backup-actions">
+          <button type="button" id="backup-refresh">Show current settings</button>
+          <button type="button" id="backup-apply">Load settings from text</button>
+          <button type="button" id="backup-reset" class="danger">Reset everything to defaults</button>
+        </div>
+        <p id="backup-status" class="status" role="status"></p>
+      </section>
+
+      <details id="diagnostics" class="diagnostics" data-pages="settings" data-page-only>
         <summary>Diagnostics</summary>
         <p class="diag-actions">
           <button type="button" id="diag-refresh">Refresh</button>

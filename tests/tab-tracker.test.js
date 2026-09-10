@@ -68,3 +68,19 @@ describe("tab tracker", () => {
     expect(values.size).toBe(0);
   });
 });
+
+describe("ignoreRules", () => {
+  it("defaults off, persists, and dies with the tab", async () => {
+    const values = new Map();
+    globalThis.browser.sessions.getTabValue = async (id, key) => values.get(`${id}:${key}`);
+    globalThis.browser.sessions.setTabValue = async (id, key, v) => values.set(`${id}:${key}`, structuredClone(v));
+    globalThis.browser.sessions.removeTabValue = async (id, key) => values.delete(`${id}:${key}`);
+    const tracker = createTabTracker();
+    await tracker.track(7, 0);
+    expect(tracker.get(7).ignoreRules).toBe(false);
+    await tracker.setIgnoreRules(7, true);
+    expect((await createTabTracker().track(7, 1)).ignoreRules).toBe(true);
+    await tracker.forget(7);
+    expect(values.has("7:timedTabs")).toBe(false);
+  });
+});
