@@ -8,6 +8,8 @@ import { api } from "./browser.js";
 export const DEFAULTS = Object.freeze({
   /** Seconds a tab may stay open before it is considered expired. */
   tabLifetimeSeconds: 30 * 60,
+  /** One press of Snooze adds this share of the tab's own lifetime. */
+  snoozePercent: 10,
   /** Switching to a tab restarts its timer. */
   resetOnActivate: false,
   /** The active tab's clock does not run; time only counts in the background. */
@@ -45,6 +47,7 @@ export const GROUPS = [
 /**
  * How each setting is presented. `type` is one of:
  * duration (seconds), toggle, choice ({ value, label }[]), percent, indicators.
+ * A percent field with `slider` is dragged rather than typed.
  * `requires` names optional permissions the panel must obtain before the
  * setting can be switched on; it is turned back off if they are ever revoked.
  */
@@ -55,6 +58,16 @@ export const FIELDS = [
     type: "duration",
     label: "Tab lifetime",
     help: "How long a tab may sit before it counts as expired.",
+  },
+  {
+    key: "snoozePercent",
+    group: "timing",
+    type: "percent",
+    slider: true,
+    label: "Snooze adds",
+    help: "How much one press of Snooze grants, as a share of that tab's own lifetime.",
+    min: 1,
+    max: 100,
   },
   {
     key: "resetOnActivate",

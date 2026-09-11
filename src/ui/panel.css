@@ -291,6 +291,61 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Slider. The pseudo-elements cannot be grouped across engines: one unknown
+   selector in a list drops the whole rule, so Gecko and Blink get their own. */
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 8.5em;
+  max-width: 100%;
+  height: var(--control-h);
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+}
+
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  margin-top: -5px;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+/* Held steady so the row does not shuffle as the number changes width. */
+.field-readout {
+  min-width: 3em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 textarea {
   padding: var(--sp-2) var(--sp-3);
 }
@@ -594,6 +649,46 @@ body:not([data-context="popup"]) .settings-title {
   position: relative;
   height: 10px;
   margin: var(--sp-1) 0 var(--sp-4);
+  touch-action: none;
+}
+
+.fuse.is-disabled {
+  cursor: default;
+}
+
+/* The ring belongs on the bar; the range itself is invisible. */
+.fuse:has(.fuse-range:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Invisible, but it is the thing you actually drag. The descendant selector
+   is deliberate: it has to outrank the shared input[type="range"] sizing. */
+.fuse .fuse-range {
+  position: absolute;
+  /* Reaches past the 10px bar so the pointer has something to grab. */
+  inset: -5px 0;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+.fuse .fuse-range:disabled {
+  cursor: default;
+}
+
+/* Nothing should lag behind the pointer mid-drag. */
+.fuse.is-dragging .fuse-burnt,
+.fuse.is-dragging .fuse-marker {
+  transition: none;
+}
+
+.fuse.is-dragging .fuse-marker {
+  width: 6px;
+  margin-left: -3px;
 }
 
 .fuse-track {
@@ -793,10 +888,10 @@ body:not([data-context="popup"]) .overview-list {
 /* One row pattern for open tabs. */
 .trow {
   display: grid;
-  grid-template-columns: 16px 1fr auto auto auto auto auto;
+  grid-template-columns: 16px 1fr auto auto auto auto auto auto;
   grid-template-areas:
-    "icon title rules time timer focus close"
-    "icon fuse  fuse  fuse timer focus close";
+    "icon title rules time snooze timer focus close"
+    "icon fuse  fuse  fuse snooze timer focus close";
   column-gap: var(--sp-2);
   row-gap: var(--sp-1);
   align-items: center;
@@ -899,6 +994,10 @@ body:not([data-context="popup"]) .trow {
 
 .trow-rules.is-ignored {
   text-decoration: line-through;
+}
+
+.qtoggle-snooze {
+  grid-area: snooze;
 }
 
 .qtoggle-timer {

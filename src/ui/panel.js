@@ -25,7 +25,12 @@ import {
 } from "../shared/rules.js";
 import { exportText, parseBundle } from "../shared/backup.js";
 import { getDisplayVersion } from "../shared/version.js";
-import { formatDuration, formatRemaining, toUnit } from "../shared/time.js";
+import {
+  formatDuration,
+  formatRemaining,
+  snoozeSeconds,
+  toUnit,
+} from "../shared/time.js";
 import { indicators } from "../background/indicators/index.js";
 
 // The same file serves three contexts: the toolbar popup (default), the
@@ -65,16 +70,29 @@ function route() {
 window.addEventListener("hashchange", route);
 
 // Dev build only (see background): dev.json may list UI actions to replay,
-// e.g. "uiActions": [{ "at": 3000, "click": "#tab-rules-list input" }].
+// e.g. "uiActions": [{ "at": 3000, "click": "#tab-rules-list input" }] or
+// [{ "at": 3000, "set": "#fuse-range", "value": "80" }] to drive a control
+// that a bare click cannot work, like a slider.
 if (typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@")) {
   fetch(api.runtime.getURL("dev.json"), { cache: "no-store" })
     .then((r) => r.json())
     .then((dev) => {
       for (const a of dev.uiActions ?? []) {
         setTimeout(() => {
-          const el = document.querySelector(a.click);
-          if (el) el.click();
-          else console.log("[timed-tabs:ui] uiAction: no element for", a.click);
+          const selector = a.click ?? a.set;
+          const el = document.querySelector(selector);
+          if (!el) {
+            console.log("[timed-tabs:ui] uiAction: no element for", selector);
+            return;
+          }
+          if (a.set === undefined) {
+            el.click();
+            return;
+          }
+          el.value = a.value;
+          for (const type of ["input", "change"]) {
+            el.dispatchEvent(new Event(type, { bubbles: true }));
+          }
         }, a.at ?? 0);
       }
     })
@@ -228,6 +246,26 @@ function renderField(field) {
     num.addEventListener("change", commit);
     units.addEventListener("change", commit);
     control.append(num, units);
+  } else if (field.type === "percent" && field.slider) {
+    const range = document.createElement("input");
+    range.type = "range";
+    range.min = String(field.min ?? 0);
+    range.max = String(field.max ?? 100);
+    range.step = "1";
+    range.value = String(value);
+    range.id = `f-${field.key}`;
+    label.htmlFor = range.id;
+    const out = document.createElement("output");
+    out.className = "field-suffix field-readout";
+    out.setAttribute("for", range.id);
+    const show = () => {
+      out.textContent = `${range.value}%`;
+    };
+    show();
+    // Follow the thumb while dragging, but only write once it is let go.
+    range.addEventListener("input", show);
+    range.addEventListener("change", () => save({ [field.key]: Number(range.value) }));
+    control.append(range, out);
   } else if (field.type === "percent") {
     const num = document.createElement("input");
     num.type = "number";
@@ -476,12 +514,58 @@ function updateReadout() {
     else note.textContent = tabState.extraSeconds ? "left, snoozed" : "left";
   }
 
-  const pct = exempt ? 0 : progress * 100;
-  $("fuse").setAttribute("aria-valuenow", String(Math.round(pct)));
-  $("fuse-burnt").style.width = `${pct}%`;
-  $("fuse-marker").style.left = `${pct}%`;
+  // A drag owns the fuse until it is let go, so the tick must not fight it.
+  if (fuseDrag === null) paintFuse(exempt ? 0 : progress * 100);
+  setFuseEnabled(!exempt);
   $("act-reset").disabled = exempt;
-  $("act-snooze").disabled = exempt;
+  const snooze = $("act-snooze");
+  snooze.disabled = exempt;
+  snooze.title = exempt ? "" : `Adds ${formatRemaining(snoozeFor(tabState))}`;
+}
+
+/**
+ * The fuse doubles as a slider: drag it to put this tab's clock wherever you
+ * want. The floor is 2% rather than 0 so a drag to the left cannot be mistaken
+ * for a reset, while the far right expires the tab on purpose. The control is
+ * a real <input type="range"> laid over the ramp, so dragging, the keyboard
+ * and ARIA are the browser's job; we only paint what it reports.
+ */
+const FUSE_MIN_PERCENT = 2;
+/** Percent while a drag is in flight, null when the tick owns the fuse again. */
+let fuseDrag = null;
+
+function paintFuse(pct) {
+  const clamped = Math.min(100, Math.max(0, pct));
+  $("fuse-burnt").style.width = `${clamped}%`;
+  $("fuse-marker").style.left = `${clamped}%`;
+  if (fuseDrag === null) {
+    $("fuse-range").value = String(
+      Math.round(Math.max(FUSE_MIN_PERCENT, clamped)),
+    );
+  }
+}
+
+function setFuseEnabled(enabled) {
+  $("fuse").classList.toggle("is-disabled", !enabled);
+  $("fuse-range").disabled = !enabled;
+}
+
+/** Show what letting go here would leave, without waiting for the background. */
+function previewFuse(pct) {
+  paintFuse(pct);
+  if (!tabState?.lifetimeSeconds) return;
+  $("remaining").textContent = formatRemaining(
+    (tabState.lifetimeSeconds * (100 - pct)) / 100,
+  );
+  $("remaining-note").textContent = "left, when you let go";
+}
+
+/** What one press of Snooze will grant this tab, given its own lifetime. */
+function snoozeFor(t) {
+  return snoozeSeconds(
+    t?.effective?.tabLifetimeSeconds ?? settings.tabLifetimeSeconds,
+    settings.snoozePercent,
+  );
 }
 
 async function tabAction(action, value, sourceEl = null) {
@@ -663,6 +747,32 @@ function renderTabRow(t) {
     `${exempt ? 0 : Math.round(t.progress * 100)}%`,
   );
   row.append(fuse);
+
+  // Snooze: the one row control that acts instead of toggling, so it says how
+  // much it grants rather than whether it is on.
+  const snooze = quickToggle(
+    "plus",
+    false,
+    false,
+    exempt
+      ? "This tab has no timer to snooze"
+      : `Snooze: adds ${formatRemaining(snoozeFor(t))}`,
+    "qtoggle-snooze",
+  );
+  snooze.disabled = exempt;
+  snooze.removeAttribute("aria-pressed");
+  snooze.addEventListener("click", async () => {
+    await api.runtime
+      .sendMessage({
+        type: "timed-tabs:tab-action",
+        tabId: t.tabId,
+        action: "snooze",
+      })
+      .catch(() => {});
+    refreshOverview();
+    if (currentTab?.id === t.tabId) refreshTab();
+  });
+  row.append(snooze);
 
   const timer = quickToggle(
     "timer",
@@ -1567,8 +1677,23 @@ $("act-reset").addEventListener("click", (e) =>
   tabAction("reset", undefined, e.currentTarget),
 );
 $("act-snooze").addEventListener("click", (e) =>
-  tabAction("snooze", settings.tabLifetimeSeconds, e.currentTarget),
+  tabAction("snooze", undefined, e.currentTarget),
 );
+
+// Dragging reports continuously; the commit waits until the drag is let go.
+$("fuse-range").addEventListener("input", (e) => {
+  fuseDrag = Number(e.target.value);
+  $("fuse").classList.add("is-dragging");
+  previewFuse(fuseDrag);
+});
+
+$("fuse-range").addEventListener("change", async (e) => {
+  const pct = Number(e.target.value);
+  fuseDrag = null;
+  $("fuse").classList.remove("is-dragging");
+  await tabAction("progress", pct);
+});
+
 $("act-never").addEventListener("change", (e) =>
   tabAction("neverExpire", e.target.checked, e.target.closest("label")),
 );

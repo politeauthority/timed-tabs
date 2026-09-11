@@ -97,6 +97,20 @@ export function createTabTracker() {
       now,
     );
 
+  /**
+   * Put the tab's clock at `seconds` elapsed. Shifting `openedAt` rather than
+   * touching `extraSeconds` keeps "snoozed" meaning snoozed, and works the
+   * same whether the clock is running or paused.
+   */
+  const setElapsed = (tabId, seconds, now) =>
+    mutate(
+      tabId,
+      (s, t) => {
+        s.openedAt = (s.pausedAt ?? t) - Math.max(0, seconds) * 1000;
+      },
+      now,
+    );
+
   const setNeverExpire = (tabId, value, now) =>
     mutate(
       tabId,
@@ -168,6 +182,7 @@ export function createTabTracker() {
     pause,
     resume,
     snooze,
+    setElapsed,
     setNeverExpire,
     setResetOnActivate,
     setIgnoreRules,

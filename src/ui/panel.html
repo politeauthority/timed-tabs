@@ -52,10 +52,14 @@
           <span id="remaining-note" class="readout-note"></span>
         </p>
 
-        <div id="fuse" class="fuse" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="fuse" class="fuse">
           <div class="fuse-track"></div>
           <div id="fuse-burnt" class="fuse-burnt"></div>
           <div id="fuse-marker" class="fuse-marker"></div>
+          <!-- A real range on top of the ramp: dragging, keyboard and ARIA
+               come from the browser, and we only paint what it reports. -->
+          <input id="fuse-range" class="fuse-range" type="range" min="2" max="100" step="1" value="2"
+            aria-label="Share of its life this tab has used" />
         </div>
 
         <div class="tab-actions">
@@ -98,6 +102,7 @@
           <span id="overview-count" class="overview-count"></span>
         </summary>
         <p class="overview-legend">
+          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg> snooze</span>
           <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-timer" /></svg> timer on</span>
           <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg> restart on focus</span>
           <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-close" /></svg> close tab</span>
