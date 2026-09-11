@@ -901,6 +901,19 @@ body:not([data-context="popup"]) .overview > summary {
   gap: var(--sp-1);
 }
 
+/* Sits at the end of the legend row, pushed right when there is room. */
+.overview-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.overview-sort select {
+  min-height: 24px;
+  font-size: var(--fs-sm);
+}
+
 .overview-list {
   max-height: 320px;
   overflow-y: auto;

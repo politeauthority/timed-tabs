@@ -1,4 +1,5 @@
 import { api } from "./browser.js";
+import { DEFAULT_TAB_SORT } from "./tab-sort.js";
 
 /**
  * All user-configurable settings live here with their defaults.
@@ -32,6 +33,11 @@ export const DEFAULTS = Object.freeze({
   recentRetentionSeconds: 24 * 3600,
   /** Show a desktop notification naming each tab we close. Needs the optional `notifications` permission. */
   notifyOnExpire: false,
+  /**
+   * How the Tabs page orders the open-tabs list. See shared/tab-sort.js.
+   * The control lives with the list it orders, not on the settings page.
+   */
+  tabSort: DEFAULT_TAB_SORT,
   /** Seconds between indicator refreshes. */
   tickSeconds: 5,
 });
