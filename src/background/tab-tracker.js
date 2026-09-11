@@ -29,6 +29,8 @@ function fresh(now) {
     ignoreRules: false,
     ignoredRules: [],
     overrides: {},
+    // Popup sections the user folded away for this tab: { settings: false, rules: false }.
+    folds: {},
   };
 }
 
@@ -117,6 +119,16 @@ export function createTabTracker() {
    * Set or clear one per-tab override. `null` or `undefined` removes the key,
    * which is how a row hands the setting back to the rules and the globals.
    */
+  /** Remember whether a popup section is open for this tab. */
+  const setFold = (tabId, section, open, now) =>
+    mutate(
+      tabId,
+      (s) => {
+        s.folds = { ...(s.folds ?? {}), [section]: Boolean(open) };
+      },
+      now,
+    );
+
   const setOverride = (tabId, key, value, now) =>
     mutate(
       tabId,
@@ -216,6 +228,7 @@ export function createTabTracker() {
     snooze,
     setElapsed,
     setOverride,
+    setFold,
     clearOverrides,
     allOverrides,
     setNeverExpire,
