@@ -99,7 +99,8 @@ jobs:
           # shellcheck disable=SC2086
           sudo DEBIAN_FRONTEND=noninteractive apt-get $APT install -y -qq $PACKAGES > /dev/null
           # Everything apt installed just now, dependencies included, from its history.
-          NEW=$(awk '/^Install:/{line=$0} END{print line}' /var/log/apt/history.log | sed 's/^Install: //' | tr ',' '\n' | sed -E 's/^ *([^ :]+).*/\1/' | sort -u)
+          # Entries read "pkg:amd64 (1.2-3, automatic)"; drop the parentheses, then split.
+          NEW=$(awk '/^Install:/{line=$0} END{print line}' /var/log/apt/history.log | sed -E 's/^Install: //; s/ \([^)]*\)//g' | tr ',' '\n' | sed -E 's/^ *//; s/:[a-z0-9]+$//' | grep -E '^[a-z0-9.+-]+$' | sort -u)
           echo "$NEW" | tr '\n' ' '; echo
           # shellcheck disable=SC2086
           dpkg -L $NEW | sort -u | while read -r f; do [ -f "$f" ] || [ -L "$f" ] && echo "$f"; done > ~/firefox-libs.list
