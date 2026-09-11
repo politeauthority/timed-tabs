@@ -21,7 +21,7 @@ explaining why it is shaped the way it is; this section is the map over the top.
 |---|---|---|
 | **CI** (`ci.yaml`) | every PR, every push to `main`, dispatch | Lints, unit-tests and builds both dist targets, then calls E2E. |
 | **E2E** (`e2e.yaml`) | called by CI; dispatch | The extension in a real headless Firefox, two versions in parallel. See [e2e.md](e2e.md). |
-| **CI run full** (`full.yaml`) | every PR, including every label change | Red until the `ci run full` label is on and the E2E scenarios have passed on the last ten Firefox releases. See [The full run](#the-full-run). |
+| **CI run full** (`full.yaml`) | every PR, including every label change | Holds the merge — *pending*, not red — until the `ci run full` label is on and the E2E scenarios have passed on the last ten Firefox releases. See [The full run](#the-full-run). |
 | **Not paused** (`pause.yaml`) | every PR, including every label change and review | Goes red while the `ci pause` label is on. Also dispatches Release Please when a review or the `release-approved` label lands on the release PR, so that workflow need not listen to PR events itself. |
 | **Auto-merge** (`automerge.yaml`) | the `automerge` label, both directions | Arms and disarms GitHub's auto-merge, and keeps the label and the state agreeing. |
 | **Release Please** (`release-please.yaml`) | push to `main`, review, label, dispatch | Maintains the release PR, and on merge tags, packages and publishes. |
@@ -53,7 +53,9 @@ are prefixed with the calling job's name, and a matrix job's name carries its ma
 values, so `E2E / Firefox latest` breaks if `jobs.e2e` in `ci.yaml` is renamed, if the
 leg is renamed, or if the matrix changes shape.
 
-Update protection in the same change that renames anything:
+Update protection in the same change that renames anything. `CI run full` is the odd
+one out: it is a commit status the gate job posts by API rather than a job's own
+check, so its `app_id` is `-1` (any source) where the others pin the Actions app.
 
 ```sh
 gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/required_status_checks \
@@ -63,7 +65,7 @@ gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/requir
             {"context": "Not paused", "app_id": 15368},
             {"context": "E2E / Firefox latest", "app_id": 15368},
             {"context": "E2E / Firefox previous", "app_id": 15368},
-            {"context": "CI run full", "app_id": 15368}]}
+            {"context": "CI run full", "app_id": -1}]}
 JSON
 ```
 
@@ -88,16 +90,19 @@ attached to a release.
 ## The full run
 
 Merging into `main` needs the **`ci run full`** label. GitHub has no required labels,
-so it is enforced the way `ci pause` is: **CI run full** (`full.yaml`) is a required
-check that reads the label. Without it the check is red and says so; with it, the
-E2E scenarios run on the last ten Firefox releases — the current one and the nine
-majors before it, each resolved from Mozilla's feed the way `E2E` resolves its two —
-and the check goes green once all ten have passed. Take the label off and it goes red
-again.
+so it is enforced by a required status, **CI run full**, that `full.yaml` posts on the
+head commit. The label is a merge requirement, not a test, so a missing one is not a
+failure: the status sits at *pending*, the merge box says "Waiting" and stays locked,
+and nothing on the PR is red for a label nobody has had a reason to add yet. With the
+label on, the E2E scenarios run on the last ten Firefox releases — the current one and
+the nine majors before it, each resolved from Mozilla's feed the way `E2E` resolves its
+two — and the status goes green once all ten have passed. Take the label off and it
+goes back to pending. It is red only when the Firefoxes actually fail.
 
 The ten legs report as `Full / Firefox latest`, `Full / Firefox previous`,
-`Full / Firefox previous-2` … `previous-9`. None of them is required on its own; only
-the gate is, so adding or dropping a leg does not touch branch protection.
+`Full / Firefox previous-2` … `previous-9`. None of them is required on its own, and
+neither is the `Full run gate` job that posts the status; only the status is, so
+adding or dropping a leg does not touch branch protection.
 
 Arming auto-merge adds the label, whether by the `automerge` label or the button on
 the PR, so a PR told to merge itself is never left waiting on a label nobody added.
@@ -106,8 +111,10 @@ workflow, and the full run would only start on the next push.
 
 Ten Firefoxes are ten runner jobs, so the workflow is careful about when they run.
 A later event on a commit that already passed — a review, another label — reuses that
-result instead of running again, and a new push cancels the legs still running for the
-commit it replaced. A pull request against a branch other than `main` passes the gate
+result instead of running again: "passed" meaning an earlier run's `Full /` legs all
+concluded green, not merely that the run finished, since an unlabelled run finishes
+green having tested nothing. A new push cancels the legs still running for the commit
+it replaced. A pull request against a branch other than `main` passes the gate
 without the label, and so does the release PR, whose branch never carries anything a
 scenario reads.
 

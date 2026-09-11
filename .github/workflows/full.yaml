@@ -4,18 +4,25 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
 # the E2E scenarios run on the last ten Firefox releases instead of two.
 #
-# GitHub has no such thing as a required label, so the label is enforced the
-# way `ci pause` is: by a required status check that reads it. The `CI run
-# full` job at the bottom is that check. It is red until the label is on and
-# the ten Firefoxes have passed, and it goes red again the moment the label
-# comes off. Auto-merge adds the label when it arms (see automerge.yaml), so a
-# PR marked to merge itself gets the full run without anyone remembering.
+# GitHub has no such thing as a required label, so the label is enforced by a
+# required status named `CI run full` that reads it. The gate job at the bottom
+# posts that status on the head commit -- it is a commit status, not the job's
+# own check, and the difference is the whole point. A missing label is not a
+# failure, it is a merge requirement not yet met, so the gate reports it as
+# *pending*: the merge box says "Waiting" and stays locked, and nothing on the
+# PR is red for a label nobody has had a reason to add yet. The status goes
+# green once the label is on and the ten Firefoxes have passed, back to pending
+# the moment the label comes off, and to failure only when the Firefoxes fail.
+# Auto-merge adds the label when it arms (see automerge.yaml), so a PR marked to
+# merge itself gets the full run without anyone remembering.
 #
 # Three jobs:
 #   - plan     decides what this event needs, on a hosted runner in seconds
 #   - Full     the ten legs, e2e.yaml called with a longer `firefox` list, so
 #              they report as `Full / Firefox latest` ... `Full / Firefox previous-9`
-#   - CI run full   the gate, and the only one branch protection reads
+#   - Full run gate   posts the `CI run full` status, which is the only thing
+#              branch protection reads. Its own check is not required and is
+#              named differently on purpose, so the two cannot be confused.
 #
 # It wakes on every label event, and it must: the gate is a required check, so
 # it can never filter itself down to its own label -- a skipped required check
@@ -29,10 +36,12 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # release PR (whose branch never carries anything a scenario can read; see
 # e2e.yaml), pass the gate without it.
 #
-# ⚠️ PREREQ: `CI run full` must be a required check on main, or its red holds
-# nothing. Add it only once this file is on main -- a required check whose
-# workflow is missing never reports, and that blocks every PR for ever. The
-# canonical list is the `gh api` call in docs/developer/ci/README.md.
+# ⚠️ PREREQ: `CI run full` must be a required status on main, or pending holds
+# nothing. It is set by the API rather than by a job, so its entry in branch
+# protection carries `app_id: -1` (any source) rather than the Actions app id
+# the job-backed checks use. Add it only once this file is on main -- a required
+# status nothing ever posts blocks every PR for ever. The canonical list is the
+# `gh api` call in docs/developer/ci/README.md.
 
 on:
   pull_request:
@@ -109,8 +118,19 @@ jobs:
 
           # The same commit already passed the full run: a label or review
           # event since then changes nothing Firefox would notice.
-          earlier=$(gh api "repos/${GH_REPO}/actions/runs?event=pull_request&head_sha=${HEAD_SHA}&status=success&per_page=100" \
-            --jq ".workflow_runs[] | select(.name == \"${WORKFLOW}\" and .id != ${RUN_ID}) | .id" | head -1)
+          # An earlier run counts only if its Firefox legs ran and every one
+          # passed. The run's own conclusion is not enough: the gate exits 0
+          # when the label is merely missing, so an unlabelled run concludes
+          # "success" having tested nothing, and trusting that would let a
+          # later `labeled` event wave the commit through untested.
+          earlier=""
+          for id in $(gh api "repos/${GH_REPO}/actions/runs?event=pull_request&head_sha=${HEAD_SHA}&per_page=100" \
+                        --jq ".workflow_runs[] | select(.name == \"${WORKFLOW}\" and .id != ${RUN_ID}) | .id"); do
+            if gh api "repos/${GH_REPO}/actions/runs/${id}/jobs?per_page=100" \
+                 --jq '[.jobs[] | select(.name | startswith("Full / "))] | length > 0 and all(.conclusion == "success")' | grep -qx true; then
+              earlier="$id"; break
+            fi
+          done
           if [ -n "$earlier" ]; then
             decide reuse "run ${earlier} already passed the ten Firefoxes on ${HEAD_SHA:0:7}"; exit 0
           fi
@@ -131,16 +151,24 @@ jobs:
       firefox: '["latest", "previous", "previous-2", "previous-3", "previous-4", "previous-5", "previous-6", "previous-7", "previous-8", "previous-9"]'
 
   gate:
-    name: CI run full
+    name: Full run gate
     needs: [plan, firefox]
     # always(): `firefox` is skipped on every path but `run`, and a job that
-    # needs a skipped job is itself skipped unless told otherwise -- which for
-    # a required check would read as a pass.
+    # needs a skipped job is itself skipped unless told otherwise -- and a
+    # skipped gate posts no status at all, which leaves the merge box waiting
+    # for one that never comes.
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write     # the `CI run full` status on the head commit
     steps:
       - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           MODE: ${{ needs.plan.outputs.mode }}
           REASON: ${{ needs.plan.outputs.reason }}
           PLAN: ${{ needs.plan.result }}
@@ -149,6 +177,15 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+          # The status is what branch protection reads. `pending` blocks the
+          # merge without painting anything red; the description is what the
+          # merge box shows beside it, and GitHub cuts it at 140 characters.
+          status() {   # <state> <description>
+            gh api -X POST "repos/${GH_REPO}/statuses/${HEAD_SHA}" \
+              -f state="$1" -f context="CI run full" -f target_url="$RUN_URL" \
+              -f description="$(printf '%s' "$2" | cut -c1-140)" > /dev/null
+            echo "CI run full -> $1: $2"
+          }
           report() {   # <emoji> <verdict> <detail...>
             local emoji="$1" verdict="$2"; shift 2
             {
@@ -160,26 +197,40 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           }
           if [ "$PLAN" != "success" ]; then
+            status error "The plan job ended ${PLAN}; see the run."
             report ❌ "could not plan" "The plan job ended \`${PLAN}\`; see its log."; exit 1
           fi
           case "$MODE" in
             exempt)
+              status success "Not needed: ${REASON}"
               report ✅ "not needed" "Passed without the label: ${REASON}." ;;
             paused)
-              report ⏸️ "paused" "Red on purpose: ${REASON}. Remove \`ci pause\` and push, or re-add \`ci run full\`, to run it." ; exit 1 ;;
+              # Not a failure of anything; `Not paused` is the check holding the
+              # red for the pause label. This one just waits.
+              status pending "Paused: ${REASON}"
+              report ⏸️ "paused" "Waiting: ${REASON}. Remove \`ci pause\` and push, or re-add \`ci run full\`, to run it." ;;
             missing)
-              report 🏷️ "label missing" \
-                "This check is red because ${REASON}." "" \
+              status pending "Add the 'ci run full' label to merge into main; arming auto-merge adds it for you"
+              report 🏷️ "waiting for the label" \
+                "The merge is held, not failed: ${REASON}." "" \
                 "Merging into \`main\` needs the E2E scenarios to pass on the last ten Firefox releases." \
-                "Add the **\`ci run full\`** label to run them; arming auto-merge adds it for you." ; exit 1 ;;
+                "Add the **\`ci run full\`** label to run them; arming auto-merge adds it for you." ;;
             reuse)
+              status success "Passed on this commit already: ${REASON}"
               report ✅ "passed" "Reused an earlier result: ${REASON}." ;;
             run)
               case "$FIREFOX" in
-                success) report ✅ "passed" "All ten Firefox legs passed. Each leg's own summary lists its scenarios." ;;
-                cancelled) report ⏹️ "cancelled" "The Firefox legs were cancelled: a job timed out, or a newer commit took over."; exit 1 ;;
-                *) report ❌ "failed" "At least one of the ten Firefox legs failed (\`${FIREFOX}\`). Open the red leg for its scenario table and artifacts."; exit 1 ;;
+                success)
+                  status success "All ten Firefox legs passed"
+                  report ✅ "passed" "All ten Firefox legs passed. Each leg's own summary lists its scenarios." ;;
+                cancelled)
+                  status error "The Firefox legs were cancelled; re-run or push again"
+                  report ⏹️ "cancelled" "The Firefox legs were cancelled: a job timed out, or a newer commit took over."; exit 1 ;;
+                *)
+                  status failure "At least one of the ten Firefox legs failed"
+                  report ❌ "failed" "At least one of the ten Firefox legs failed (\`${FIREFOX}\`). Open the red leg for its scenario table and artifacts."; exit 1 ;;
               esac ;;
             *)
+              status error "Plan mode '${MODE}' is not one the gate knows"
               report ❌ "unknown plan" "Plan mode \`${MODE}\` is not one this gate knows."; exit 1 ;;
           esac
