@@ -1313,12 +1313,60 @@ body:not([data-context="popup"]) .field {
   padding: var(--sp-3) 0;
 }
 
+.rule-pattern-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
 .rule-pattern {
   flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   font-family: var(--mono);
   font-size: var(--fs-md);
   padding: 0 10px;
+  /* The mirror behind draws the text; the input keeps only caret and selection. */
+  color: transparent;
+  caret-color: var(--ink);
+}
+
+.rule-pattern-mirror {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  color: var(--ink);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rule-pattern-mirror .wildcard {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rule.is-just-added {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  animation: rule-just-added 2.4s ease-out forwards;
+}
+
+@keyframes rule-just-added {
+  0%,
+  60% {
+    box-shadow: 0 0 0 2px var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+    background: transparent;
+  }
 }
 
 .rule-pattern::placeholder {
