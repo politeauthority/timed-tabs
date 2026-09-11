@@ -3,8 +3,8 @@
 `npm run e2e` runs the extension in a real, headless Firefox and checks what it did.
 `npm run e2e:chrome` runs the same scenarios in a real, headless Chrome. CI runs the
 Firefox half on the self-hosted runner for every push to `main` and every open PR, as
-the second half of the **CI** workflow, against two versions of Firefox; the Chrome
-leg joins on one branch while it is being proven there.
+the second half of the **CI** workflow, against four channels of Firefox, with two
+Chrome legs beside them while Chrome is planned rather than supported.
 
 Both take the same arguments: `npm run e2e -- navigation` runs one scenario by name,
 `FIREFOX=` and `CHROME=` pick a binary.
@@ -161,28 +161,23 @@ on port 80 at all.
 One vocabulary of channels for both browsers, resolved at run time from each
 browser's own feed:
 
-| Channel | Firefox | Chrome | CI | Full run |
-|---|---|---|---|---|
-| `nightly` | Firefox Nightly (`latest-nightly`) | Chrome Canary | advisory | advisory |
-| `stable` | the current release, 155.0.1 today | the current stable, 153.x | required (Firefox), advisory (Chrome) | counts (Firefox), advisory (Chrome) |
-| `stable-1` | the last release of the major before it, 154.0.1 | one major behind stable, 152 | required (Firefox) | counts (Firefox) |
-| `stable-2` | two majors back, 153.x | two majors back, 151 | — | counts (Firefox) |
+| Channel | Firefox | Chrome | In CI |
+|---|---|---|---|
+| `nightly` | Firefox Nightly (`latest-nightly`) | Chrome Canary | advisory |
+| `stable` | the current release, 155.0.1 today | the current stable, 153.x | required (Firefox), advisory (Chrome) |
+| `stable-1` | the last release of the major before it, 154.0.1 | one major behind stable, 152 | required (Firefox) |
+| `stable-2` | two majors back, 153.x | two majors back, 151 | required (Firefox) |
 
-Chrome runs only `nightly` and `stable`, in CI and in the full run alike, while it is
-planned rather than supported; `stable-1` and `stable-2` are Firefox-only until then.
+Chrome runs only `nightly` and `stable` while it is planned rather than supported;
+`stable-1` and `stable-2` are Firefox-only until then.
 
-CI runs Firefox nightly, stable and stable-1, of which stable and stable-1 are the
-required checks, and Chrome nightly and stable beside them. The full run, on a PR
-labelled `ci run full`, runs all four Firefox channels and the same two Chrome ones. Nightly is shown and flagged but never
-holds the merge, since a daily build breaking is worth knowing and not worth blocking
-on — and while Chrome is planned rather than supported (see the
-[road map](../../road-map.md)), the same goes for every Chrome leg (`chrome-advisory`,
-on by default), and no older Chrome major runs at all. An advisory leg that fails is a
-warning on its job rather than a red.
-
-On a PR to `main` that carries `ci run full`, CI's legs skip: the full run covers the
-same versions and the `CI run full` status holds the merge until it passes. The
-`skip-when-full` input is what `ci.yaml` sets for that; the full run leaves it off.
+CI runs all four Firefox channels, of which stable, stable-1 and stable-2 are the
+required checks, and Chrome nightly and stable beside them, on every PR and every push
+to `main`. Nightly is shown and flagged but never holds the merge, since a daily build
+breaking is worth knowing and not worth blocking on — and while Chrome is planned
+rather than supported (see the [road map](../../road-map.md)), the same goes for every
+Chrome leg (`chrome-advisory`, on by default), and no older Chrome major runs at all.
+An advisory leg that fails is a warning on its job rather than a red.
 
 All legs run the same scenarios in `tests/e2e/scenarios`. Nothing in them is
 browser-specific — they pin `indicators` explicitly rather than relying on a default,
@@ -212,20 +207,19 @@ The legs come from two inputs, `firefox` and `chrome`, each a JSON list of chann
 that is that browser's matrix directly; the workflow has one job per browser, near
 copies of each other, and a leg is named `<Browser> <channel>`. `stable-N` is N
 majors behind stable. The defaults are Firefox stable
-and stable-1 plus Chrome stable, which is what the beta gate runs; CI adds Firefox
-nightly and Chrome nightly, and the **CI run full** workflow passes all four Firefox channels and Chrome
-nightly and stable when a PR carries the `ci run full` label — see
-[README.md](README.md#the-full-run). To change
-the default pair, change the input's default and update branch protection in the same
-change, because those two legs are the required checks. See below.
+and stable-1 plus Chrome stable, which is what the beta gate runs; CI passes all four
+Firefox channels and Chrome nightly and stable — see [README.md](README.md#the-legs).
+To change what CI runs, change the lists in `ci.yaml` and update branch protection in
+the same change, because the Firefox stable legs are the required checks. See below.
 
 ## The status checks
 
-Each leg reports its own check, and both Firefox ones are required on `main`,
-alongside **Lint, test & build**, **Not paused** and **CI run full**:
+Each leg reports its own check, and the three Firefox stable ones are required on
+`main`, alongside **Lint, test & build** and **Not paused**:
 
 - **E2E / Firefox stable**
 - **E2E / Firefox stable-1**
+- **E2E / Firefox stable-2**
 
 `E2E / Firefox nightly` reports too and is never required: a daily build breaking is
 worth seeing and not worth holding a merge for. `E2E / Chrome nightly` and
@@ -234,7 +228,7 @@ worth seeing and not worth holding a merge for. `E2E / Chrome nightly` and
 Both halves of each name are load-bearing. GitHub prefixes a called workflow's jobs
 with the calling job's name, so the context is `jobs.e2e` in `ci.yaml` (named `E2E`)
 plus the leg's own name — and a matrix job's name carries its matrix values, which is
-what puts `stable` and `stable-1` in there.
+what puts `stable`, `stable-1` and `stable-2` in there.
 
 That last part is the sharp edge: **changing the matrix renames a protected context.**
 Add a third version, rename a leg, drop one — each of those silently stops a required
@@ -250,7 +244,7 @@ red and holding the merge anyway.
 
 The release PR skips the matrix too. release-please's branch only ever rewrites
 `CHANGELOG.md` and the four files that carry the version, and no scenario reads any of
-them, so both Firefoxes had nothing to say about it — while still costing four minutes
+them, so no Firefox had anything to say about it — while still costing four minutes
 each on every push to `main`. Lint, the unit tests and the build still run there, so
 `web-ext lint` sees the bumped manifest version before the tag is cut, and the
 `package` job re-runs lint and the tests against the tag itself before anything is

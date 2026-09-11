@@ -19,19 +19,13 @@ run-name: "Auto-merge — ${{ github.event_name == 'push' && github.ref_name || 
 # allow auto-merge. Without a required check GitHub refuses to arm auto-merge,
 # because nothing is blocking the PR.
 #
-# 🏷️ Arming also puts the `ci run full` label on, because that label is itself
-# required to merge into main (full.yaml): a PR told to merge itself would
-# otherwise sit at a red check waiting for a label nobody was going to add. The
-# label goes on with the PAT secret rather than GITHUB_TOKEN, since a label
-# added by GITHUB_TOKEN wakes no workflow and the full run would never start.
-#
 # 🔄 An armed PR is kept current with main. Auto-merge merges whatever the
 # checks passed on, and the checks ran on the merge ref of the moment; a PR that
 # then sits behind three other merges lands having been tested against none of
 # them. So every push to main looks for open PRs with auto-merge armed and
 # brings each one that has fallen behind up to date (the same "Update branch"
 # the PR page offers), and arming does the same for the one PR being armed.
-# The update is a push with the PAT, so CI and the full run see the new commit;
+# The update is a push with the PAT, so CI sees the new commit;
 # GITHUB_TOKEN could make the same push and nothing would wake for it, which
 # would leave the PR with no checks on the commit it is about to merge.
 #
@@ -67,8 +61,6 @@ permissions:
   contents: write
   pull-requests: write
 
-env:
-  FULL_LABEL: ci run full
 
 jobs:
   # One job, three concerns, each a step that only runs for its own event:
@@ -220,53 +212,8 @@ jobs:
           exit 1
 
       # Whichever way auto-merge came on -- the step above, or the button on
-      # the PR -- the full run has to be asked for, or the merge waits on a red
-      # `CI run full` for ever. Checked against the live state rather than the
-      # event, so it is idempotent and safe to run after either path.
-      - name: Ask for the full run
-        if: github.event.action != 'unlabeled' && github.event.action != 'auto_merge_disabled'
-        env:
-          # PAT so the `labeled` event actually fires full.yaml. Falls back to
-          # GITHUB_TOKEN, which adds the label but wakes nothing -- the summary
-          # says so, and the next push starts the run instead.
-          GH_TOKEN: ${{ secrets.PAT || github.token }}
-          HAVE_PAT: ${{ secrets.PAT != '' }}
-          GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          # REST, not `gh pr view --json`. The GraphQL shape of autoMergeRequest
-          # carries `enabledBy.login`, a User field that needs a user-read scope
-          # the PAT does not have, and the query is refused whole -- so this step
-          # died before it ever reached the add-label line, on every PR, and
-          # auto-merge sat waiting on a label nothing would add. The pulls
-          # endpoint says whether auto-merge is armed without naming who armed
-          # it, which is all that is asked here.
-          state=$(gh api "repos/${GH_REPO}/pulls/${PR}" --jq \
-            '.state + " " + ((.auto_merge != null) | tostring) + " " + (([.labels[].name] | index("'"${FULL_LABEL}"'") != null) | tostring)')
-          read -r open armed labelled <<< "$state"
-          [ "$open" = "open" ] || exit 0
-          if [ "$armed" != "true" ]; then
-            echo "Auto-merge is not armed, so the \`${FULL_LABEL}\` label is left alone." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          if [ "$labelled" = "true" ]; then
-            echo "🏷️ \`${FULL_LABEL}\` is already on, so the full run is already asked for." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          # Same reason: `gh pr edit` goes through GraphQL too. The issues
-          # endpoint adds a label on repo scope alone.
-          gh api -X POST "repos/${GH_REPO}/issues/${PR}/labels" -f "labels[]=${FULL_LABEL}" > /dev/null
-          if [ "$HAVE_PAT" = "true" ]; then
-            echo "🏷️ Added \`${FULL_LABEL}\`: merging into main needs the four-Firefox run, and it starts now." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "⚠️ Added \`${FULL_LABEL}\` with GITHUB_TOKEN, which wakes no workflow: the full run starts on the next push. Set the \`PAT\` secret to have it start now." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      # Armed, so it will merge itself as soon as the checks say yes -- and the
-      # checks should be saying yes about a branch that has main in it. Bring
-      # it up to date now if it has fallen behind; the push to main job below
-      # keeps it that way afterwards.
+      # the PR -- the branch is brought up to date. Checked against the live
+      # state rather than the event, so it is idempotent after either path.
       - name: Bring the branch up to date
         if: github.event.action != 'unlabeled' && github.event.action != 'auto_merge_disabled'
         env:
@@ -287,7 +234,7 @@ jobs:
             exit 0
           fi
           if gh api -X PUT "repos/${GH_REPO}/pulls/${PR}/update-branch" -f expected_head_sha="$sha" > /dev/null 2> err.txt; then
-            echo "🔄 Brought the branch up to date: it was ${behind} commit(s) behind \`${base}\`. CI and the full run start on the new commit." >> "$GITHUB_STEP_SUMMARY"
+            echo "🔄 Brought the branch up to date: it was ${behind} commit(s) behind \`${base}\`. CI starts on the new commit." >> "$GITHUB_STEP_SUMMARY"
           else
             {
               echo "⚠️ Could not bring the branch up to date (${behind} commit(s) behind \`${base}\`). Usually a conflict, which needs a hand:"
@@ -297,7 +244,7 @@ jobs:
 
   # 🔄 On every push to main: every open PR with auto-merge armed that has
   # fallen behind is brought up to date. Each update is a push, so each one
-  # costs a CI and a full run; that is the price of merging what was tested.
+  # costs a CI run; that is the price of merging what was tested.
   refresh:
     name: Keep armed PRs current
     if: github.event_name == 'push'

@@ -47,8 +47,8 @@ Manual workflows name what they produce rather than a ref, because the ref is al
 
 This one is load-bearing. A job's name is the status-check context that branch
 protection matches on, so renaming `Lint, test & build`, `E2E / Firefox stable`,
-`E2E / Firefox stable-1` or `Not paused` silently stops the check from being
-required. Update branch protection in the same change or leave the name alone.
+`E2E / Firefox stable-1`, `E2E / Firefox stable-2` or `Not paused` silently stops the
+check from being required. Update branch protection in the same change or leave the name alone.
 
 A called workflow's jobs are named `<calling job's name> / <called job's name>`.
 That is where `E2E / Firefox stable` comes from: `jobs.e2e` in `ci.yaml` is named
@@ -57,11 +57,11 @@ part of the required context, so either one renamed breaks it. The prefix is not
 optional — a called workflow cannot report under a bare name — which is the price of
 calling one, and worth knowing before moving a required check into one.
 
-`CI run full` is the gate job in `full.yaml`; the eight `Full / Firefox …` and `Full / Chrome …` legs it
-waits on are not required on their own, so that list can change freely.
+`E2E / Firefox nightly`, `E2E / Chrome nightly` and `E2E / Chrome stable` report
+beside them and are not required, so those legs can change freely.
 
-A matrix job's name carries its matrix values, which is where the `stable` and
-`stable-1` in those contexts come from. So changing what the matrix covers renames a
+A matrix job's name carries its matrix values, which is where the `stable`,
+`stable-1` and `stable-2` in those contexts come from. So changing what the matrix covers renames a
 protected context: adding a version, renaming a leg or dropping one all need the
 required checks on `main` updated in the same change, or branch protection goes on
 waiting for a name nothing reports.
@@ -88,7 +88,6 @@ of the trigger, as `CI` does, or let the job run every time, as `Not paused` doe
 |---|---|---|
 | `CI` | no | the label it cared about moved to `Not paused`, and `E2E`, which it calls, is a required check whose skip would overwrite a real pass |
 | `Not paused` | yes, all of them | required check; its red must never become a skip |
-| `CI run full` | yes, all of them | required check, same reason; its `plan` job keeps the eight browser legs from re-running on a commit that already passed |
 | `Auto-merge` | `automerge` only; also every push to `main` | not a required check, so an `if` is safe |
 
 `Auto-merge` listens both ways. Adding the label arms GitHub's auto-merge and

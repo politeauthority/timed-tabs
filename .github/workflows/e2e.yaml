@@ -19,12 +19,11 @@ run-name: "E2E — ${{ github.ref_name }}"
 # so nothing here is pinned and every leg follows the browser's own releases.
 # Nightly is Firefox Nightly and Chrome Canary, the two daily builds. The
 # `firefox` and `chrome` inputs are the two lists; they default to Firefox stable
-# and stable-1 plus Chrome stable, which is what the beta gate runs. ci.yaml adds
-# Firefox nightly and Chrome nightly, and full.yaml passes nightly, stable, stable-1 and stable-2 of Firefox, and nightly
-# and stable of Chrome while Chrome is planned rather than supported, for
-# the `ci run full` label. This file runs what it is told and holds no opinion about branches. No
-# Chrome leg is a required check yet; making one required is a branch protection
-# change, not a change here.
+# and stable-1 plus Chrome stable, which is what the beta gate runs. ci.yaml passes
+# nightly, stable, stable-1 and stable-2 of Firefox, and nightly and stable of
+# Chrome while Chrome is planned rather than supported. This file runs what it is
+# told and holds no opinion about branches. No Chrome leg is a required check yet;
+# making one required is a branch protection change, not a change here.
 #
 # Two jobs, one per browser, and they are deliberate near-copies of each other:
 # the same skip logic, caches, record and summary, with only the resolve-and-
@@ -35,24 +34,24 @@ run-name: "E2E — ${{ github.ref_name }}"
 # one job's plumbing is a change to both.
 #
 # Each leg is its own status check: called from CI they report as
-# `E2E / Firefox stable` and `E2E / Firefox stable-1`, GitHub prefixing a called
-# workflow's jobs with the calling job's name. Both are required on main, so both
-# halves of each name are load-bearing -- and because a matrix leg's name carries its
-# matrix values, changing what the matrix covers renames a protected context.
-# Branch protection has to be updated in the same change. Dispatched rather than
-# called, the legs report under their bare names.
+# `E2E / Firefox stable`, `E2E / Firefox stable-1` and `E2E / Firefox stable-2`,
+# GitHub prefixing a called workflow's jobs with the calling job's name. Those
+# three are required on main, so both halves of each name are load-bearing -- and
+# because a matrix leg's name carries its matrix values, changing what the matrix
+# covers renames a protected context. Branch protection has to be updated in the
+# same change. Dispatched rather than called, the legs report under their bare
+# names.
 #
-# Three things make a leg skip its work: a PR labelled "ci pause", the release PR
-# (release-please's branch only ever carries a CHANGELOG entry and the version,
-# which no scenario reads), and CI's legs on a PR to main that carries "ci run
-# full", which the full run covers. In every case the leg still runs and reports
-# green, by name, with the reason in its summary -- it is a required status check,
-# and a check that never reports blocks the PR for ever, while one skipped at the
-# job level is not even expanded into its matrix and so never reports under the
-# names branch protection is waiting for. See the `skip` step. CI does not wake on
-# label events, so a label applied after a run does not rewrite it; the `Not
-# paused` and `CI run full` checks are what hold the merge in the meantime, and the
-# next push picks the label up.
+# Two things make a leg skip its work: a PR labelled "ci pause", and the release
+# PR (release-please's branch only ever carries a CHANGELOG entry and the version,
+# which no scenario reads). In either case the leg still runs and reports green,
+# by name, with the reason in its summary -- it is a required status check, and a
+# check that never reports blocks the PR for ever, while one skipped at the job
+# level is not even expanded into its matrix and so never reports under the names
+# branch protection is waiting for. See the `skip` step. CI does not wake on label
+# events, so a label applied after a run does not rewrite it; the `Not paused`
+# check is what holds the merge in the meantime, and the next push picks the
+# label up.
 on:
   workflow_call:
     inputs:
@@ -90,15 +89,18 @@ on:
         # Ten browsers at once starved one another on the runner node until a
         # scenario saw a single tick in its whole window. The scenarios time
         # things, so contention reads as failure; run fewer legs at a time.
-        # Per browser job: the two jobs run beside each other.
-        description: How many legs of each browser may run at once.
+        # Four is what the node has been shown to carry. It is the whole
+        # budget, not a per-browser share: the Chrome job waits for the
+        # Firefox job (see `needs` below), so the two never run beside each
+        # other and each may take the node in turn.
+        description: How many legs of a browser may run at once.
         type: number
         required: false
-        default: 2
+        default: 4
       leg-summary:
         # `always` gives every leg its own step summary, which is right for the
-        # CI pair. `on-failure` keeps a green leg quiet so the caller can write
-        # one table for the lot: full.yaml does, from the leg records each leg
+        # CI set. `on-failure` keeps a green leg quiet, for a caller that would
+        # rather write one table for the lot from the leg records each leg
         # uploads (see "Record the leg" below).
         description: When a leg writes its own step summary, `always` or `on-failure`.
         type: string
@@ -114,16 +116,6 @@ on:
         type: boolean
         required: false
         default: true
-      skip-when-full:
-        # For CI. A PR to main carrying `ci run full` gets these same versions
-        # again inside the full run, and the `CI run full` status holds the
-        # merge until that passes -- so CI's legs skip, which a required check
-        # reads as a pass, and the runner is spent once. full.yaml leaves this
-        # off, since its legs are the ones being counted on.
-        description: Skip the legs on a PR to main that carries the `ci run full` label.
-        type: boolean
-        required: false
-        default: false
   workflow_dispatch:
     inputs:
       ref:
@@ -142,10 +134,10 @@ on:
         required: false
         default: '["stable"]'
       max-parallel:
-        description: How many legs of each browser may run at once.
+        description: How many legs of a browser may run at once.
         type: number
         required: false
-        default: 2
+        default: 4
       leg-summary:
         description: When a leg writes its own step summary, `always` or `on-failure`.
         type: string
@@ -156,13 +148,6 @@ on:
         type: boolean
         required: false
         default: true
-      skip-when-full:
-        # Never true on a dispatch, which is not a pull request; declared so
-        # that every `inputs.*` the job reads exists for this trigger too.
-        description: Skip the legs on a PR to main that carries the `ci run full` label.
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: read
@@ -185,8 +170,8 @@ jobs:
     # does leave one skipped check named with the literal `name` expression,
     # which is why the defaults leave no list empty.)
     #
-    # Everything else that skips a leg -- the `ci pause` label, the release PR,
-    # and CI's legs when the full run covers them -- is decided by the `skip`
+    # Everything else that skips a leg -- the `ci pause` label and the release
+    # PR -- is decided by the `skip`
     # step inside the job, never here. A matrix job skipped at the job level is
     # not expanded: it reports once, under the literal text of its `name`
     # expression, and the contexts branch protection is waiting for never
@@ -209,19 +194,16 @@ jobs:
       # checked out. A PR labelled `ci pause` is paused; the release PR only
       # carries the CHANGELOG and the version, which no scenario reads (lint and
       # the unit tests still run on it, which is what keeps `web-ext lint` on
-      # the bumped manifest before the tag is cut); and CI's legs on a PR to
-      # main carrying `ci run full` are covered by the full run, whose status
-      # holds the merge until they pass. Each answer is a pass with a reason.
+      # the bumped manifest before the tag is cut). Each answer is a pass with
+      # a reason.
       - id: skip
         env:
           PAUSED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci pause') }}
           RELEASE: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'release-please--') }}
-          FULL: ${{ github.event_name == 'pull_request' && inputs.skip-when-full && github.event.pull_request.base.ref == 'main' && contains(github.event.pull_request.labels.*.name, 'ci run full') }}
         run: |
           reason=""
           if [ "$PAUSED" = "true" ]; then reason="the \`ci pause\` label is on this pull request."
           elif [ "$RELEASE" = "true" ]; then reason="the release PR only carries the CHANGELOG and the version, which no scenario reads."
-          elif [ "$FULL" = "true" ]; then reason="the \`ci run full\` label is on, so the full run tests this version and more; the \`CI run full\` status holds the merge until it passes."
           fi
           echo "skip=$([ -n "$reason" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "reason=${reason}" >> "$GITHUB_OUTPUT"
@@ -492,14 +474,24 @@ jobs:
     # does leave one skipped check named with the literal `name` expression,
     # which is why the defaults leave no list empty.)
     #
-    # Everything else that skips a leg -- the `ci pause` label, the release PR,
-    # and CI's legs when the full run covers them -- is decided by the `skip`
+    # Everything else that skips a leg -- the `ci pause` label and the release
+    # PR -- is decided by the `skip`
     # step inside the job, never here. A matrix job skipped at the job level is
     # not expanded: it reports once, under the literal text of its `name`
     # expression, and the contexts branch protection is waiting for never
     # arrive, so the PR is stuck. Skipping the steps instead leaves each leg
     # reporting, by name, as a pass -- which is what a skip is meant to be.
-    if: inputs.chrome != '[]'
+    #
+    # After Firefox, not beside it. Actions has no job priority, but a `needs`
+    # edge is the same thing here: the Firefox legs are the required checks
+    # and Chrome's are advisory, so Firefox takes the whole node first and the
+    # merge decision lands in one wave instead of two, with Chrome in the wave
+    # after. always(), so a red Firefox leg still gets its Chrome results,
+    # and so Chrome runs when the Firefox list is empty and that job skipped.
+    # When a Chrome leg becomes a required check, drop the `needs` and halve
+    # `max-parallel`, so the two browsers share the node again.
+    needs: firefox
+    if: always() && inputs.chrome != '[]'
     # Nightly always; every Chrome leg while `chrome-advisory` is on.
     continue-on-error: ${{ matrix.channel == 'nightly' || inputs.chrome-advisory }}
     timeout-minutes: 20
@@ -516,19 +508,16 @@ jobs:
       # checked out. A PR labelled `ci pause` is paused; the release PR only
       # carries the CHANGELOG and the version, which no scenario reads (lint and
       # the unit tests still run on it, which is what keeps `web-ext lint` on
-      # the bumped manifest before the tag is cut); and CI's legs on a PR to
-      # main carrying `ci run full` are covered by the full run, whose status
-      # holds the merge until they pass. Each answer is a pass with a reason.
+      # the bumped manifest before the tag is cut). Each answer is a pass with
+      # a reason.
       - id: skip
         env:
           PAUSED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci pause') }}
           RELEASE: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'release-please--') }}
-          FULL: ${{ github.event_name == 'pull_request' && inputs.skip-when-full && github.event.pull_request.base.ref == 'main' && contains(github.event.pull_request.labels.*.name, 'ci run full') }}
         run: |
           reason=""
           if [ "$PAUSED" = "true" ]; then reason="the \`ci pause\` label is on this pull request."
           elif [ "$RELEASE" = "true" ]; then reason="the release PR only carries the CHANGELOG and the version, which no scenario reads."
-          elif [ "$FULL" = "true" ]; then reason="the \`ci run full\` label is on, so the full run tests this version and more; the \`CI run full\` status holds the merge until it passes."
           fi
           echo "skip=$([ -n "$reason" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "reason=${reason}" >> "$GITHUB_OUTPUT"

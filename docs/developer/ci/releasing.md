@@ -144,8 +144,8 @@ Open the **Beta Release** workflow in the Actions tab and run it. It:
    `chore(main): release 0.8.0`.
 3. Pins the commit `main` is on, so every step below is about that commit and not
    about whatever `main` becomes while the run is going.
-4. Runs the **E2E scenarios in both Firefoxes and in Chrome stable** against it, the same legs that
-   gates a pull request. Nothing is built or published until they pass.
+4. Runs the **E2E scenarios in Firefox stable and stable-1 and in Chrome stable** against it, the
+   scenarios that gate a pull request. Nothing is built or published until they pass.
 5. Runs lint and tests, then builds with `BUILD_CHANNEL=beta`, `BUILD_SEMVER=0.8.0`,
    `BUILD_TAG=beta.N` and `MANIFEST_VERSION=0.7.0.N`.
 6. Tags `v0.8.0-beta.N` on the pinned commit and publishes a GitHub Release
