@@ -22,14 +22,36 @@ runs `web-ext run` headless for `runSeconds`, stops it, and matches the log agai
 the expectations. The log, and the screenshot the scenario captured, are written to
 `e2e-artifacts/<name>.*`, which CI uploads.
 
+## What a run prints
+
+The runner counts as it goes, so a log being watched halfway through says where it is
+rather than only what has happened:
+
+```
+🦊 3 scenarios to run: appearance-overrides, close-on-expire, navigation
+
+🧪 [2/3] close-on-expire — up to 25s
+  ⏱️  extension up after 3s; running 25s
+  ✅ expect    expired \d+ https://example\.com/ action=close
+  ✅ expectNot expired \d+ https://example\.org/
+  ✅ [2/3] PASS close-on-expire 📸
+  📊 2/2 passed so far, 1 to go
+
+🏁 2/3 scenarios passed in 75s
+```
+
+The total comes first because the first Firefox can take half a minute to start, and
+on a runner that line is the only thing that says how long the step ought to take. 📸
+means the scenario captured a screenshot.
+
 ## What CI reports
 
 Alongside the per-scenario files, the run writes `e2e-artifacts/results.json`: one
-record per scenario with its duration, every expectation, and whether each one
-matched. `scripts/e2e-summary.py` turns that into the job summary — a pass/fail table
-over the scenarios, the exact expectations that missed on a failure, and a link to
-the artifact. Running locally you can ignore it; the console output says the same
-thing.
+record per scenario with its position, duration, every expectation, and whether each
+one matched. `scripts/e2e-summary.py` turns that into the job summary — the same
+counts the console prints, a pass/fail table over the scenarios, the exact
+expectations that missed on a failure, and a link to the artifact. Running locally you
+can ignore it; the console output says the same thing.
 
 The summary also carries a timing table from `.github/actions/step-times`, which
 marks any step over a minute. Firefox on the runner is the usual reason a run drags:

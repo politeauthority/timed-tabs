@@ -40,14 +40,21 @@ if (!names.length) {
 }
 await mkdir(OUT, { recursive: true });
 
+const total = names.length;
+const suiteStartedAt = Date.now();
+// What is about to run, before the first Firefox takes half a minute to start.
+// On a runner this is the only thing that says how long the step should take.
+console.log(`\n🦊 ${total} scenario${total === 1 ? "" : "s"} to run: ${names.join(", ")}`);
+
 let failed = 0;
 const results = [];
-for (const name of names) {
+for (const [i, name] of names.entries()) {
+  const index = i + 1;
   const scenario = JSON.parse(await readFile(path.join(SCENARIOS, `${name}.json`), "utf8"));
   const seconds = scenario.runSeconds ?? 25;
   const startedAt = Date.now();
   const checks = [];
-  console.log(`\n=== ${name} (${seconds}s)`);
+  console.log(`\n🧪 [${index}/${total}] ${name} — up to ${seconds}s`);
   const devJson = path.join(OUT, `${name}.dev.json`);
   await writeFile(devJson, JSON.stringify(scenario.dev, null, 2));
   await run("node", ["scripts/build.mjs", "dev"], { DEV_JSON: devJson });
@@ -64,25 +71,28 @@ for (const name of names) {
   let ok = true;
   for (const re of scenario.expect ?? []) {
     const hit = new RegExp(re).test(log);
-    console.log(`  ${hit ? "ok  " : "MISS"} expect    ${re}`);
+    console.log(`  ${hit ? "✅" : "❌"} expect    ${re}`);
     checks.push({ kind: "expect", pattern: re, ok: hit });
     ok &&= hit;
   }
   for (const re of scenario.expectNot ?? []) {
     const hit = new RegExp(re).test(log);
-    console.log(`  ${hit ? "SEEN" : "ok  "} expectNot ${re}`);
+    console.log(`  ${hit ? "❌" : "✅"} expectNot ${re}`);
     checks.push({ kind: "expectNot", pattern: re, ok: !hit });
     ok &&= !hit;
   }
   if (!ok) {
     failed += 1;
-    console.log(`  FAIL ${name}: see e2e-artifacts/${name}.log`);
+    console.log(`  ❌ [${index}/${total}] FAIL ${name}: see e2e-artifacts/${name}.log`);
     const lines = log.match(/\[timed-tabs\][^"\n]*/g) ?? [];
     for (const l of lines.filter((l) => !l.includes("CAPTURE")).slice(-25)) console.log(`    ${l.slice(0, 160)}`);
-  } else console.log(`  PASS ${name}${capture ? " (screenshot saved)" : ""}`);
+  } else console.log(`  ✅ [${index}/${total}] PASS ${name}${capture ? " 📸" : ""}`);
+  // A running tally, so a log tailed halfway through still says where it is.
+  console.log(`  📊 ${index - failed}/${index} passed so far, ${total - index} to go`);
 
   results.push({
     name,
+    index,
     ok,
     seconds: Math.round((Date.now() - startedAt) / 1000),
     budget: seconds,
@@ -90,7 +100,8 @@ for (const name of names) {
     artifacts: [`${name}.log`, ...(capture ? [`${name}.png`] : [])],
   });
 }
-console.log(`\n${names.length - failed}/${names.length} scenarios passed`);
+const elapsed = Math.round((Date.now() - suiteStartedAt) / 1000);
+console.log(`\n🏁 ${total - failed}/${total} scenarios passed in ${elapsed}s`);
 await writeFile(path.join(OUT, "results.json"), JSON.stringify({ scenarios: results }, null, 2));
 process.exit(failed ? 1 : 0);
 
@@ -126,7 +137,7 @@ function runFor(cmd, args, ms, env) {
         started = true;
         clearTimeout(timer);
         timer = setTimeout(stop, ms);
-        console.log(`  extension up after ${Math.round((Date.now() - t0) / 1000)}s; running ${ms / 1000}s`);
+        console.log(`  ⏱️  extension up after ${Math.round((Date.now() - t0) / 1000)}s; running ${ms / 1000}s`);
       }
     };
     const t0 = Date.now();
