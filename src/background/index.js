@@ -7,12 +7,15 @@ import { watchRules, watchSettings } from "../shared/settings.js";
 import { effectiveSettings } from "../shared/rules.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
+import { createNotifier } from "./notify.js";
 import { findIndicators } from "./indicators/index.js";
 import { lastOutcome as faviconOutcome } from "./indicators/favicon.js";
 
 const TICK_ALARM = "timed-tabs:tick";
 
 const tracker = createTabTracker();
+const notifier = createNotifier();
+notifier.start();
 let settings = null;
 let rules = [];
 let active = [];
@@ -92,6 +95,7 @@ watchSettings(async (next) => {
   const previous = settings;
   settings = next;
   await ready;
+  notifier.configure(settings);
 
   const wanted = findIndicators(settings.indicators);
   await Promise.all(active.filter((i) => !wanted.includes(i)).map((i) => i.stop()));
@@ -407,6 +411,9 @@ async function expire(tab, onExpire) {
       const icon = tab.favIconUrl && !tab.favIconUrl.startsWith("data:") ? tab.favIconUrl : "";
       await recordExpired({ ...tab, favIconUrl: icon }, "close").catch(() => {});
       await api.tabs.remove(tab.id);
+      // Only once the tab is actually gone, and only for close: unloading and
+      // reloading leave the tab where it was.
+      notifier.tabClosed(tab);
     }
     else if (onExpire === "discard") await api.tabs.discard(tab.id);
     else if (onExpire === "reload") {

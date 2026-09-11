@@ -28,6 +28,8 @@ export const DEFAULTS = Object.freeze({
   onExpire: "none",
   /** How long closed-by-expiry tabs stay in the "Recently expired" list. */
   recentRetentionSeconds: 24 * 3600,
+  /** Show a desktop notification naming each tab we close. Needs the optional `notifications` permission. */
+  notifyOnExpire: false,
   /** Seconds between indicator refreshes. */
   tickSeconds: 5,
 });
@@ -43,6 +45,8 @@ export const GROUPS = [
 /**
  * How each setting is presented. `type` is one of:
  * duration (seconds), toggle, choice ({ value, label }[]), percent, indicators.
+ * `requires` names optional permissions the panel must obtain before the
+ * setting can be switched on; it is turned back off if they are ever revoked.
  */
 export const FIELDS = [
   {
@@ -86,6 +90,14 @@ export const FIELDS = [
     label: "Keep recently expired tabs for",
     help: "Tabs that Timed Tabs closed stay listed on the Tabs page for this long, so you can reopen them.",
     min: 60,
+  },
+  {
+    key: "notifyOnExpire",
+    group: "expiry",
+    type: "toggle",
+    label: "Tell me when a tab is closed",
+    help: "A notification naming the tab, one for each batch we close. Click it to bring the tab back.",
+    requires: { permissions: ["notifications"] },
   },
   {
     key: "indicators",
