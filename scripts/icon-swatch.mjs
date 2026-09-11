@@ -2,7 +2,7 @@
 /**
  * Render the toolbar ring at every position and colour it passes through.
  *
- *   npm run icons:swatch                       # write design/icons/clock/
+ *   npm run icons:swatch                       # write src/icons/clock/
  *   npm run icons:swatch -- --muted=#8a8f98    # with a colour of your own
  *
  * The button only ever paints 16 and 32 pixel rings, which is too small to
@@ -10,9 +10,9 @@
  * clockwise (the direction the live ring will take when the interactive
  * clock flag is folded in; until then the button keeps the legacy one), one PNG and
  * SVG per five percent of time remaining, and a contact sheet SVG laying them
- * all out on a light and a dark toolbar. It is for the README, the store
- * listing and for looking at the ramp with a human eye; the extension ships
- * none of it.
+ * all out on a light and a dark toolbar. It ships inside the extension, so
+ * UI pages can show any frame by path, and it doubles as the artwork for the
+ * README and the store listing.
  *
  * Two sets come out:
  *
@@ -41,7 +41,7 @@ import { fromHex, rampColor, toHex } from "../src/shared/color.js";
 import { encodePng, rasterise, toSvg } from "./icons.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const outDir = join(root, "design", "icons", "clock");
+const outDir = join(root, "src", "icons", "clock");
 
 const SIZE = 128;
 /** Time remaining, in percent, one file each. */
@@ -152,4 +152,4 @@ for (const f of frames) {
   writeFileSync(join(outDir, `${f.name}.svg`), toSvg(f.shapes, toHex(f.rgb)));
 }
 writeFileSync(join(outDir, "sheet.svg"), sheet());
-console.log(`wrote ${frames.length} rings and sheet.svg to design/icons/clock/`);
+console.log(`wrote ${frames.length} rings and sheet.svg to src/icons/clock/`);

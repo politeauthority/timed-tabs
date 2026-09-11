@@ -1,10 +1,10 @@
 # Design resources
 
-Rendered artwork for people, not for the extension. Nothing under `design/` ships; it is
-for the README, the AMO listing, mockups and for judging the mark at a size the toolbar
-never shows it at.
+Rendered artwork the extension ships and people can borrow: for the UI pages, the
+README, the AMO listing, mockups, and for judging the mark at a size the toolbar never
+shows it at.
 
-## `design/icons/clock/` — the ring at every position
+## `src/icons/clock/` — the ring at every position
 
 The toolbar ring, drawn from the same geometry the extension paints with
 (`src/shared/icon-art.js`), at 128 pixels, one file per five percent of time remaining.
@@ -35,8 +35,8 @@ npm run icons:swatch
 ```
 
 writes the whole directory again. Run it after any change to `icon-art.js` and commit
-what it writes, the same way `npm run icons` keeps `src/icons/` honest. There is no drift
-check for this set: it is documentation, not something the browser loads.
+what it writes, the same way `npm run icons` keeps the packaged icon set honest. There is
+no drift check for this set yet.
 
 ### Colours
 
@@ -55,6 +55,13 @@ opacity, which is how the toolbar draws it. `#707d91` is the slate the paused cl
 
 ## Using the files
 
+- **In the extension.** The directory is under `src/`, so every build packages it and an
+  extension page reaches a frame by relative path: from `src/ui/`, that is
+  `../icons/clock/ring-075.svg`, or `browser.runtime.getURL("icons/clock/ring-075.png")`
+  from anywhere. Prefer the SVGs there; they scale to whatever the layout needs. For a
+  ring that has to follow a live value, draw it instead with `drawDial` from
+  `src/shared/icon-art.js` on a canvas, which is what the toolbar does, rather than
+  swapping between twenty static files.
 - **Store listing and README.** Use the PNGs; AMO and GitHub both render them, and the
   SVGs use `opacity` on strokes, which some image pipelines flatten badly.
 - **Mockups.** The SVGs scale without loss. Each is a 32-unit viewBox, so they drop into

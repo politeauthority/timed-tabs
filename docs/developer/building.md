@@ -77,8 +77,8 @@ button still drains anticlockwise, the direction every user has; `clockwise: tru
 flag, which paints the clock face instead.
 
 `npm run icons:swatch` renders the ring at every position and colour into
-`design/icons/clock/`, at a size a human can judge. Nothing in there ships; what the files
-are and how to use them is in [design.md](design.md).
+`src/icons/clock/`, at a size a human can judge. It ships with the extension so the UI
+can use it; what the files are and how to use them is in [design.md](design.md).
 
 Each dist tree gets a `build.json` next to the manifest holding the version, semver,
 tag, channel, commit and build time. A plain `src/` load has no `build.json`, and that

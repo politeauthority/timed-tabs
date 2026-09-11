@@ -72,7 +72,7 @@ function handEnd(turn, len) {
  * true` draws the ring the right way (spent part opening at twelve and
  * sweeping right), but the live button keeps the legacy direction until
  * `primary-icon-interactive` is folded in, rather than changing the mark every
- * user already has. The swatch set in design/icons/clock/ shows the clockwise ring.
+ * user already has. The swatch set in src/icons/clock/ shows the clockwise ring.
  *
  * Every shape is the one colour or a hole punched out of it. Nothing is white
  * and nothing is dark, because the same image has to sit on a light and a
