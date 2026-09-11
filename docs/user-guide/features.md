@@ -115,7 +115,11 @@ keeps the site's icon and can be reopened. A page that keeps expiring shows once
 with a count and the time it was last closed. Rows can be removed one at a time, or
 the whole list cleared.
 
-**Statistics** is the tally: how many tabs have been seen off and how (closed,
+**Statistics** is behind the **Statistics** feature flag — see
+[feature-flags.md](feature-flags.md#statistics). The tally is kept whether the flag is
+on or off; the flag only decides whether the section is there to read.
+
+It is the tally: how many tabs have been seen off and how (closed,
 unloaded, reloaded), how many snoozes you have granted and how much time they bought,
 how many timers you have restarted, and the most tabs you have ever had open at once.
 A small chart shows the last fortnight a day at a time, and names your busiest day.

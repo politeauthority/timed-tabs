@@ -160,7 +160,11 @@
         </p>
       </details>
 
-      <details id="stats" class="overview stats" data-pages="tabs" data-page-only>
+      <!-- Statistics (feature flag "statistics-panel"): the tally, as tiles and a chart.
+           The flag hides the reading of it, never the counting -- the background tallies
+           on regardless, so turning this back on shows everything that happened while
+           it was off. Starts hidden so it cannot flash up before settings have loaded. -->
+      <details id="stats" class="overview stats" data-pages="tabs" data-page-only hidden>
         <summary class="chev">
           <span>📊 Statistics</span>
           <span id="stats-headline" class="overview-count"></span>

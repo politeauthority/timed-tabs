@@ -29,6 +29,14 @@ describe("FLAGS", () => {
     }
   });
 
+  // The tally is counted whatever this says -- the flag is over the reading of
+  // it, not the collecting -- so nothing is lost while it is off and there is
+  // no reason for it to start on.
+  it("keeps the statistics panel off until both switches are on", () => {
+    expect(DEFAULT_FLAGS["statistics-panel"]).toBe(false);
+    expect(flagRequires("statistics-panel")).toBe("beta-features");
+  });
+
   it("only requires flags that exist", () => {
     const ids = new Set(FLAGS.map((f) => f.id));
     for (const f of FLAGS) if (f.requires) expect(ids.has(f.requires)).toBe(true);
