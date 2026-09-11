@@ -3,8 +3,10 @@
 // Each tests/e2e/scenarios/<name>.json is
 //   { "runSeconds": 25, "dev": { ...dev.json... }, "expect": [regex...], "expectNot": [regex...] }
 // The dev object is written into a dev build (see the dev hook in
-// background/index.js), web-ext runs that build headless for `runSeconds`,
-// and the log it printed is matched against the expectations. Screenshots the
+// background/index.js), web-ext runs that build headless, and the log it
+// printed is matched against the expectations. `runSeconds` counts from the
+// extension's first log line, not from launch, so a slow Firefox start on a
+// busy runner does not eat into the scenario; launch itself is capped at 90s. Screenshots the
 // scenario captured, and the raw log, land in e2e-artifacts/<name>.*.
 //
 // Usage: npm run e2e [-- name ...]   FIREFOX=/path/to/firefox to pick a binary.
@@ -79,13 +81,17 @@ function run(cmd, args, env) {
   });
 }
 
-/** Run a command for a fixed time, then stop it and everything it started. */
+/**
+ * Run a command until `ms` after its output first mentions the extension,
+ * then stop it and everything it started. A hard cap covers a Firefox that
+ * never comes up.
+ */
 function runFor(cmd, args, ms, env) {
   return new Promise((resolve) => {
     const child = spawn(cmd, args, { cwd: ROOT, detached: true, env: { ...process.env, ...env } });
     let out = "";
-    child.stdout.on("data", (d) => (out += d));
-    child.stderr.on("data", (d) => (out += d));
+    let started = false;
+    let timer = null;
     const stop = () => {
       try {
         process.kill(-child.pid, "SIGTERM");
@@ -93,7 +99,19 @@ function runFor(cmd, args, ms, env) {
         // Already gone.
       }
     };
-    const timer = setTimeout(stop, ms);
+    const onData = (d) => {
+      out += d;
+      if (!started && out.includes("[timed-tabs]")) {
+        started = true;
+        clearTimeout(timer);
+        timer = setTimeout(stop, ms);
+        console.log(`  extension up after ${Math.round((Date.now() - t0) / 1000)}s; running ${ms / 1000}s`);
+      }
+    };
+    const t0 = Date.now();
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    timer = setTimeout(stop, 90_000 + ms);
     child.on("exit", () => {
       clearTimeout(timer);
       resolve(out);
