@@ -35,3 +35,45 @@ describe("backup keeps rule descriptions", () => {
     expect(parseBundle(text).rules[0].description).toBe("Why");
   });
 });
+
+describe("feature flags in a backup", () => {
+  it("exports the flags", () => {
+    const bundle = exportBundle({ ...DEFAULTS, featureFlags: { "beta-features": true } }, []);
+    expect(bundle.settings.featureFlags).toEqual({ "beta-features": true });
+  });
+
+  it("round-trips a flag that is on", () => {
+    const text = exportText({ ...DEFAULTS, featureFlags: { "beta-features": true } }, []);
+    const { settings, warnings } = parseBundle(text);
+    expect(settings.featureFlags).toEqual({ "beta-features": true });
+    expect(warnings).toEqual([]);
+  });
+
+  it("drops a retired flag on import without complaining", () => {
+    const text = JSON.stringify({
+      timedTabs: 1,
+      settings: { featureFlags: { "beta-features": true, "flag-that-was-retired": true } },
+      rules: [],
+    });
+    const { settings, warnings } = parseBundle(text);
+    expect(settings.featureFlags).toEqual({ "beta-features": true });
+    expect(warnings).toEqual([]);
+  });
+
+  it("takes a backup written before flags existed", () => {
+    const text = JSON.stringify({ timedTabs: 1, settings: { tabLifetimeSeconds: 600 }, rules: [] });
+    const { settings, warnings } = parseBundle(text);
+    expect(settings.tabLifetimeSeconds).toBe(600);
+    expect("featureFlags" in settings).toBe(false);
+    expect(warnings).toEqual([]);
+  });
+
+  it("falls back to the defaults when the flags are not an object", () => {
+    for (const junk of ["on", 3, ["beta-features"]]) {
+      const text = JSON.stringify({ timedTabs: 1, settings: { featureFlags: junk }, rules: [] });
+      const { settings, warnings } = parseBundle(text);
+      expect(settings.featureFlags).toBeUndefined();
+      expect(warnings.length).toBe(1);
+    }
+  });
+});
