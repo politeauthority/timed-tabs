@@ -33,6 +33,8 @@ Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
 
 ## What you get
 
+The full tour, with screenshots, is in [docs/features.md](docs/features.md).
+
 - **Four ways to show the time left.** The favicon, a coloured dot in the page
   title, the toolbar badge, or a tint over the Firefox theme. Pick any of them.
 - **Per-site rules.** Docs get an hour, news gets fifteen minutes, work repos
