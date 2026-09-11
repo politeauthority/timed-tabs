@@ -95,9 +95,17 @@ if (IS_DEV_BUILD) {
       await Promise.all((dev.openUrls ?? []).map((u) => api.tabs.create({ url: api.runtime.getURL(u) })));
       // "navigate": [{ "at": ms, "from": url, "to": url }] sends the tab that is
       // on `from` to `to`, so a scenario can check rules re-evaluate on navigation.
+      // From `at` on, it waits (up to 30s) for a tab to have finished loading
+      // `from`, so a slow page on a busy machine does not turn into a miss.
       for (const n of dev.navigate ?? []) {
         setTimeout(async () => {
-          const [tab] = await api.tabs.query({ url: n.from }).catch(() => []);
+          const deadline = Date.now() + 30_000;
+          let tab = null;
+          while (!tab && Date.now() < deadline) {
+            const found = await api.tabs.query({ url: n.from, status: "complete" }).catch(() => []);
+            tab = found[0] ?? null;
+            if (!tab) await new Promise((r) => setTimeout(r, 500));
+          }
           if (!tab) return console.log(`[timed-tabs] navigate: no tab on ${n.from}`);
           await api.tabs.update(tab.id, { url: n.to }).catch(() => {});
           console.log(`[timed-tabs] navigated ${tab.id} ${n.to}`);
