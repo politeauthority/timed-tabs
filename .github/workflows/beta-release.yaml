@@ -1,0 +1,136 @@
+name: Beta Release
+run-name: "Beta Release — ${{ github.ref_name }}"
+
+# Cuts a beta from `main` as it stands right now. A beta is a snapshot of the
+# work the pending release PR would ship, so it is named after that PR's
+# version: "chore(main): release 0.8.0" gives v0.8.0-beta.N, where N counts the
+# commits on main since the last stable tag. Nothing is bumped or committed;
+# release-please is untouched and the stable pipeline stays exactly as it is.
+#
+# Firefox only accepts digits in the manifest version, so the beta ships with
+# MANIFEST_VERSION=<last stable>.N (0.7.0.14). That sorts after 0.7.0 and before
+# 0.8.0, so a beta install updates cleanly to the next stable once builds are
+# signed. The UI shows 0.8.0-beta.14 and a BETA badge; see
+# docs/developer/releasing.md.
+#
+# Refuses to run when there is no open release PR (nothing releasable on main)
+# or when the beta tag for the current commit already exists.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-please-main   # never race a stable release
+  cancel-in-progress: false
+
+jobs:
+  beta:
+    name: Tag, build and publish a beta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Work out the beta version
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          LAST=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude 'v*-beta*' 2>/dev/null || true)
+          if [ -z "$LAST" ]; then
+            echo "::error::No stable tag found; cut a stable release first."; exit 1
+          fi
+          STABLE="${LAST#v}"
+          N=$(git rev-list --count "${LAST}..HEAD")
+          if [ "$N" -eq 0 ]; then
+            echo "::error::main is exactly ${LAST}; nothing to beta."; exit 1
+          fi
+          TITLE=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json title,headRefName \
+                    --jq '[.[] | select(.headRefName | startswith("release-please--"))][0].title // empty')
+          NEXT=$(printf '%s' "$TITLE" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+          if [ -z "$NEXT" ]; then
+            echo "::error::No open release PR, so there is nothing releasable on main to beta."; exit 1
+          fi
+          TAG="v${NEXT}-beta.${N}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "::error::${TAG} already exists; no new commits since the last beta."; exit 1
+          fi
+          {
+            echo "stable=${STABLE}"
+            echo "next=${NEXT}"
+            echo "n=${N}"
+            echo "tag=${TAG}"
+            echo "manifest=${STABLE}.${N}"
+            echo "zip=${NEXT}-beta.${N}"
+          } >> "$GITHUB_OUTPUT"
+          echo "::notice::${TAG} (manifest ${STABLE}.${N}) from $(git rev-parse --short HEAD)"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Build beta zips
+        env:
+          BUILD_CHANNEL: beta
+          BUILD_SEMVER: ${{ steps.ver.outputs.next }}
+          BUILD_TAG: beta.${{ steps.ver.outputs.n }}
+          MANIFEST_VERSION: ${{ steps.ver.outputs.manifest }}
+          ZIP_VERSION: ${{ steps.ver.outputs.zip }}
+        run: |
+          npm run package
+          ls -la web-ext-artifacts
+          cat dist/firefox/build.json
+
+      - name: Tag and publish the prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          LAST: v${{ steps.ver.outputs.stable }}
+          MANIFEST: ${{ steps.ver.outputs.manifest }}
+        run: |
+          set -euo pipefail
+          NOTES=$(mktemp)
+          {
+            echo "Beta build of the work on \`main\` since ${LAST}. Installs as version \`${MANIFEST}\`; the UI shows \`${TAG#v}\` with a BETA badge."
+            echo ""
+            echo "## Changes since ${LAST}"
+            echo ""
+            git log --no-merges --pretty='- %s (%h)' "${LAST}..HEAD"
+          } > "$NOTES"
+          # `gh release create` makes the tag on the given commit; no PAT needed
+          # because nothing downstream has to be re-triggered by the push.
+          gh release create "$TAG" web-ext-artifacts/*.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --title "$TAG" --notes-file "$NOTES"
+
+      - name: 📋 Summary
+        if: always()
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          ZIP: ${{ steps.ver.outputs.zip }}
+          MANIFEST: ${{ steps.ver.outputs.manifest }}
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then s="✅ published"; else s="❌ failed"; fi
+          {
+            echo "# 🧪 Beta ${TAG:-?} ${s}"
+            echo ""
+            echo "> ▶️ **Why this ran:** manual dispatch — a beta snapshot of \`main\`."
+            echo ""
+            echo "| 🏷️ Tag | 🦊 Firefox | 🌐 Chrome | manifest version |"
+            echo "| --- | --- | --- | --- |"
+            echo "| \`${TAG}\` | \`timed-tabs-firefox-${ZIP}.zip\` | \`timed-tabs-chrome-${ZIP}.zip\` | \`${MANIFEST}\` |"
+            echo ""
+            echo "📦 Attached to the [prerelease](${{ github.server_url }}/${{ github.repository }}/releases/tag/${TAG}). Unsigned, like stable."
+          } >> "$GITHUB_STEP_SUMMARY"

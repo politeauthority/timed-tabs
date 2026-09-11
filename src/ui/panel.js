@@ -1983,6 +1983,19 @@ getDisplayVersion().then((v) => {
     el.textContent = text;
     el.title = tip;
   }
+  // Beta and dev builds wear a badge next to the title so nobody mistakes
+  // one for a release. The manifest version differs from the release name
+  // for betas, so the tooltip spells both out.
+  if (v.channel) {
+    document.body.dataset.channel = v.channel;
+    const badge = $("channel-badge");
+    badge.textContent = v.channel;
+    badge.hidden = false;
+    badge.title =
+      v.channel === "beta"
+        ? `Beta build ${v.display}. The browser lists it as version ${v.version}.`
+        : `Development build ${v.display}`;
+  }
 });
 
 (async () => {
