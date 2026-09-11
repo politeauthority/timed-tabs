@@ -566,7 +566,7 @@ function renderTabSettings() {
     },
   };
 
-  const defs = defsFor(RULE_FIELDS);
+  const defs = defsFor(RULE_FIELDS, THIS_TAB_SUBJECT);
   const list = $("tab-settings-list");
   list.replaceChildren(
     ...defs.map((def) => {
@@ -1178,7 +1178,7 @@ function markJustAdded(id) {
 const RULE_FIELD_TEXT = {
   tabLifetimeSeconds: {
     label: "Lifetime",
-    help: "How long {tabs} may sit before {they} expire.",
+    help: "How long {tabs} may sit before {they} {expire}.",
   },
   onExpire: {
     label: "When a tab expires",
@@ -1214,7 +1214,7 @@ const RULE_FIELD_TEXT = {
   },
   flashBeforeExpiry: {
     label: "Flash before expiry",
-    help: "{Tabs} {blink} during the last stretch before {they} run out of time.",
+    help: "{Tabs} {blink} during the last stretch before {they} {run} out of time.",
   },
   flashLeadSeconds: {
     label: "Start flashing",
@@ -1222,14 +1222,23 @@ const RULE_FIELD_TEXT = {
   },
 };
 /** Help text placeholders, worded for the tabs a rule matches. */
-const SUBJECT = { tabs: "matching tabs", Tabs: "Matching tabs", tab: "a matching tab", they: "they", expire: "expire", show: "show", blink: "blink" };
-const wordFor = (text) => text.replace(/\{(\w+)\}/g, (_, k) => SUBJECT[k] ?? k);
+/**
+ * Help text is written once with {placeholders} and read in two places: a
+ * rule, which speaks about every page it matches, and Page settings, which
+ * speaks about the tab in front of you.
+ */
+const SUBJECT = { tabs: "matching tabs", Tabs: "Matching tabs", tab: "a matching tab", they: "they", expire: "expire", show: "show", blink: "blink", run: "run" };
+const THIS_TAB_SUBJECT = { tabs: "this tab", Tabs: "This tab", tab: "this tab", they: "it", expire: "expires", show: "shows", blink: "blinks", run: "runs" };
+const wordFor = (text, subject = SUBJECT) =>
+  text.replace(/\{(\w+)\}/g, (_, k) => subject[k] ?? k);
 const RULE_FIELD_DEFS = RULE_FIELDS.map((key) => {
   const base = FIELDS.find((f) => f.key === key) ?? { key, type: "toggle" };
   return { ...base, ...RULE_FIELD_TEXT[key] };
 });
-const defsFor = (keys) =>
-  keys.map((k) => RULE_FIELD_DEFS.find((d) => d.key === k)).map((d) => ({ ...d, help: wordFor(d.help ?? "") }));
+const defsFor = (keys, subject = SUBJECT) =>
+  keys
+    .map((k) => RULE_FIELD_DEFS.find((d) => d.key === k))
+    .map((d) => ({ ...d, help: wordFor(d.help ?? "", subject) }));
 
 /** What a brand-new rule starts with, so the scheme is explicit from the first keystroke. */
 const NEW_RULE_PATTERN = "https://";
