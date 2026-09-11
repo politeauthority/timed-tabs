@@ -170,8 +170,10 @@ browser's own feed:
 
 CI runs Firefox stable and stable-1, which are the required checks, and Chrome stable
 beside them. The full run, on a PR labelled `ci run full`, runs all four channels in
-both browsers; nightly is shown and flagged but never holds the merge, since a daily
-build breaking is worth knowing and not worth blocking on.
+both browsers. Nightly is shown and flagged but never holds the merge, since a daily
+build breaking is worth knowing and not worth blocking on — and while Chrome is being
+proven on the runner, the same goes for every Chrome leg (`chrome-advisory`, on by
+default). An advisory leg that fails is a warning on its job rather than a red.
 
 On a PR to `main` that carries `ci run full`, CI's legs skip: the full run covers the
 same versions and the `CI run full` status holds the merge until it passes. The

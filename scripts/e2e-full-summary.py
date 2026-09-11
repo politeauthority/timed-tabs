@@ -10,7 +10,9 @@ failed. A green leg has nothing to say beyond its row. Each segment's verdict
 goes to stderr, one line per browser, and the exit code is 3 when a leg that
 counts failed in either; nightly never counts.
 
-Usage: e2e-full-summary.py <legs dir> <jobs.json>
+Usage: e2e-full-summary.py [--advisory nightly,chrome] <legs dir> <jobs.json>
+  --advisory  channels or browsers whose legs are shown and never counted;
+              `nightly` is a channel, `chrome` a browser. Default: nightly.
   <legs dir>  one subdirectory per artifact, each holding leg.json
   <jobs.json> `gh run view <id> --json jobs`, for wall times and links
 """
@@ -42,10 +44,14 @@ def leg_order(leg):
     return int(m.group(1)) if m else 99
 
 
+ADVISORY = {"nightly"}
+
+
 def counts(record):
     """Whether a leg holds the merge. Nightly is a daily build: worth watching,
-    not worth blocking on, so it is reported, flagged, and then ignored."""
-    return record.get("leg") != "nightly"
+    not worth blocking on, so it is reported, flagged, and then ignored; a whole
+    browser can be advisory the same way while it is being proven."""
+    return record.get("leg") not in ADVISORY and record.get("browser", "firefox") not in ADVISORY
 
 
 def leg_name(record):
@@ -69,7 +75,12 @@ def wall(job):
 
 
 def main():
-    legs_dir, jobs_path = sys.argv[1], sys.argv[2]
+    args = sys.argv[1:]
+    if args[:1] == ["--advisory"]:
+        ADVISORY.clear()
+        ADVISORY.update(a for a in args[1].split(",") if a)
+        args = args[2:]
+    legs_dir, jobs_path = args[0], args[1]
 
     records = []
     for name in sorted(os.listdir(legs_dir)):
@@ -113,16 +124,21 @@ def main():
         advisory_failed = [r for r in segment if not counts(r) and r["outcome"] != "success"]
         any_required_failed = any_required_failed or bool(required_failed)
 
+        browser_advisory = browser in ADVISORY
         if required_failed:
             verdict = f"{label}: {', '.join(r['leg'] for r in required_failed)} failed"
+        elif advisory_failed and browser_advisory:
+            verdict = f"{label} (advisory): {', '.join(r['leg'] for r in advisory_failed)} did not pass"
         elif advisory_failed:
             verdict = f"{label}: passed, nightly did not"
         else:
-            verdict = f"{label}: passed"
+            verdict = f"{label}: passed" + (" (advisory)" if browser_advisory else "")
         print(verdict, file=sys.stderr)
 
-        out.append(f"#### {emoji} {label} — {'❌' if required_failed else '✅'} {passed}/{len(segment)} legs passed\n")
-        if advisory_failed:
+        mark = "❌" if required_failed else ("⚠️" if advisory_failed else "✅")
+        tag = " · advisory, does not hold the merge" if browser_advisory else ""
+        out.append(f"#### {emoji} {label} — {mark} {passed}/{len(segment)} legs passed{tag}\n")
+        if advisory_failed and not browser_advisory:
             names = ", ".join(f"`{leg_name(r)}`" for r in advisory_failed)
             out.append(f"⚠️ {names} did not pass. Nightly is a daily build and advisory: "
                        "it is shown here and does not hold the merge.\n")
