@@ -88,6 +88,84 @@ export function dialShapes({ progress = 0, size = GRID, state = "running" } = {}
   return shapes;
 }
 
+/**
+ * Stroke weights for the interactive clock, which is a different animal from
+ * the ring: a thin rim holding a filled face, so the weights that keep the
+ * ring legible would swallow it. The hands are cut *out* of the face rather
+ * than drawn, so they are sized to survive as a hole - a knocked-out hand
+ * needs more width than a painted one to read at 16px.
+ */
+export function faceMetrics(size) {
+  if (size <= 20) return { rim: 12.3, rimWidth: 2.6, face: 9.6, hand: 3.2, minute: 7, hour: 5 };
+  if (size <= 40) return { rim: 12.4, rimWidth: 2.2, face: 10, hand: 2.8, minute: 7.4, hour: 5.3 };
+  return { rim: 12.5, rimWidth: 2, face: 10.2, hand: 2.6, minute: 7.6, hour: 5.4 };
+}
+
+/** How faint the drained part of the face sits behind the part still to run. */
+const FACE_ALPHA = 0.16;
+
+/**
+ * The interactive clock: the same mark as `dialShapes`, but the face itself
+ * empties instead of a ring draining around it. The wedge still to run is
+ * solid and the hands are punched out of it, so a tab with time left reads as
+ * a full clock and one nearly out reads as a rim with a sliver in it.
+ *
+ * `state` adds two the ring has no way to say. "paused" is a stopped clock:
+ * the face freezes where it is and the hands give way to a pause bar, which
+ * is what tells the tab apart from one that is simply running slowly.
+ * "exempt" is a tab that will never expire: no face at all, just the rim and
+ * the hands, so there is visibly nothing draining.
+ */
+export function faceShapes({ progress = 0, size = GRID, state = "running" } = {}) {
+  const c = GRID / 2;
+  const m = faceMetrics(size);
+  const rim = { kind: "arc", cx: c, cy: c, r: m.rim, width: m.rimWidth, from: 0, to: 1 };
+
+  if (state === "flash") return [{ kind: "disc", cx: c, cy: c, r: m.rim + m.rimWidth / 2 }];
+  if (state === "expired") {
+    return [
+      { kind: "disc", cx: c, cy: c, r: m.rim + m.rimWidth / 2 },
+      { kind: "erase", shapes: bangShapes() },
+    ];
+  }
+  if (state === "exempt") return [rim, ...handShapes(m)];
+
+  const remaining = 1 - Math.min(1, Math.max(0, progress));
+  const shapes = [
+    rim,
+    { kind: "wedge", cx: c, cy: c, r: m.face, from: 0, to: 1, alpha: FACE_ALPHA },
+  ];
+  // A sliver of face left is still worth drawing; none at all is not.
+  if (remaining > 0) shapes.push({ kind: "wedge", cx: c, cy: c, r: m.face, from: 0, to: remaining });
+  shapes.push({ kind: "erase", shapes: state === "paused" ? pauseShapes(m) : handShapes(m) });
+  return shapes;
+}
+
+/** The two hands, at the resting angles the packaged mark uses. */
+function handShapes(m) {
+  const c = GRID / 2;
+  const [mx, my] = handEnd(0, m.minute);
+  const [hx, hy] = handEnd(1 / 3, m.hour);
+  return [
+    { kind: "capsule", x1: c, y1: c, x2: mx, y2: my, width: m.hand },
+    { kind: "capsule", x1: c, y1: c, x2: hx, y2: hy, width: m.hand },
+  ];
+}
+
+/** The two bars of a stopped clock, punched out of the face. */
+function pauseShapes(m) {
+  const gap = m.hand * 0.9;
+  const reach = m.face * 0.52;
+  return [-1, 1].map((side) => ({
+    kind: "capsule",
+    x1: GRID / 2 + side * gap,
+    y1: GRID / 2 - reach,
+    x2: GRID / 2 + side * gap,
+    y2: GRID / 2 + reach,
+    width: m.hand,
+  }));
+}
+
 /** The exclamation that marks an expired tab, punched out of a solid disc. */
 function bangShapes() {
   return [
@@ -139,6 +217,14 @@ function paintShape(ctx, shape, color) {
     const end = -Math.PI / 2 + shape.to * Math.PI * 2;
     ctx.arc(shape.cx, shape.cy, shape.r, start, end);
     ctx.stroke();
+  } else if (shape.kind === "wedge") {
+    // A slice of the face: centre, out to the rim, round, and back.
+    const start = -Math.PI / 2 + shape.from * Math.PI * 2;
+    const end = -Math.PI / 2 + shape.to * Math.PI * 2;
+    ctx.moveTo(shape.cx, shape.cy);
+    ctx.arc(shape.cx, shape.cy, shape.r, start, end);
+    ctx.closePath();
+    ctx.fill();
   } else if (shape.kind === "capsule") {
     ctx.lineWidth = shape.width;
     ctx.lineCap = "round";

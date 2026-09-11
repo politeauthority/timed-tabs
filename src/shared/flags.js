@@ -52,6 +52,13 @@ export const FLAGS = [
     default: false,
     requires: "beta-features",
   },
+  {
+    id: "primary-icon-interactive",
+    label: "Interactive toolbar clock",
+    help: "The toolbar button stops being a ring and becomes a clock face that empties as the tab you are on runs out of time, with a look of its own for a paused clock and for a tab that never expires. It follows the tab you are looking at rather than painting every tab.",
+    default: false,
+    requires: "beta-features",
+  },
 ];
 
 /** The shape a fresh profile starts with. */

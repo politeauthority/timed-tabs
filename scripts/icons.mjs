@@ -44,6 +44,15 @@ function covers(shape, x, y) {
     if (turn < 0) turn += 1;
     return turn >= shape.from && turn <= shape.to;
   }
+  if (shape.kind === "wedge") {
+    const dx = x - shape.cx;
+    const dy = y - shape.cy;
+    if (Math.hypot(dx, dy) > shape.r) return false;
+    if (shape.to - shape.from >= 1) return true;
+    let turn = Math.atan2(dx, -dy) / (Math.PI * 2);
+    if (turn < 0) turn += 1;
+    return turn >= shape.from && turn <= shape.to;
+  }
   if (shape.kind === "capsule") {
     const vx = shape.x2 - shape.x1;
     const vy = shape.y2 - shape.y1;
