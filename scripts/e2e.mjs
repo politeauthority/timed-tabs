@@ -1,11 +1,11 @@
-// End-to-end scenarios in a real, headless Firefox.
+// End-to-end scenarios in a real, headless browser -- Firefox or Chrome.
 //
 // Each tests/e2e/scenarios/<name>.json is
 //   { "runSeconds": 25, "dev": { ...dev.json... }, "expect": [regex...], "expectNot": [regex...] }
 // The dev object is written into a dev build (see the dev hook in
-// background/index.js), web-ext runs that build headless, and the log it
+// background/index.js), the browser runs that build headless, and the log it
 // printed is matched against the expectations. `runSeconds` counts from the
-// extension's first log line, not from launch, so a slow Firefox start on a
+// extension's first log line, not from launch, so a slow browser start on a
 // busy runner does not eat into the scenario; launch itself is capped at 90s. Screenshots the
 // scenario captured, and the raw log, land in e2e-artifacts/<name>.*.
 //
@@ -14,10 +14,19 @@
 // summary; nothing else reads it, so the console output below stays the source
 // of truth for a human running this locally.
 //
-// Usage: npm run e2e [-- name ...]   FIREFOX=/path/to/firefox to pick a binary.
+// Both browsers run the same scenarios. Firefox prints the extension's console
+// to stdout given two prefs, so web-ext is the whole driver; Chrome does not, so
+// scripts/e2e-chrome.mjs attaches over the DevTools protocol and returns a log in
+// the same shape. Everything below this line is browser-agnostic on purpose --
+// a scenario that passes in one and fails in the other is a real difference in
+// the extension, not a difference in how it was measured.
+//
+// Usage: npm run e2e [-- name ...]          FIREFOX=/path/to/firefox
+//        npm run e2e:chrome [-- name ...]   CHROME=/path/to/chrome
 import { spawn } from "node:child_process";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { runChrome } from "./e2e-chrome.mjs";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const SCENARIOS = path.join(ROOT, "tests", "e2e", "scenarios");
@@ -29,7 +38,17 @@ const PREFS = [
   "browser.aboutwelcome.enabled=false",
 ];
 
-const only = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const browser = (argv.find((a) => a.startsWith("--browser="))?.slice(10) ?? "firefox").toLowerCase();
+if (!["firefox", "chrome"].includes(browser)) {
+  console.error(`Unknown browser "${browser}"; expected firefox or chrome.`);
+  process.exit(2);
+}
+const isChrome = browser === "chrome";
+// The dev build is browser-shaped: Chrome refuses background.scripts and a gecko
+// id, Firefox refuses a service worker, so each gets its own target.
+const devTarget = isChrome ? "chrome-dev" : "dev";
+const only = argv.filter((a) => !a.startsWith("--"));
 const names = (await readdir(SCENARIOS))
   .filter((f) => f.endsWith(".json"))
   .map((f) => f.slice(0, -5))
@@ -42,9 +61,10 @@ await mkdir(OUT, { recursive: true });
 
 const total = names.length;
 const suiteStartedAt = Date.now();
-// What is about to run, before the first Firefox takes half a minute to start.
+// What is about to run, before the first browser takes half a minute to start.
 // On a runner this is the only thing that says how long the step should take.
-console.log(`\n🦊 ${total} scenario${total === 1 ? "" : "s"} to run: ${names.join(", ")}`);
+const badge = isChrome ? "🌐 Chrome" : "🦊 Firefox";
+console.log(`\n${badge}: ${total} scenario${total === 1 ? "" : "s"} to run: ${names.join(", ")}`);
 
 let failed = 0;
 const results = [];
@@ -57,12 +77,17 @@ for (const [i, name] of names.entries()) {
   console.log(`\n🧪 [${index}/${total}] ${name} — up to ${seconds}s`);
   const devJson = path.join(OUT, `${name}.dev.json`);
   await writeFile(devJson, JSON.stringify(scenario.dev, null, 2));
-  await run("node", ["scripts/build.mjs", "dev"], { DEV_JSON: devJson });
+  await run("node", ["scripts/build.mjs", devTarget], { DEV_JSON: devJson });
 
-  const args = ["web-ext", "run", "--source-dir", "dist/dev", "--verbose", "--args=-headless", "--no-input"];
-  if (process.env.FIREFOX) args.push("--firefox", process.env.FIREFOX);
-  for (const p of PREFS) args.push("--pref", p);
-  const log = await runFor("npx", args, seconds * 1000, { MOZ_HEADLESS: "1" });
+  let log;
+  if (isChrome) {
+    log = await runChrome({ extDir: path.join(ROOT, "dist", "chrome-dev"), ms: seconds * 1000 });
+  } else {
+    const args = ["web-ext", "run", "--source-dir", "dist/dev", "--verbose", "--args=-headless", "--no-input"];
+    if (process.env.FIREFOX) args.push("--firefox", process.env.FIREFOX);
+    for (const p of PREFS) args.push("--pref", p);
+    log = await runFor("npx", args, seconds * 1000, { MOZ_HEADLESS: "1" });
+  }
   await writeFile(path.join(OUT, `${name}.log`), log);
 
   const capture = decodeCapture(log);
@@ -102,7 +127,7 @@ for (const [i, name] of names.entries()) {
 }
 const elapsed = Math.round((Date.now() - suiteStartedAt) / 1000);
 console.log(`\n🏁 ${total - failed}/${total} scenarios passed in ${elapsed}s`);
-await writeFile(path.join(OUT, "results.json"), JSON.stringify({ scenarios: results }, null, 2));
+await writeFile(path.join(OUT, "results.json"), JSON.stringify({ browser, scenarios: results }, null, 2));
 process.exit(failed ? 1 : 0);
 
 function run(cmd, args, env) {
@@ -116,7 +141,7 @@ function run(cmd, args, env) {
 /**
  * Run a command until `ms` after its output first mentions the extension,
  * then stop it and everything it started. A hard cap covers a Firefox that
- * never comes up.
+ * never comes up. Chrome's equivalent lives in e2e-chrome.mjs.
  */
 function runFor(cmd, args, ms, env) {
   return new Promise((resolve) => {

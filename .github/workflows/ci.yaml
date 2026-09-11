@@ -137,3 +137,11 @@ jobs:
     permissions:
       contents: read
       actions: read
+    with:
+      # The Chrome leg, on the one branch proving it can run on this runner. This
+      # is the only place it is switched on: full.yaml and beta-release.yaml call
+      # the same workflow and stay Firefox-only. The PR's head branch on a pull
+      # request, the pushed branch otherwise. Widening it to every branch is
+      # deleting this condition, in the same commit that adds `E2E / Chrome
+      # stable` to branch protection.
+      chrome: ${{ (github.head_ref == 'feat/chrome-e2e' || github.ref_name == 'feat/chrome-e2e') && 'true' || 'false' }}
