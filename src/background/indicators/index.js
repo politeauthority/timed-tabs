@@ -25,9 +25,10 @@
 import * as favicon from "./favicon.js";
 import * as themeTint from "./theme-tint.js";
 import * as badge from "./badge.js";
+import * as actionIcon from "./action-icon.js";
 import * as titlePrefix from "./title-prefix.js";
 
-export const indicators = [favicon, titlePrefix, themeTint, badge];
+export const indicators = [favicon, titlePrefix, themeTint, actionIcon, badge];
 
 export function findIndicators(ids) {
   return indicators.filter((i) => ids.includes(i.id) && i.supported());
