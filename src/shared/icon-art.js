@@ -12,7 +12,7 @@
  * a 32x32 grid, and `size` is only ever a hint about how much detail survives.
  *
  * Angles are turns, not radians: 0 is twelve o'clock and they increase
- * clockwise, which is the direction the ring drains.
+ * clockwise.
  */
 
 /** The design grid every coordinate below is expressed in. */
@@ -56,6 +56,12 @@ function handEnd(turn, len) {
  * `state` is "running" (ring drains as `progress` goes 0 -> 1), "flash" (a
  * solid disc, the loud half of a blink) or "expired" (solid disc with an
  * exclamation knocked out of it).
+ *
+ * The arc still to run starts at twelve, so the part already spent opens to
+ * the *left* of twelve and eats anticlockwise -- against the hands. That is
+ * wrong, and `faceShapes` does it the other way round; the fix is held behind
+ * `primary-icon-interactive` with the rest of the clock rather than changing
+ * the mark every user already has. Lift them together.
  *
  * Every shape is the one colour or a hole punched out of it. Nothing is white
  * and nothing is dark, because the same image has to sit on a light and a
@@ -110,11 +116,17 @@ const FACE_ALPHA = 0.16;
  * solid and the hands are punched out of it, so a tab with time left reads as
  * a full clock and one nearly out reads as a rim with a sliver in it.
  *
- * `state` adds two the ring has no way to say. "paused" is a stopped clock:
- * the face freezes where it is and the hands give way to a pause bar, which
- * is what tells the tab apart from one that is simply running slowly.
- * "exempt" is a tab that will never expire: no face at all, just the rim and
- * the hands, so there is visibly nothing draining.
+ * `state` adds one the ring has no way to say: "exempt" is a tab that will
+ * never expire, no face at all, just the rim and the hands, so there is
+ * visibly nothing draining.
+ *
+ * A stopped clock needs no artwork of its own. The face is drawn from
+ * `progress`, and a paused tab's progress is what stops advancing, so the mark
+ * freezes where it stood by itself; `STATE_COLORS.paused` takes it off the
+ * green-to-red ramp, which is what says stopped rather than merely slow. It
+ * used to swap the hands for a pause bar, and that could not survive the
+ * drain: the bar is punched *out* of the face, so once the face had gone the
+ * bar went with it, and a clock stopped past halfway read as a smear.
  */
 export function faceShapes({ progress = 0, size = GRID, state = "running" } = {}) {
   const c = GRID / 2;
@@ -130,14 +142,16 @@ export function faceShapes({ progress = 0, size = GRID, state = "running" } = {}
   }
   if (state === "exempt") return [rim, ...handShapes(m)];
 
-  const remaining = 1 - Math.min(1, Math.max(0, progress));
+  const spent = Math.min(1, Math.max(0, progress));
   const shapes = [
     rim,
     { kind: "wedge", cx: c, cy: c, r: m.face, from: 0, to: 1, alpha: FACE_ALPHA },
   ];
+  // The wedge still to run ends at twelve, so the part already spent opens at
+  // twelve and sweeps right -- the way the hands move.
   // A sliver of face left is still worth drawing; none at all is not.
-  if (remaining > 0) shapes.push({ kind: "wedge", cx: c, cy: c, r: m.face, from: 0, to: remaining });
-  shapes.push({ kind: "erase", shapes: state === "paused" ? pauseShapes(m) : handShapes(m) });
+  if (spent < 1) shapes.push({ kind: "wedge", cx: c, cy: c, r: m.face, from: spent, to: 1 });
+  shapes.push({ kind: "erase", shapes: handShapes(m) });
   return shapes;
 }
 
@@ -150,20 +164,6 @@ function handShapes(m) {
     { kind: "capsule", x1: c, y1: c, x2: mx, y2: my, width: m.hand },
     { kind: "capsule", x1: c, y1: c, x2: hx, y2: hy, width: m.hand },
   ];
-}
-
-/** The two bars of a stopped clock, punched out of the face. */
-function pauseShapes(m) {
-  const gap = m.hand * 0.9;
-  const reach = m.face * 0.52;
-  return [-1, 1].map((side) => ({
-    kind: "capsule",
-    x1: GRID / 2 + side * gap,
-    y1: GRID / 2 - reach,
-    x2: GRID / 2 + side * gap,
-    y2: GRID / 2 + reach,
-    width: m.hand,
-  }));
 }
 
 /** The exclamation that marks an expired tab, punched out of a solid disc. */
