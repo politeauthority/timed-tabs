@@ -52,7 +52,7 @@ import {
   toUnit,
 } from "../shared/time.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
-import { FLAGS, featureOn, flagOn, flagRequires } from "../shared/flags.js";
+import { FLAGS, activeFeatures, featureOn, flagOn, flagRequires } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
 import { mountToasts } from "./toasts.js";
 
@@ -2557,8 +2557,36 @@ watchSettings((next) => {
   renderFlagged();
 });
 
+/**
+ * Say which beta features are on, and name them.
+ *
+ * The reason this exists is the question it answers: a flag can change the
+ * popup enough that the documentation stops describing it, and there was no
+ * way to tell from the screen that a switch was the cause. Naming the features
+ * is the whole point, so the note lists them rather than counting them.
+ *
+ * Nothing is shown when none is on -- the ordinary case, which should cost no
+ * space at all -- nor when "Beta features" is on by itself, since the master
+ * switch changes nothing you could notice.
+ */
+function renderFlagsNote() {
+  const on = activeFeatures(settings);
+  const note = $("flags-note");
+  note.hidden = on.length === 0;
+  if (!on.length) return;
+  // Terse on purpose: this sits above everything else for as long as a flag
+  // is on, and the popup has no room to spare. The names are what earn their
+  // place; the reason for saying any of it waits in the tooltip.
+  const names = on.map((f) => f.label);
+  $("flags-note-text").textContent =
+    `${names.length === 1 ? "1 beta feature" : `${names.length} beta features`} on: ${names.join(", ")}`;
+  note.title =
+    "Timed Tabs may not match the user guide while a beta feature is on. Settings \u2192 Advanced \u2192 Feature flags.";
+}
+
 /** Every part of the UI a feature flag can show or hide. */
 function renderFlagged() {
+  renderFlagsNote();
   // With the toasts switched off there is no host on the page any more, so
   // anything still showing would sit there unreachable.
   if (!toastsOn()) toasts.clear();
@@ -2979,6 +3007,23 @@ async function openPageView(hash = "", extraParams = {}) {
 }
 
 $("open-page").addEventListener("click", () => openPageView("#tabs"));
+
+/**
+ * "Change" on the flags note goes to the switches it is talking about. From
+ * the popup that means opening the page, since the flags live on the Settings
+ * page and the popup has no copy of them; from a page view it is a hop and a
+ * scroll, because the row is below the fold of a long Settings page.
+ */
+$("flags-note-manage").addEventListener("click", () => {
+  if (isPopup) return openPageView("#settings");
+  location.hash = "#settings";
+  // After the hash has been routed and the section is displayed.
+  requestAnimationFrame(() => {
+    $("fields")
+      .querySelector('.field[data-key="featureFlags"]')
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+});
 
 // Backup has a page of its own; these are the ways in and out of it.
 $("open-backup").addEventListener("click", () => {

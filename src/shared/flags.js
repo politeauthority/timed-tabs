@@ -84,6 +84,31 @@ export function flagRequires(id) {
 }
 
 /**
+ * True for a flag that exists only to gate others, which is to say one some
+ * other flag requires. "Beta features" is the one today: on its own it changes
+ * nothing you can see, so it is not something to tell anyone is on.
+ *
+ * Derived rather than declared, so a second gate added later needs no list
+ * keeping up to date.
+ */
+export function isGate(id) {
+  return FLAGS.some((f) => f.requires === id);
+}
+
+/**
+ * The features in force, in the order the settings page lists them: every flag
+ * that is on, that something can actually be seen from, and whose gates are on
+ * too. This is what the UI names when it says why it does not match the docs.
+ *
+ * Empty when "Beta features" is on but nothing under it is, which is the case
+ * worth getting right: the master switch alone changes nothing, so saying so
+ * would be telling the user about a difference that is not there.
+ */
+export function activeFeatures(settings) {
+  return FLAGS.filter((f) => !isGate(f.id) && featureOn(settings, f.id));
+}
+
+/**
  * True when a feature is in force: its flag is on, and so is every flag it
  * requires, all the way up. This is the read the UI and background use.
  */

@@ -24,6 +24,16 @@ without losing track of which ones you had chosen. Turning **Beta features** off
 leaves the individual switches as they were; turning it back on restores exactly the
 set you had.
 
+## 🚩 Knowing one is on
+
+While any beta feature is on, a line at the top of the popup and of every page names
+which ones — `2 beta features on: Site groups, Settings toasts` — with **Change** to
+go straight back to the switches. It is there so that a screen which no longer matches
+this guide explains itself, rather than leaving you to wonder which switch did it.
+
+It counts features, not switches: **Beta features** on its own changes nothing you can
+see, so on its own it says nothing.
+
 Flags are stored with the rest of your settings, which means they follow the
 browser's extension storage sync and travel in a **Backup** like any other setting.
 A backup written before a flag existed loads without complaint — the flag simply

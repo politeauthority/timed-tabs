@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FLAGS, FLAGS, featureOn, flagOn, flagRequires, mergeFlags } from "../src/shared/flags.js";
+import { DEFAULT_FLAGS, FLAGS, activeFeatures, featureOn, flagOn, flagRequires, isGate, mergeFlags } from "../src/shared/flags.js";
 
 describe("FLAGS", () => {
   it("declares beta-features, off by default", () => {
@@ -117,5 +117,61 @@ describe("flagOn", () => {
   it("only counts a real true, not anything truthy", () => {
     expect(flagOn({ featureFlags: { "beta-features": "true" } }, "beta-features")).toBe(false);
     expect(flagOn({ featureFlags: { "beta-features": 1 } }, "beta-features")).toBe(false);
+  });
+});
+
+describe("isGate", () => {
+  it("calls beta-features a gate, because everything else needs it", () => {
+    expect(isGate("beta-features")).toBe(true);
+  });
+
+  it("calls a flag nothing depends on a feature", () => {
+    for (const f of FLAGS) {
+      if (f.id === "beta-features") continue;
+      expect(isGate(f.id)).toBe(false);
+    }
+  });
+
+  it("answers for an id this build never declared", () => {
+    expect(isGate("retired-long-ago")).toBe(false);
+  });
+});
+
+describe("activeFeatures", () => {
+  const on = (...ids) => ({ featureFlags: Object.fromEntries(ids.map((id) => [id, true])) });
+
+  it("says nothing is on for a fresh profile", () => {
+    expect(activeFeatures({ featureFlags: DEFAULT_FLAGS })).toEqual([]);
+  });
+
+  // The case the note exists to get right: the master switch on its own
+  // changes nothing anyone can see, so there is nothing to announce.
+  it("stays empty when only the master switch is on", () => {
+    expect(activeFeatures(on("beta-features"))).toEqual([]);
+  });
+
+  it("stays empty when a feature is on but its gate is not", () => {
+    expect(activeFeatures(on("site-groups"))).toEqual([]);
+  });
+
+  it("names a feature once both switches are on", () => {
+    expect(activeFeatures(on("beta-features", "site-groups")).map((f) => f.id)).toEqual(["site-groups"]);
+  });
+
+  it("lists several in the order the settings page does", () => {
+    const ids = activeFeatures(on("beta-features", "settings-toasts", "mini-ui-page-settings")).map((f) => f.id);
+    expect(ids).toEqual(["mini-ui-page-settings", "settings-toasts"]);
+    const declared = FLAGS.map((f) => f.id);
+    expect(ids).toEqual([...ids].sort((a, b) => declared.indexOf(a) - declared.indexOf(b)));
+  });
+
+  it("carries the label the note needs to name it", () => {
+    const [only] = activeFeatures(on("beta-features", "site-groups"));
+    expect(only.label).toBe(FLAGS.find((f) => f.id === "site-groups").label);
+  });
+
+  it("survives settings that have no flags at all", () => {
+    expect(activeFeatures({})).toEqual([]);
+    expect(activeFeatures(undefined)).toEqual([]);
   });
 });
