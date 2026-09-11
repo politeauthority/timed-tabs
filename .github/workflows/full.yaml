@@ -34,9 +34,9 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # it can never filter itself down to its own label -- a skipped required check
 # is a pass, and on an unlabelled PR that would hand back the merge the label
 # is holding. What keeps that cheap is `plan`. Eight browsers only run when the
-# head commit has not already passed them: any later event on the same commit
-# (another label, a review) finds the earlier green run and reuses it, and
-# events on an older commit are cancelled outright.
+# head commit has not already passed them: a later event on a commit an earlier
+# run has finished green finds that run and reuses it. A run on a commit the PR
+# has since moved past is cancelled by the concurrency group below.
 #
 # Only merges into main need the label. A PR against any other branch, and the
 # release PR (whose branch never carries anything a scenario can read; see
@@ -57,13 +57,25 @@ permissions:
   contents: read
   actions: read
 
-# One group per head commit, and nothing is cancelled: a second event on the
-# same commit waits behind the run already testing it, then finds it green and
-# reuses it (see `plan`). Runs on a commit the PR has moved past are cancelled
-# by `plan` instead, since a group keyed on the commit cannot see them.
+# One group per pull request, and the newest event takes it: a push cancels
+# whatever was still running for the commit before it. The commit used to be in
+# the group key, which put every commit in a group of its own and so left a run
+# on a commit the PR had moved past with nothing able to cancel it -- `plan` had
+# to do it over the API instead, and `plan` needs a runner first. On a queue
+# deep enough to matter that is exactly the runner it does not get, so the
+# stale run sat in front of the live one it was supposed to make way for.
+# Concurrency is applied when the run is queued and costs no runner at all,
+# which is why it belongs here and not in a job.
+#
+# The cost is the one case the commit in the key used to buy: a label added
+# while the legs for that same commit are already running now cancels and
+# restarts them, where before it queued behind and reused the result. A label
+# burst still collapses -- GitHub keeps one pending run per group and cancels
+# the rest either way -- and `plan` still reuses a run that has *finished*
+# green on the commit, which is the path auto-merge arming takes.
 concurrency:
-  group: full-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-  cancel-in-progress: false
+  group: full-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   plan:
@@ -71,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      actions: write      # to cancel runs on commits this PR has moved past
+      actions: read       # to find an earlier run on this commit worth reusing
       contents: read
     outputs:
       # exempt | paused | missing | reuse | run
@@ -85,12 +97,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
           BASE: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_ID: ${{ github.run_id }}
-          RUN_NUMBER: ${{ github.run_number }}
           # A run's `name` in the API is its run-name ("CI run full — PR #7"),
           # so runs of this workflow are picked out by file instead.
           WORKFLOW: .github/workflows/full.yaml
@@ -104,18 +114,9 @@ jobs:
             echo "$1: $2"
           }
 
-          # Older commits of this PR still running the legs are answering a
-          # question nobody will merge any more. Older only: two pushes in
-          # quick succession start two runs, and the first one's plan must not
-          # cancel the newer one that is about to cancel it.
-          for status in queued in_progress; do
-            gh api "repos/${GH_REPO}/actions/runs?event=pull_request&status=${status}&branch=${HEAD_REF}&per_page=100" \
-              --jq ".workflow_runs[] | select(.path == \"${WORKFLOW}\" and .head_sha != \"${HEAD_SHA}\" and .run_number < ${RUN_NUMBER}) | .id" \
-              | while read -r id; do
-                  echo "cancelling run ${id}: an older commit of this PR"
-                  gh api -X POST "repos/${GH_REPO}/actions/runs/${id}/cancel" > /dev/null || true
-                done
-          done
+          # Nothing to cancel here any more: the concurrency group at the top
+          # of this file drops a run on a commit the PR has moved past, and it
+          # does it without waiting for a runner, which this job cannot.
 
           if [ "$BASE" != "main" ]; then
             decide exempt "the label is only required to merge into main, and this PR targets \`${BASE}\`"; exit 0
