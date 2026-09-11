@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FLAGS, FLAGS, flagOn, mergeFlags } from "../src/shared/flags.js";
+import { DEFAULT_FLAGS, FLAGS, featureOn, flagOn, flagRequires, mergeFlags } from "../src/shared/flags.js";
 
 describe("FLAGS", () => {
   it("declares beta-features, off by default", () => {
@@ -19,35 +19,63 @@ describe("FLAGS", () => {
   it("has no duplicate ids", () => {
     expect(new Set(FLAGS.map((f) => f.id)).size).toBe(FLAGS.length);
   });
+
+  it("only requires flags that exist", () => {
+    const ids = new Set(FLAGS.map((f) => f.id));
+    for (const f of FLAGS) if (f.requires) expect(ids.has(f.requires)).toBe(true);
+    expect(flagRequires("mini-ui-page-settings")).toBe("beta-features");
+    expect(flagRequires("beta-features")).toBeNull();
+  });
+});
+
+describe("featureOn", () => {
+  const on = (...ids) => ({ featureFlags: Object.fromEntries(ids.map((i) => [i, true])) });
+  it("needs both the feature's flag and the master switch", () => {
+    expect(featureOn(on("beta-features", "mini-ui-page-settings"), "mini-ui-page-settings")).toBe(true);
+    expect(featureOn(on("mini-ui-page-settings"), "mini-ui-page-settings")).toBe(false);
+    expect(featureOn(on("beta-features"), "mini-ui-page-settings")).toBe(false);
+    expect(featureOn(on(), "mini-ui-page-settings")).toBe(false);
+  });
+  it("is plain flagOn for a flag with no parent", () => {
+    expect(featureOn(on("site-groups"), "site-groups")).toBe(true);
+    expect(featureOn(on("beta-features"), "beta-features")).toBe(true);
+    expect(featureOn(on(), "beta-features")).toBe(false);
+  });
+  it("is off for an unknown id and never loops", () => {
+    // An id this build does not declare has no parent, so its raw switch decides.
+    expect(featureOn(on("nope"), "nope")).toBe(true);
+    expect(featureOn(on(), "nope")).toBe(false);
+    expect(featureOn(undefined, "mini-ui-page-settings")).toBe(false);
+  });
 });
 
 describe("mergeFlags", () => {
   it("starts from the defaults when nothing is stored", () => {
-    expect(mergeFlags(undefined)).toEqual({ "beta-features": false, "site-groups": false });
-    expect(mergeFlags(null)).toEqual({ "beta-features": false, "site-groups": false });
-    expect(mergeFlags({})).toEqual({ "beta-features": false, "site-groups": false });
+    expect(mergeFlags(undefined)).toEqual({ "beta-features": false, "site-groups": false, "mini-ui-page-settings": false });
+    expect(mergeFlags(null)).toEqual({ "beta-features": false, "site-groups": false, "mini-ui-page-settings": false });
+    expect(mergeFlags({})).toEqual({ "beta-features": false, "site-groups": false, "mini-ui-page-settings": false });
   });
 
   it("keeps a stored value", () => {
-    expect(mergeFlags({ "beta-features": true })).toEqual({ "beta-features": true, "site-groups": false });
+    expect(mergeFlags({ "beta-features": true })).toEqual({ "beta-features": true, "site-groups": false, "mini-ui-page-settings": false });
   });
 
   it("drops a flag this build no longer declares", () => {
     const merged = mergeFlags({ "beta-features": true, "flag-that-was-retired": true });
-    expect(merged).toEqual({ "beta-features": true, "site-groups": false });
+    expect(merged).toEqual({ "beta-features": true, "site-groups": false, "mini-ui-page-settings": false });
     expect("flag-that-was-retired" in merged).toBe(false);
   });
 
   it("falls back to the default for a value that is not a switch", () => {
-    expect(mergeFlags({ "beta-features": "yes" })).toEqual({ "beta-features": false, "site-groups": false });
-    expect(mergeFlags({ "beta-features": 1 })).toEqual({ "beta-features": false, "site-groups": false });
-    expect(mergeFlags({ "beta-features": null })).toEqual({ "beta-features": false, "site-groups": false });
+    expect(mergeFlags({ "beta-features": "yes" })).toEqual({ "beta-features": false, "site-groups": false, "mini-ui-page-settings": false });
+    expect(mergeFlags({ "beta-features": 1 })).toEqual({ "beta-features": false, "site-groups": false, "mini-ui-page-settings": false });
+    expect(mergeFlags({ "beta-features": null })).toEqual({ "beta-features": false, "site-groups": false, "mini-ui-page-settings": false });
   });
 
   it("survives junk where the flags should be, rather than throwing", () => {
     for (const junk of ["", 0, [], "beta-features", true]) {
       expect(() => mergeFlags(junk)).not.toThrow();
-      expect(mergeFlags(junk)).toEqual({ "beta-features": false, "site-groups": false });
+      expect(mergeFlags(junk)).toEqual({ "beta-features": false, "site-groups": false, "mini-ui-page-settings": false });
     }
   });
 });

@@ -1375,6 +1375,15 @@ body:not([data-context="popup"]) .field {
   gap: var(--sp-5);
 }
 
+/* A feature flag that needs another one on first. */
+.field.flag-dependent {
+  padding-left: var(--sp-4);
+}
+
+.field.flag-dependent.is-blocked {
+  opacity: 0.55;
+}
+
 /* Site groups: cards like rules, with a name in the head and the patterns below. */
 .site-groups {
   margin-top: var(--sp-5);

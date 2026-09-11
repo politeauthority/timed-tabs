@@ -45,7 +45,7 @@ describe("feature flags in a backup", () => {
   it("round-trips a flag that is on", () => {
     const text = exportText({ ...DEFAULTS, featureFlags: { "beta-features": true } }, []);
     const { settings, warnings } = parseBundle(text);
-    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false });
+    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false, "mini-ui-page-settings": false });
     expect(warnings).toEqual([]);
   });
 
@@ -56,7 +56,7 @@ describe("feature flags in a backup", () => {
       rules: [],
     });
     const { settings, warnings } = parseBundle(text);
-    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false });
+    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false, "mini-ui-page-settings": false });
     expect(warnings).toEqual([]);
   });
 
