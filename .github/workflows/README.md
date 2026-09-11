@@ -95,3 +95,5 @@ of the trigger, as `CI` does, or let the job run every time, as `Not paused` doe
 removing it disarms; arming or disarming from the PR page moves the label to match.
 Each direction checks the current state before acting, so the two halves settle
 after one hop instead of handing the event back and forth.
+
+<!-- PAT scope check: a throwaway change under .github/workflows; this PR is closed, not merged. -->
