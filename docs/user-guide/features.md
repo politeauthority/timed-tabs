@@ -50,7 +50,7 @@ reopens the tab when there was one, and opens the Tabs page when there were more
 Switching the setting on sends a test notification at once. If the switch stays on but
 nothing appears, the browser accepted it and your operating system is holding it back:
 on macOS check System Settings, Notifications, Firefox, and any Focus mode; on Windows,
-Settings, Notifications. The Diagnostics section of the Settings page shows whether the
+Settings, Notifications. The Diagnostics pill on the Settings page shows whether the
 setting is on and the permission granted.
 
 This needs the browser's notification permission, which is asked for when the setting
@@ -208,18 +208,24 @@ Some details worth knowing:
 
 ![The Settings page](../../assets/screenshots/settings.png)
 
-Settings save as soon as they change and show a Saved mark. Settings sync
-through the browser's extension storage; rules are kept locally.
+Settings save as soon as they change and say so in a message that slides in at the
+bottom of the window, naming what you changed. A success fades after a few seconds,
+with a line burning down the bottom of it; a failure stays until you dismiss it and
+says what went wrong, because a setting that could not be written is one you would
+otherwise go on believing you had changed. Resting the pointer on a message holds
+every countdown. Rules and the per-tab controls keep their **Saved** tick instead —
+it sits on the row you edited, which a message at the bottom of the window cannot do.
+Settings sync through the browser's extension storage; rules are kept locally.
 
 - **Manage tabs** is the master switch. Off leaves every tab alone, with no timers,
   no closing and no colours, and undoes every mark already made. Back on, every tab
   starts its life afresh from that moment.
-- **Backup** exports every setting and every rule as one JSON document, to copy or
+- **Backup**, on its own pill, exports every setting and every rule as one JSON document, to copy or
   download, and loads one back. Loading replaces everything. The file records the
   Timed Tabs that wrote it, and says so when you load one from a different version;
   the copy shown after a load carries the version you loaded it into, not the one it
   came from.
-- **Diagnostics** shows what the background is doing for each tab, which is useful
+- **Diagnostics**, on its own pill, shows what the background is doing for each tab, which is useful
   when an indicator does not seem to paint.
 - **Feature flags**, on their own pill, switch on the parts that are not finished enough
   to be on for everyone. [feature-flags.md](feature-flags.md) lists them.

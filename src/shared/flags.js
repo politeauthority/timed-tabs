@@ -39,13 +39,6 @@ export const FLAGS = [
     requires: "beta-features",
   },
   {
-    id: "settings-toasts",
-    label: "Settings toasts",
-    help: "Say whether a change landed in a small message that slides in over the page instead of a “Saved” tick beside the setting. A success fades on its own; a failure stays until you dismiss it. These are the extension's own messages, nothing to do with the desktop notifications a tab gets when it expires.",
-    default: false,
-    requires: "beta-features",
-  },
-  {
     id: "statistics-panel",
     label: "Statistics",
     help: "A Statistics section on the Tabs page: how many tabs have run out of time and how, a chart of the last fortnight, snoozes, restarts and the most tabs you have had open at once. The counting happens either way — this switch only decides whether the section is there to read, so turning it off loses nothing and turning it back on shows the whole tally.",

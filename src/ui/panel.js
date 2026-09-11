@@ -65,12 +65,14 @@ const params = new URLSearchParams(location.search);
 // The full page and the preferences pane show one page at a time, chosen by
 // the URL hash: #tabs (default), #rules, #settings.
 
-const PAGES = ["tabs", "rules", "settings", "backup"];
+const PAGES = ["tabs", "rules", "settings"];
 
 function pageFromHash() {
   const h = location.hash.replace(/^#/, "");
   if (h.startsWith("rule-")) return "rules";
   if (PAGES.includes(h)) return h;
+  // Backup was a page of its own once; an old link to it lands on its pill.
+  if (h === "backup") return "settings";
   return context === "options" ? "settings" : "tabs";
 }
 
@@ -78,11 +80,8 @@ function route() {
   if (isPopup) return;
   const page = pageFromHash();
   document.body.dataset.page = page;
-  // Backup hangs off Settings and has no nav item of its own, so Settings
-  // stays marked while you are on it rather than nothing being current.
-  const nav = page === "backup" ? "settings" : page;
   for (const a of document.querySelectorAll("[data-page-link]")) {
-    if (a.dataset.pageLink === nav) a.setAttribute("aria-current", "page");
+    if (a.dataset.pageLink === page) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
   onPageShown(page);
@@ -167,6 +166,33 @@ function renderFields() {
   showGroup(currentGroup());
 }
 
+/**
+ * Pills on the Settings page that are not settings. Their sections are
+ * written in panel.html rather than rendered from FIELDS, and they are shown
+ * and hidden by showGroup like any group. Kept out of shared/settings.js,
+ * which describes user preferences and nothing else.
+ */
+const EXTRA_GROUPS = [
+  {
+    id: "backup",
+    emoji: "💾",
+    title: "Backup",
+    short: "Backup",
+    help: "Every setting and every rule as one JSON document, to keep or to restore.",
+    onShow: () => showBackup(),
+  },
+  {
+    id: "diagnostics",
+    emoji: "🩺",
+    title: "Diagnostics",
+    short: "Diagnostics",
+    help: "What the background is doing for each tab.",
+    onShow: () => refreshDiag(),
+  },
+];
+/** Every pill, in order: the settings groups, then the extras. */
+const PILLS = [...GROUPS, ...EXTRA_GROUPS];
+
 /** Which group of settings is on show. Remembered like the folds are. */
 const GROUP_KEY = "settings-group";
 function currentGroup() {
@@ -176,7 +202,7 @@ function currentGroup() {
   } catch {
     // Private window or blocked storage: fall back to the first group.
   }
-  return GROUPS.some((g) => g.id === stored) ? stored : GROUPS[0].id;
+  return PILLS.some((g) => g.id === stored) ? stored : GROUPS[0].id;
 }
 
 function showGroup(id) {
@@ -188,6 +214,16 @@ function showGroup(id) {
   for (const sec of $("fields").querySelectorAll(".group")) {
     sec.hidden = sec.id !== `group-${id}`;
   }
+  // An extra refreshes as it comes into view, not on every call: renderFields
+  // lands here on any settings change, and refilling the backup box then
+  // would throw away text pasted into it but not yet loaded.
+  for (const extra of EXTRA_GROUPS) {
+    const sec = $(`group-${extra.id}`);
+    const on = extra.id === id;
+    const arriving = on && sec.hidden;
+    sec.hidden = !on;
+    if (arriving) extra.onShow();
+  }
   for (const pill of $("settings-jump").querySelectorAll("[data-group]")) {
     const on = pill.dataset.group === id;
     pill.classList.toggle("is-selected", on);
@@ -198,16 +234,15 @@ function showGroup(id) {
 
 /**
  * The pills over the settings. They switch which group is shown rather than
- * scrolling to it, so the page is only ever as long as one group.
- *
- * Backup and Diagnostics are deliberately not pills: they are not settings,
- * and they keep their own places below.
+ * scrolling to it, so the page is only ever as long as one group. Backup and
+ * Diagnostics come last: they are not settings, but they live on this page
+ * and are reached the same way.
  */
 function renderGroupTabs() {
   const nav = $("settings-jump");
   nav.setAttribute("role", "tablist");
   nav.replaceChildren(
-    ...GROUPS.map((g) => {
+    ...PILLS.map((g) => {
       const pill = document.createElement("button");
       pill.type = "button";
       pill.className = "jump-pill";
@@ -222,8 +257,8 @@ function renderGroupTabs() {
         const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
         if (!step) return;
         e.preventDefault();
-        const at = GROUPS.findIndex((x) => x.id === g.id);
-        const next = GROUPS[(at + step + GROUPS.length) % GROUPS.length];
+        const at = PILLS.findIndex((x) => x.id === g.id);
+        const next = PILLS[(at + step + PILLS.length) % PILLS.length];
         showGroup(next.id);
         nav.querySelector(`[data-group="${next.id}"]`)?.focus();
       });
@@ -448,16 +483,14 @@ function applyManagementState() {
 }
 
 // ---- Saying whether it worked ----------------------------------------------
-// Two ways of reporting the same thing, chosen by the "settings-toasts" flag.
-// Off, a save confirms itself with a "Saved" tick on the row it changed and a
-// failure is only in the console. On, an outcome that has no natural home on
-// the page goes to a toast instead: a success fades, a failure stays until it
-// is dismissed, and the tick is left off so nothing is said twice.
+// An outcome with no natural home on the page goes to a toast: a success
+// fades, a failure stays until it is dismissed. A rule card or a per-tab
+// control keeps its "Saved" tick instead, since that sits on the thing that
+// changed, which a message at the bottom of the window cannot do.
 
 // The popup is 320px wide and only as tall as its content, so a pile deep
 // enough for the full page would cover most of it.
 const toasts = mountToasts(document.body, isPopup ? { max: 2 } : {});
-const toastsOn = () => featureOn(settings, "settings-toasts");
 
 /** The label of a settings field, for naming what was just saved. */
 function fieldLabel(key) {
@@ -485,14 +518,12 @@ async function write(run, { what, key = null, note = "Nothing was changed." }) {
     return true;
   } catch (err) {
     console.warn(`[timed-tabs] could not save ${what}:`, err);
-    if (toastsOn()) {
-      const reason = reasonFor(err);
-      toasts.error(
-        `Could not save ${what}`,
-        [reason, note].filter(Boolean).join(" "),
-        key ? `save:${key}` : null,
-      );
-    }
+    const reason = reasonFor(err);
+    toasts.error(
+      `Could not save ${what}`,
+      [reason, note].filter(Boolean).join(" "),
+      key ? `save:${key}` : null,
+    );
     return false;
   }
 }
@@ -517,16 +548,7 @@ async function save(partial) {
   // A flag can show or hide whole sections; the rules page depends on site-groups.
   if ("featureFlags" in partial) renderFlagged();
   updateFieldVisibility();
-  if (toastsOn()) {
-    toasts.success("Saved", what, keys.length === 1 ? keys[0] : "settings");
-  } else {
-    for (const key of keys) {
-      const row = $("fields").querySelector(
-        `.field[data-key="${CSS.escape(key)}"]`,
-      );
-      if (row && !row.classList.contains("field-group")) markSaved(row);
-    }
-  }
+  toasts.success("Saved", what, keys.length === 1 ? keys[0] : "settings");
   if (isPopup) refreshTab();
   if ($("overview").open) refreshOverview();
   return true;
@@ -535,14 +557,14 @@ async function save(partial) {
 /**
  * Inline confirmation on the row whose value has just been written to storage.
  *
- * A settings row says nothing while the toasts are on, because `save` has
- * already raised one naming the setting. Everywhere else the tick stays: on a
- * rule card or a per-tab control it sits on the thing that changed, which a
- * message at the bottom of the window cannot do.
+ * A settings row says nothing, because `save` has already raised a toast
+ * naming the setting. Everywhere else the tick stays: on a rule card or a
+ * per-tab control it sits on the thing that changed, which a message at the
+ * bottom of the window cannot do.
  */
 function markSaved(el, container = null) {
   if (!el) return;
-  if (toastsOn() && $("fields").contains(el)) return;
+  if ($("fields").contains(el)) return;
   container ??= el.querySelector(":scope > .field-control") ?? el;
   let mark = container.querySelector(":scope > .saved-mark");
   if (!mark) {
@@ -1004,24 +1026,12 @@ async function tabAction(action, value, sourceEl = null) {
   if (!reply) flashTabError();
 }
 
-let tabErrorTimer;
 function flashTabError() {
-  if (toastsOn()) {
-    toasts.error(
-      "Could not change this tab",
-      "Timed Tabs did not answer. Try again.",
-      "tab-action",
-    );
-    return;
-  }
-  const note = $("remaining-note");
-  const prev = note.textContent;
-  note.textContent = "could not save, try again";
-  clearTimeout(tabErrorTimer);
-  tabErrorTimer = setTimeout(() => {
-    if (note.textContent === "could not save, try again")
-      note.textContent = prev;
-  }, 2500);
+  toasts.error(
+    "Could not change this tab",
+    "Timed Tabs did not answer. Try again.",
+    "tab-action",
+  );
 }
 
 // ---- Fold state, remembered across page opens ------------------------------
@@ -1658,9 +1668,13 @@ function onPageShown(page) {
     applyRulesFilter();
   } else if (page === "settings") {
     renderFields();
+    // `#backup` was a page of its own once. It still opens the Backup pill,
+    // then reads as the Settings page it now is.
+    if (location.hash === "#backup") {
+      showGroup("backup");
+      history.replaceState(null, "", "#settings");
+    }
     refreshPermissionWarning();
-  } else if (page === "backup") {
-    showBackup();
   }
 }
 
@@ -2726,7 +2740,7 @@ watchSettings((next) => {
   // "Change" uses to send the popup somewhere specific. After renderFields,
   // which otherwise restores the last group looked at.
   const group = params.get("group");
-  if (!isPopup && GROUPS.some((g) => g.id === group)) showGroup(group);
+  if (!isPopup && PILLS.some((g) => g.id === group)) showGroup(group);
   renderSortControl();
   renderFlagged();
 });
@@ -2761,9 +2775,6 @@ function renderFlagsNote() {
 /** Every part of the UI a feature flag can show or hide. */
 function renderFlagged() {
   renderFlagsNote();
-  // With the toasts switched off there is no host on the page any more, so
-  // anything still showing would sit there unreachable.
-  if (!toastsOn()) toasts.clear();
   if (!isPopup) {
     renderGroups();
     renderRules();
@@ -2785,7 +2796,6 @@ watchGroups((next) => {
 // ---- Backup ----------------------------------------------------------------
 
 const backupText = $("backup-text");
-const backupStatus = $("backup-status");
 
 /**
  * Fill the box with everything as it stands, stamped with the build writing
@@ -2798,21 +2808,15 @@ const backupStatus = $("backup-status");
 async function showBackup() {
   const v = await getDisplayVersion().catch(() => null);
   backupText.value = exportText(settings, rules, groups, v?.display ?? "");
-  backupStatus.textContent = "";
 }
 
 /**
- * The outcome of a backup action. It has no row to sit on, so with the toasts
- * on it goes to one; without them it stays on the small line under the box,
- * where a failure has always been easy to miss.
+ * The outcome of a backup action. It has no row to sit on, so it goes to a
+ * toast rather than the small line under the box, where a failure was easy to
+ * miss.
  */
 function backupNote(text, level = "info") {
-  if (toastsOn()) {
-    backupStatus.textContent = "";
-    toasts.show({ level, message: text, key: "backup" });
-    return;
-  }
-  backupStatus.textContent = text;
+  toasts.show({ level, message: text, key: "backup" });
 }
 
 $("backup-refresh").addEventListener("click", showBackup);
@@ -2942,14 +2946,7 @@ async function applyBackup() {
 let backupTimer;
 function showBackupSoon() {
   clearTimeout(backupTimer);
-  backupTimer = setTimeout(async () => {
-    // `showBackup` clears the line as it refills the box, so what was just
-    // said has to be put back after it — and awaited, or it is put back
-    // before the clearing rather than after it.
-    const note = backupStatus.textContent;
-    await showBackup();
-    backupStatus.textContent = note;
-  }, 300);
+  backupTimer = setTimeout(showBackup, 300);
 }
 
 // ---- Theme -----------------------------------------------------------------
@@ -3192,20 +3189,10 @@ $("flags-note-manage").addEventListener("click", () => {
   });
 });
 
-// Backup has a page of its own; these are the ways in and out of it.
-$("open-backup").addEventListener("click", () => {
-  location.hash = "#backup";
-});
-$("backup-back").addEventListener("click", () => {
-  location.hash = "#settings";
-});
 $("diag-refresh").addEventListener("click", refreshDiag);
 $("diag-tick").addEventListener("click", async () => {
   await api.runtime.sendMessage({ type: "timed-tabs:tick" }).catch(() => {});
   refreshDiag();
-});
-$("diagnostics").addEventListener("toggle", (e) => {
-  if (e.target.open) refreshDiag();
 });
 api.permissions.onAdded?.addListener(refreshPermissionWarning);
 api.permissions.onRemoved?.addListener(() => {
