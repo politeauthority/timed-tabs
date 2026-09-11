@@ -1,5 +1,5 @@
 name: Auto-merge
-run-name: "Auto-merge — PR #${{ github.event.pull_request.number }}"
+run-name: "Auto-merge — ${{ github.event_name == 'push' && github.ref_name || format('PR #{0}', github.event.pull_request.number) }}"
 
 # 🏷️ Label a PR `automerge` and GitHub merges it once CI is green.
 #
@@ -25,11 +25,24 @@ run-name: "Auto-merge — PR #${{ github.event.pull_request.number }}"
 # label goes on with the PAT secret rather than GITHUB_TOKEN, since a label
 # added by GITHUB_TOKEN wakes no workflow and the full run would never start.
 #
+# 🔄 An armed PR is kept current with main. Auto-merge merges whatever the
+# checks passed on, and the checks ran on the merge ref of the moment; a PR that
+# then sits behind three other merges lands having been tested against none of
+# them. So every push to main looks for open PRs with auto-merge armed and
+# brings each one that has fallen behind up to date (the same "Update branch"
+# the PR page offers), and arming does the same for the one PR being armed.
+# The update is a push with the PAT, so CI and the full run see the new commit;
+# GITHUB_TOKEN could make the same push and nothing would wake for it, which
+# would leave the PR with no checks on the commit it is about to merge.
+#
 # 🔒 The release PR is deliberately left out of all this: it is admin-gated
 # behind the STABLE_RELEASES variable (see docs/developer/ci/releasing.md). It has
 # no `automerge` label, so this workflow never touches it. Do not add one.
 
 on:
+  # Every merge into main is a chance for an armed PR to have fallen behind.
+  push:
+    branches: [main]
   pull_request:
     # auto_merge_enabled/disabled keep the label honest when auto-merge is
     # armed some other way -- the button on the PR, or `gh pr merge --auto`.
@@ -68,7 +81,7 @@ jobs:
     name: Auto-merge
     # Stand down entirely for a label that is none of this workflow's business,
     # so the run is a single skipped check rather than three.
-    if: github.event.action != 'labeled' || github.event.label.name == 'automerge'
+    if: github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'automerge')
     runs-on: ubuntu-latest
     steps:
       - name: Match the label to the state
@@ -249,3 +262,79 @@ jobs:
           else
             echo "⚠️ Added \`${FULL_LABEL}\` with GITHUB_TOKEN, which wakes no workflow: the full run starts on the next push. Set the \`PAT\` secret to have it start now." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # Armed, so it will merge itself as soon as the checks say yes -- and the
+      # checks should be saying yes about a branch that has main in it. Bring
+      # it up to date now if it has fallen behind; the push to main job below
+      # keeps it that way afterwards.
+      - name: Bring the branch up to date
+        if: github.event.action != 'unlabeled' && github.event.action != 'auto_merge_disabled'
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "⚠️ No \`PAT\` secret, so the branch was not brought up to date: an update pushed with GITHUB_TOKEN wakes no checks." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          read -r state armed base sha <<< "$(gh api "repos/${GH_REPO}/pulls/${PR}" --jq '.state + " " + ((.auto_merge != null) | tostring) + " " + .base.ref + " " + .head.sha')"
+          [ "$state" = "open" ] && [ "$armed" = "true" ] || exit 0
+          behind=$(gh api "repos/${GH_REPO}/compare/${sha}...${base}" --jq .ahead_by)
+          if [ "$behind" = "0" ]; then
+            echo "🔄 The branch already has everything on \`${base}\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if gh api -X PUT "repos/${GH_REPO}/pulls/${PR}/update-branch" -f expected_head_sha="$sha" > /dev/null 2> err.txt; then
+            echo "🔄 Brought the branch up to date: it was ${behind} commit(s) behind \`${base}\`. CI and the full run start on the new commit." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "⚠️ Could not bring the branch up to date (${behind} commit(s) behind \`${base}\`). Usually a conflict, which needs a hand:"
+              echo '```'; cat err.txt; echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # 🔄 On every push to main: every open PR with auto-merge armed that has
+  # fallen behind is brought up to date. Each update is a push, so each one
+  # costs a CI and a full run; that is the price of merging what was tested.
+  refresh:
+    name: Keep armed PRs current
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.PAT }}
+          GH_REPO: ${{ github.repository }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## 🔄 Keep armed PRs current"
+            echo ""
+            echo "> ▶️ **Why this ran:** a push to \`${BASE}\`."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$GH_TOKEN" ]; then
+            echo "⚠️ No \`PAT\` secret, so nothing was updated: an update pushed with GITHUB_TOKEN wakes no checks." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Open PRs into this branch with auto-merge armed. REST, since the
+          # GraphQL shape of autoMergeRequest needs a scope the PAT lacks.
+          armed=$(gh api "repos/${GH_REPO}/pulls?state=open&base=${BASE}&per_page=100" \
+            --jq '.[] | select(.auto_merge != null) | "\(.number) \(.head.sha) \(.head.ref)"')
+          if [ -z "$armed" ]; then
+            echo "No open PR into \`${BASE}\` has auto-merge armed. Nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          while read -r pr sha ref; do
+            behind=$(gh api "repos/${GH_REPO}/compare/${sha}...${BASE}" --jq .ahead_by)
+            if [ "$behind" = "0" ]; then
+              echo "- #${pr} (\`${ref}\`): already current." >> "$GITHUB_STEP_SUMMARY"
+            elif gh api -X PUT "repos/${GH_REPO}/pulls/${pr}/update-branch" -f expected_head_sha="$sha" > /dev/null 2> err.txt; then
+              echo "- #${pr} (\`${ref}\`): 🔄 brought up to date, was ${behind} commit(s) behind." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- #${pr} (\`${ref}\`): ⚠️ could not update (${behind} behind): $(tr '\n' ' ' < err.txt | cut -c1-200)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done <<< "$armed"

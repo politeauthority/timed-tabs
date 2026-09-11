@@ -89,7 +89,7 @@ of the trigger, as `CI` does, or let the job run every time, as `Not paused` doe
 | `CI` | no | the label it cared about moved to `Not paused`, and `E2E`, which it calls, is a required check whose skip would overwrite a real pass |
 | `Not paused` | yes, all of them | required check; its red must never become a skip |
 | `CI run full` | yes, all of them | required check, same reason; its `plan` job keeps the eight browser legs from re-running on a commit that already passed |
-| `Auto-merge` | `automerge` only | not a required check, so an `if` is safe |
+| `Auto-merge` | `automerge` only; also every push to `main` | not a required check, so an `if` is safe |
 
 `Auto-merge` listens both ways. Adding the label arms GitHub's auto-merge and
 removing it disarms; arming or disarming from the PR page moves the label to match.
