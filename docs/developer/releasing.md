@@ -4,6 +4,18 @@ A stable release is cut by release-please from `main` once an admin approves it.
 beta is a snapshot of `main` taken between stables. Both attach unsigned Firefox and
 Chrome zips to a GitHub Release, and AMO submission is still manual.
 
+## Stable releases are paused
+
+While the project is in development, every release is a beta. release-please still
+keeps its release PR up to date, because the Beta Release workflow reads the next
+version from that PR's title, but the job that merges it is skipped and the Force
+Release workflow refuses to run. Both check the repository variable
+`STABLE_RELEASES`, found under Settings, Secrets and variables, Actions, Variables.
+Set it to `true` to resume stable releases; delete it to pause them again.
+
+Do not merge the release PR by hand while paused. The next workflow run would treat
+that merge as a stable release and tag it.
+
 ## Versions
 
 Stable releases use three-part semver, `0.8.0`. Betas use a prerelease suffix,
