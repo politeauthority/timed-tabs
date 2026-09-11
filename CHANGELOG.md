@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/politeauthority/timed-tabs/compare/v0.5.0...v0.6.0) (2026-09-11)
+
+
+### Features
+
+* make a tab's remaining time directly adjustable ([a5b5d4f](https://github.com/politeauthority/timed-tabs/commit/a5b5d4f50ffb6d66a42ed2c31a2fc779793b5904))
+* notify when a tab is closed by expiry ([311696f](https://github.com/politeauthority/timed-tabs/commit/311696fc0b9ed425c0a934f3894c731fa240c74d))
+
 ## [0.5.0](https://github.com/politeauthority/timed-tabs/compare/v0.4.0...v0.5.0) (2026-09-11)
 
 
