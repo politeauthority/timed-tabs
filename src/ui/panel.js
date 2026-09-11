@@ -67,7 +67,7 @@ const params = new URLSearchParams(location.search);
 
 // ---- Pages -----------------------------------------------------------------
 // The full page and the preferences pane show one page at a time, chosen by
-// the URL hash: #tabs (default), #rules (also #rule-<id>), #settings.
+// the URL hash: #tabs (default), #rules, #settings.
 
 const PAGES = ["tabs", "rules", "settings", "backup"];
 
@@ -459,11 +459,9 @@ async function save(partial) {
 }
 
 /** Inline confirmation on the row whose value has just been written to storage. */
-function markSaved(
-  el,
-  container = el.querySelector(":scope > .field-control") ?? el,
-) {
+function markSaved(el, container = null) {
   if (!el) return;
+  container ??= el.querySelector(":scope > .field-control") ?? el;
   let mark = container.querySelector(":scope > .saved-mark");
   if (!mark) {
     mark = document.createElement("span");
@@ -498,7 +496,10 @@ async function refreshTab() {
 }
 
 function renderTab() {
-  const hideTimer = settings.pauseWhileActive && settings.resetOnActivate;
+  // What this tab actually does, rules and overrides included; the globals
+  // only until the background has answered for it.
+  const eff = tabState?.effective ?? settings;
+  const hideTimer = Boolean(eff.pauseWhileActive && eff.resetOnActivate);
   $("tab").hidden = hideTimer;
   $("tab-paused").hidden = !hideTimer;
   if (!currentTab || !tabState) return;
@@ -555,12 +556,14 @@ function renderTabRules() {
         await tabAction("ignoreRule", { ruleId: r.id, ignored: !on }, row);
       });
       sw.input.disabled = allOff;
-      sw.el.title = allOff
+      // The row is the switch (it borrows makeSwitch's parts below), so the
+      // tooltip belongs on it; sw.el itself is never inserted.
+      row.title = allOff
         ? "All rules are ignored for this tab"
         : r.ignored
           ? "Apply this rule again"
           : "Ignore this rule for this tab";
-      sw.el.classList.add("tab-rule-switch");
+      row.classList.add("tab-rule-switch");
       const text = document.createElement("span");
       const name = document.createElement("span");
       name.className = "tab-rule-name";
@@ -690,10 +693,14 @@ function renderTabSettings() {
     belongsInPageSettings(def.key, explained[def.key]),
   );
   const list = $("tab-settings-list");
+  // The popup refreshes every few seconds; a rebuild while a control here has
+  // focus would throw away what is being typed.
+  if (list.contains(document.activeElement)) return;
   list.replaceChildren(
     ...defs.map((def) => {
       const entry = explained[def.key];
-      const row = renderOverride(def, store, () => renderTabSettings(), {
+      // No onChanged: the commit goes through tabAction, which re-renders.
+      const row = renderOverride(def, store, () => {}, {
         adopt: true,
         compact: true,
       });
@@ -702,7 +709,13 @@ function renderTabSettings() {
         row.title = [row.title, ruleSourceText(entry)].filter(Boolean).join(" ");
       }
       if (entry.from === "tab") {
-        const badge = thisTabBadge(() => tabAction("override", { key: def.key, value: null }));
+        // neverExpire and resetOnActivate live in the tab's own state, not in
+        // the overrides map; undoing them goes through their own actions.
+        const legacy = !(def.key in (tabState.overrides ?? {}));
+        const undo = legacy
+          ? () => tabAction(def.key, def.key === "neverExpire" ? false : null)
+          : () => tabAction("override", { key: def.key, value: null });
+        const badge = thisTabBadge(undo);
         // A stacked control (the indicator list) is a column of its own, so
         // the badge goes with the label; beside the column it would read as
         // belonging to whichever row it happened to line up with.
@@ -716,7 +729,7 @@ function renderTabSettings() {
     }),
   );
 
-  $("tab-settings-clear").hidden = Object.keys(tabState.overrides ?? {}).length === 0;
+  $("tab-settings-clear").hidden = Object.keys(overrides).length === 0;
 }
 
 $("tab-settings-clear").addEventListener("click", async () => {
@@ -905,11 +918,17 @@ function rememberFold(details, key, fallbackOpen) {
 
 let overviewTimer = null;
 
+let overviewSeq = 0;
 async function refreshOverview() {
+  const seq = ++overviewSeq;
   const groups = await api.runtime
     .sendMessage({ type: "timed-tabs:all-tabs" })
     .catch(() => []);
   const list = $("overview-list");
+  // A slower earlier request must not paint over a newer one, and a rebuild
+  // must not pull an armed Close or a focused control out from under the user.
+  if (seq !== overviewSeq) return;
+  if (list.querySelector(".is-armed") || list.contains(document.activeElement)) return;
   const total = groups.reduce((n, g) => n + g.tabs.length, 0);
   $("overview-count").textContent = total
     ? `${total} tab${total === 1 ? "" : "s"}`
@@ -1099,6 +1118,7 @@ function renderTabRow(t) {
     "Close this tab",
     "qtoggle-close",
   );
+  close.removeAttribute("aria-pressed"); // a plain button, not a toggle
   let armed = null;
   const disarm = () => {
     clearTimeout(armed);
@@ -1271,11 +1291,18 @@ $("recent-clear").addEventListener("click", async () => {
 
 /** Per-page setup when a page becomes visible. */
 function onPageShown(page) {
+  // The tab lists poll the background; only while they are on screen.
+  clearInterval(overviewTimer);
+  overviewTimer = null;
+  clearInterval(recentTimer);
+  recentTimer = null;
   if (page === "tabs") {
-    if ($("overview").open) refreshOverview();
+    if ($("overview").open) {
+      refreshOverview();
+      overviewTimer = setInterval(refreshOverview, 5000);
+    }
     if ($("recent").open) refreshRecent();
     // Recent list keeps itself fresh while the page is open.
-    clearInterval(recentTimer);
     recentTimer = setInterval(() => {
       if ($("recent").open) refreshRecent();
     }, 15000);
@@ -1636,22 +1663,6 @@ function renderRules() {
   }
   list.replaceChildren(...sortedRules().map(renderRule));
   if ($("rules-filter").value.trim()) applyRulesFilter();
-  const target = location.hash.startsWith("#rule-")
-    ? location.hash.slice(6)
-    : null;
-  if (target) {
-    const el = list.querySelector(`[data-rule-id="${CSS.escape(target)}"]`);
-    if (el) {
-      el.classList.add("is-target");
-      el.scrollIntoView({ block: "center" });
-      el.querySelector(".rule-pattern")?.focus();
-      history.replaceState(
-        null,
-        "",
-        location.pathname + location.search + "#rules",
-      );
-    }
-  }
 }
 
 /**
@@ -1762,7 +1773,9 @@ function ruleHead(rule, el, targetsGroup, open) {
     updateRule(rule.id, { pattern: pattern.value.trim() }, true, "head"),
   );
   const patternWrap = mirrorWildcards(pattern);
-  patternWrap.hidden = targetsGroup;
+  // Hidden only when the picker below stands in for it: with site groups
+  // off there is no picker, and the field is the one way to retarget the rule.
+  patternWrap.hidden = targetsGroup && groupsOn();
 
   // With site groups on, the head gets a picker: an address, or one of the groups.
   let target = null;
@@ -2063,7 +2076,15 @@ function settingRow(labelText, helpText, control, { checkbox } = {}) {
   }
   const ctl = document.createElement("div");
   ctl.className = "field-control";
-  if (control) ctl.append(control);
+  if (control) {
+    ctl.append(control);
+    // The label element is not associated with these controls (they are
+    // built apart from it), so each one that has no name yet takes the row's.
+    const inputs = control.matches?.("input,select,textarea") ? [control] : [...control.querySelectorAll("input,select,textarea")];
+    for (const c of inputs) {
+      if (!c.hasAttribute("aria-label") && !c.id) c.setAttribute("aria-label", labelText);
+    }
+  }
   row.append(label, ctl);
   return row;
 }
@@ -2119,7 +2140,8 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
       const sw = makeSwitch(chosen.has(ind.id), () => commit(true));
       sw.input.value = ind.id;
       sw.input.disabled = !ind.supported();
-      const item = document.createElement("label");
+      // A span, not a label: makeSwitch already built a label around the input.
+      const item = document.createElement("span");
       item.className = "override-indicator";
       item.title = ind.description + (ind.supported() ? "" : " Not available in this browser.");
       const name = document.createElement("span");
@@ -2173,9 +2195,12 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
     if (on.checked) set[def.key] = read();
     else delete set[def.key];
     wrap.classList.toggle("is-on", on.checked);
+    const parent = wrap.parentElement;
     await store.commit(set);
     onChanged();
-    markSaved(wrap);
+    // A commit may have rebuilt the list; mark the row that replaced this one.
+    const live = wrap.isConnected ? wrap : parent?.querySelector(`.override[data-key="${CSS.escape(def.key)}"]`);
+    markSaved(live ?? wrap);
   };
   on.addEventListener("change", commit);
   return wrap;
@@ -2236,7 +2261,7 @@ $("rule-add").addEventListener("click", async () => {
   const pattern = site ? patternForUrl(site) : "";
   // Don't pile up blank rules: reuse one that is still empty, or one with the same pattern.
   const existing = rules.find((r) =>
-    pattern ? r.pattern === pattern : !r.pattern.trim(),
+    pattern ? r.pattern === pattern : isEmptyRule(r),
   );
   let rule = existing;
   if (!rule) {
@@ -2305,7 +2330,9 @@ $("rules-filter-clear").addEventListener("click", () => {
 });
 
 watchRules((next) => {
-  if (rulesSaving) return;
+  // Our own save arrives here too, after an extra async hop that outlives
+  // the saving flag; what is in memory already matches it.
+  if (rulesSaving || JSON.stringify(next) === JSON.stringify(rules)) return;
   rules = next;
   if (!isPopup) renderRules();
   if (isPopup) refreshTab();
@@ -2351,7 +2378,7 @@ function applyRulesDisplay() {
 }
 
 watchGroups((next) => {
-  if (groupsSaving) return;
+  if (groupsSaving || JSON.stringify(next) === JSON.stringify(groups)) return;
   groups = next;
   if (!isPopup) {
     renderGroups();
@@ -2634,9 +2661,11 @@ $("fuse-range").addEventListener("input", (e) => {
 
 $("fuse-range").addEventListener("change", async (e) => {
   const pct = Number(e.target.value);
-  fuseDrag = null;
   $("fuse").classList.remove("is-dragging");
+  // Keep showing the dragged value until the reply lands, or the once-a-second
+  // readout snaps back to the old state in between.
   await tabAction("progress", pct);
+  fuseDrag = null;
 });
 
 $("act-never").addEventListener("change", (e) =>
