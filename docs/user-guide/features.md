@@ -67,11 +67,12 @@ green, yellow, red as time runs out.
   History entries show it too.
 - **Tint the active tab.** The background of the tab you are viewing takes the
   colour. Firefox only.
-- **Timer ring on the toolbar button.** The Timed Tabs button draws a ring that
+- **Timer on the toolbar button.** The Timed Tabs button draws a ring that
   empties as the tab you are on runs out of time, and turns into an exclamation
   once it has expired. This one needs nothing from the page, so it keeps working
   on `about:` pages and the add-ons store where the favicon and title indicators
-  cannot reach.
+  cannot reach. The [Interactive toolbar clock](feature-flags.md#interactive-toolbar-clock)
+  beta swaps the ring for a clock face that empties.
 - **Minutes left on the toolbar button.** The Timed Tabs button shows the minutes
   left for the current tab.
 

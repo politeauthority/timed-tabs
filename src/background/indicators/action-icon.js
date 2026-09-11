@@ -1,9 +1,9 @@
 /**
  * Strategy: the toolbar button itself becomes the timer.
  *
- * The button's icon is repainted per tab with a ring that drains clockwise
- * from twelve and ramps green -> yellow -> red, so the button shows the state
- * of the tab you are looking at without reading a number off the badge.
+ * The button's icon is repainted per tab with a ring that drains from twelve
+ * and ramps green -> yellow -> red, so the button shows the state of the tab
+ * you are looking at without reading a number off the badge.
  *
  * This is the only indicator with no reach problem: it needs no content
  * script, no permissions and no theme API, so it works on `about:` pages,
@@ -17,18 +17,23 @@
  *
  * Behind the `primary-icon-interactive` flag the same indicator paints a
  * different mark: a clock face that empties rather than a ring that drains,
- * with a look of its own for a stopped clock and for a tab that never
- * expires, and only for the tab in front of you. See `iconKey`.
+ * with a look of its own for a tab that never expires, a colour of its own for
+ * a stopped clock, and only for the tab in front of you. See `iconKey`.
  */
-import { api } from "../../shared/browser.js";
+import { api, isDevBuild } from "../../shared/browser.js";
 import { STATE_COLORS, rampColor, toHex } from "../../shared/color.js";
 import { IDENTITY_PROGRESS, dialShapes, faceShapes, paintShapes } from "../../shared/icon-art.js";
 import { featureOn } from "../../shared/flags.js";
 
 export const id = "action-icon";
-export const label = "Timer ring on the toolbar button";
+// Named for the button rather than the artwork, because the artwork is what
+// the flag changes: a ring by default, a clock face while the interactive
+// clock is on. One entry turns the indicator on and off either way, so a label
+// naming one of the two marks is wrong half the time. When the flag is folded
+// in, this goes back to naming the mark it is left with.
+export const label = "Timer on the toolbar button";
 export const description =
-  "The Timed Tabs button draws a ring that empties as the tab you are on runs out of time. Works on pages the other indicators cannot reach.";
+  "The Timed Tabs button empties as the tab you are on runs out of time: a ring that drains, or a clock face with the Interactive toolbar clock beta on. Works on pages the other indicators cannot reach.";
 
 /** The flag that swaps the draining ring for the interactive clock. */
 const FLAG = "primary-icon-interactive";
@@ -103,6 +108,14 @@ async function paint(tabs) {
   }
   // The interactive mark is the state of the tab you are looking at, so only
   // the active tab of each window carries one.
+  //
+  // The ring paints every tab, which is work nobody can see: a toolbar button
+  // belongs to a tab and the window only ever shows the active tab's, so a
+  // window of sixty tabs is sixty `setIcon` calls a tick for fifty-nine
+  // pictures no one can reach. Following the active tab would be safe --
+  // `tabs.onActivated` ticks, so a switch repaints in the same turn rather
+  // than on the next timer -- but it changes the mark every user already has,
+  // so it waits behind `primary-icon-interactive` with the rest of the clock.
   const targets = interactive ? tabs.filter((t) => t.active) : tabs;
   const live = new Set(targets.map((t) => t.tabId));
   for (const tabId of painted.keys()) {
@@ -120,6 +133,7 @@ async function paint(tabs) {
       try {
         await a.setIcon({ tabId: t.tabId, imageData: iconFor(key) });
         painted.set(t.tabId, key);
+        devLogPaint(t.tabId, key);
       } catch {
         // Tab may have closed mid-update.
         painted.delete(t.tabId);
@@ -149,8 +163,20 @@ async function resetIcons() {
   await Promise.all([...tabIds].map((tabId) => clearIcon(tabId)));
 }
 
+/**
+ * Dev build only: what was pushed to which tab's button. Only a change is ever
+ * pushed, so the line is already one per change rather than one per tick --
+ * which makes it the record of what the toolbar actually shows, the one thing
+ * no screenshot can prove (the button is browser chrome, and `captureVisibleTab`
+ * photographs the page).
+ */
+function devLogPaint(tabId, key) {
+  if (isDevBuild) console.log(`[timed-tabs] painted ${tabId} ${key}`);
+}
+
 async function clearIcon(tabId) {
   const a = action();
+  devLogPaint(tabId, "none");
   // Firefox drops a per-tab icon when handed null. A browser that will not
   // gets the resting mark instead, which is the packaged icon redrawn.
   try {
@@ -173,7 +199,8 @@ async function clearIcon(tabId) {
  * tab that can never expire is `exempt` rather than resting, because "nothing
  * is draining" is worth saying; a stopped clock is `paused` at the fill it
  * stopped at, which is the state the active tab is in whenever the clock is
- * set to pause on the tab you are using.
+ * set to pause on the tab you are using. `paused` keys apart for the colour
+ * alone -- it draws the running face, frozen where its progress left it.
  */
 export function iconKey(tab, lit = true, live = false) {
   const prefix = live ? "face-" : "";
@@ -210,9 +237,10 @@ function iconFor(key) {
   if (hit) return hit;
 
   const { live, state, progress, color } = specFor(key);
-  // Both marks draw a resting tab as an ordinary running one; only the fill
-  // and the colour say it is not counting down.
-  const art = state === "idle" ? "running" : state;
+  // Both marks draw a resting tab as an ordinary running one, and the clock
+  // draws a stopped one the same way: only the fill and the colour say it is
+  // not counting down.
+  const art = state === "idle" || state === "paused" ? "running" : state;
 
   const images = {};
   for (const size of SIZES) {

@@ -110,11 +110,11 @@ reads as a clock rather than a pie chart.
 
 It also gains two looks the ring has no way to show:
 
-- **A stopped clock.** The face freezes where it stopped and the hands give way
-  to a pause bar, in slate rather than a colour off the green-to-red ramp. You
-  will see this on the tab you are using if you have **Only count time while a
-  tab is in the background** on — the button now says so, instead of showing a
-  timer that looks stuck.
+- **A stopped clock.** The face freezes at the fill it stopped at and turns
+  slate, a colour off the green-to-red ramp entirely, so a stopped clock cannot
+  be misread as one with plenty of time left. You will see this on the tab you
+  are using if you have **Only count time while a tab is in the background**
+  on — the button now says so, instead of showing a timer that looks stuck.
 - **A tab that will never expire**, pinned or set that way by hand: a hollow
   blue rim with nothing draining inside it.
 
@@ -122,9 +122,11 @@ One more difference: the button follows the tab you are looking at. Normally
 every tab carries its own painted button, which you only ever see one of
 anyway; with this on, only the active tab is painted.
 
-This is the **Timer ring on the toolbar button** indicator either way — the same
+This is the **Timer on the toolbar button** indicator either way — the same
 entry under **Show remaining time with** turns it on and off, and turning the
-flag off puts the ring straight back.
+flag off puts the ring straight back. The entry is named for the button rather
+than for the ring or the face, because which of the two you get is what this
+flag decides.
 
 ## 🧹 When a flag goes away
 
