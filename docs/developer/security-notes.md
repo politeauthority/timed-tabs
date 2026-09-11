@@ -50,11 +50,14 @@ tab Timed Tabs closed, capped at 200 and pruned by `recentRetentionSeconds`. It 
 never transmitted and is not part of a backup. Users can shorten the retention, drop
 a row, or clear the list; `docs/user-guide/privacy.md` explains how.
 
-**Private windows are not filtered.** A tab closed in a private window is recorded
-like any other, and the record outlives the session. Browsers do not enable
-extensions in private windows without being told to, so this needs the user to have
-opted in first — but if we ever want to run there honestly, `recordExpired` should
-skip tabs where `tab.incognito` is true.
+**Private windows are filtered.** `recordFor` in `shared/recent.js` returns `null` for
+a tab where `tab.incognito` is true, so nothing reaches the list; the decision sits in
+the pure module, with tests, rather than in the background script. The notifier does
+the same: a private tab is counted in the batch but carries no title and no url, so it
+appears as "a private tab" and a click cannot reopen it in an ordinary window.
+
+Rows written by builds before that change cannot be identified — nothing marked them —
+so the advice for anyone who ran in private windows earlier is to clear the list once.
 
 ## 🚧 Open items
 

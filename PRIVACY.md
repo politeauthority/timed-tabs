@@ -47,11 +47,17 @@ lowest value is the closest thing; if you want a real off switch, open an issue.
 
 ### Private windows
 
-Browsers do not run extensions in private windows unless you allow it, and Timed Tabs
-is better left that way. **If you do allow it, tabs closed in a private window are
-recorded in the list of closed tabs like any other**, and that record outlives the
-private session. This is a known gap rather than a deliberate choice; it is noted in
-[docs/developer/security-notes.md](docs/developer/security-notes.md).
+Browsers do not run extensions in private windows unless you allow it. If you do allow
+it, Timed Tabs times those tabs like any other — but **nothing about them is written
+down**. A tab closed in a private window is never added to the list of closed tabs,
+and never named in a desktop notification; it is counted there only as "a private
+tab", and clicking that notification cannot reopen it in an ordinary window.
+
+Nothing about a private tab survives the window it was in.
+
+Versions before this one did record them. Those older rows cannot be picked out now,
+because nothing marked them, so if you ran Timed Tabs in private windows before this
+change, **Clear list** on the Tabs page is the way to be sure.
 
 In Firefox: `about:addons` → Timed Tabs → Details → "Run in Private Windows". In
 Chrome: `chrome://extensions` → Timed Tabs → Details → "Allow in Incognito".

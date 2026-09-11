@@ -42,9 +42,13 @@ issue tracker.
 ## 🕵️ Private windows
 
 Browsers do not run extensions in private windows unless you allow it. Timed Tabs is
-no exception, and **leaving it that way is the safest choice**: a tab closed in a
-private window would otherwise be recorded in the recently expired list like any
-other, and that record outlives the private session.
+no exception. If you do allow it, your private tabs get timers like any other tab, but
+**nothing about them is kept**: a tab closed in a private window is never added to the
+recently expired list, and a notification about it says only "a private tab" and
+cannot be clicked to reopen the page.
+
+Versions before this one did record them, and those rows cannot be told apart now. If
+you ran Timed Tabs in private windows before, use **Clear list** once to be sure.
 
 In Firefox, the setting is in `about:addons` → Timed Tabs → Details → "Run in Private
 Windows". In Chrome it is on `chrome://extensions` → Timed Tabs → Details → "Allow in
