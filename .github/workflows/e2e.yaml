@@ -15,18 +15,13 @@ run-name: "E2E — ${{ github.ref_name }}"
 # Two versions of Firefox by default, in parallel: the current release and the one
 # before it. Both are resolved at run time from Mozilla's product-details feed
 # rather than pinned, so "previous" follows every release without anyone editing
-# this file. Both must pass. The `firefox` input replaces that list: `previous-N`
-# is N majors back, and full.yaml passes four of them for the `ci run full` label.
-#
-# The `chrome` input is the same shape for Chrome: a JSON list of legs, `stable`
-# or `previous-N` for N majors behind the current stable, resolved from the Chrome
-# for Testing feed. It is empty by default and only the callers on `feat/chrome-e2e`
-# fill it while Chrome is being proven on this runner -- ci.yaml with one leg, and
-# full.yaml with four beside its four Firefoxes -- so every other caller stays
-# Firefox-only without knowing Chrome exists. The gate lives in the callers on
-# purpose: this file runs what it is told and holds no opinion about branches.
-# No Chrome leg is a required check yet; widening is a change in the callers made
-# in the same commit that adds the contexts to branch protection.
+# this file. Both must pass. The `legs` input replaces that list with any mix of
+# Firefox and Chrome: `previous-N` is N majors back, Chrome's `stable` and
+# `previous-N` come from the Chrome for Testing feed. ci.yaml adds Chrome stable
+# beside the two Firefoxes, and full.yaml passes four of each for the `ci run
+# full` label. This file runs what it is told and holds no opinion about branches.
+# No Chrome leg is a required check yet; making one required is a branch
+# protection change, not a change here.
 #
 # Each leg is its own status check: called from CI they report as
 # `E2E / Firefox latest` and `E2E / Firefox previous`, GitHub prefixing a called
@@ -61,21 +56,17 @@ on:
         type: string
         required: false
         default: ""
-      firefox:
-        # A JSON list, because a workflow input cannot be a real one. Each entry
-        # names a leg and becomes part of its check name: `latest`, `previous`,
-        # or `previous-N` for N majors behind the current release.
-        description: 'JSON list of Firefox legs to run, e.g. ["latest", "previous", "previous-2"].'
+      legs:
+        # A JSON list of {browser, channel}, because a workflow input cannot be a
+        # real one and expressions cannot build objects from two flat lists.
+        # `channel` is `latest`, `previous` or `previous-N` for Firefox and
+        # `stable`, `previous` or `previous-N` for Chrome, each N majors back.
+        # Each entry becomes one leg named `<Browser> <channel>`, which is the
+        # status-check context branch protection matches on.
+        description: 'JSON list of legs, e.g. [{"browser":"firefox","channel":"latest"},{"browser":"chrome","channel":"stable"}].'
         type: string
         required: false
-        default: '["latest", "previous"]'
-      chrome:
-        # Same shape as `firefox`, and empty rather than absent so the `legs`
-        # job can always parse it.
-        description: 'JSON list of Chrome legs to run, e.g. ["stable", "previous"]. Empty for none.'
-        type: string
-        required: false
-        default: '[]'
+        default: '[{"browser": "firefox", "channel": "latest"}, {"browser": "firefox", "channel": "previous"}]'
       max-parallel:
         # Ten Firefoxes at once starved one another on the runner node until
         # a scenario saw a single tick in its whole window. The scenarios time
@@ -93,6 +84,16 @@ on:
         type: string
         required: false
         default: always
+      skip-when-full:
+        # For CI. A PR to main carrying `ci run full` gets these same versions
+        # again inside the full run, and the `CI run full` status holds the
+        # merge until that passes -- so CI's legs skip, which a required check
+        # reads as a pass, and the runner is spent once. full.yaml leaves this
+        # off, since its legs are the ones being counted on.
+        description: Skip the legs on a PR to main that carries the `ci run full` label.
+        type: boolean
+        required: false
+        default: false
   workflow_dispatch:
     inputs:
       ref:
@@ -100,16 +101,17 @@ on:
         type: string
         required: false
         default: ""
-      firefox:
-        description: 'JSON list of Firefox legs to run: latest, previous, previous-N.'
+      legs:
+        # A JSON list of {browser, channel}, because a workflow input cannot be a
+        # real one and expressions cannot build objects from two flat lists.
+        # `channel` is `latest`, `previous` or `previous-N` for Firefox and
+        # `stable`, `previous` or `previous-N` for Chrome, each N majors back.
+        # Each entry becomes one leg named `<Browser> <channel>`, which is the
+        # status-check context branch protection matches on.
+        description: 'JSON list of legs, e.g. [{"browser":"firefox","channel":"latest"},{"browser":"chrome","channel":"stable"}].'
         type: string
         required: false
-        default: '["latest", "previous"]'
-      chrome:
-        description: 'JSON list of Chrome legs to run: stable, previous, previous-N. Empty for none.'
-        type: string
-        required: false
-        default: '[]'
+        default: '[{"browser": "firefox", "channel": "latest"}, {"browser": "firefox", "channel": "previous"}]'
       max-parallel:
         description: How many legs may run at once.
         type: number
@@ -133,36 +135,8 @@ env:
 # would only be a second way to say the same thing, scoped to a different key.
 
 jobs:
-  # Turns the inputs into the matrix. Each Firefox leg name becomes an object
-  # whose `name` is the string it always was -- "Firefox latest", "Firefox
-  # previous-3" -- so no status-check context changes shape; Chrome legs are
-  # built the same way from the `chrome` list. A matrix `include` with
-  # heterogeneous legs has to be built somewhere, and a job that echoes JSON is
-  # the smallest somewhere. ubuntu-latest and no checkout: it cannot
-  # realistically fail, which matters because the Firefox legs that depend on
-  # it are required checks.
-  legs:
-    name: Which legs
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      include: ${{ steps.pick.outputs.include }}
-    steps:
-      - id: pick
-        env:
-          FIREFOX: ${{ inputs.firefox }}
-          CHROME: ${{ inputs.chrome }}
-        run: |
-          set -euo pipefail
-          legs=$(jq -cn --argjson ff "$FIREFOX" --argjson ch "$CHROME" '
-            [ $ff[] | {browser: "firefox", channel: ., slug: ("firefox-" + .), name: ("Firefox " + .)} ]
-            + [ $ch[] | {browser: "chrome",  channel: ., slug: ("chrome-"  + .), name: ("Chrome "  + .)} ]')
-          echo "include=${legs}" >> "$GITHUB_OUTPUT"
-          echo "legs: $(jq -r '[.[].name] | join(", ")' <<<"$legs")"
-
   scenarios:
-    name: ${{ matrix.name }}
-    needs: legs
+    name: ${{ matrix.browser == 'chrome' && 'Chrome' || 'Firefox' }} ${{ matrix.channel }}
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     # Two ways a PR skips Firefox. Both skip the job rather than the caller, so
     # the check still reports: a required check that never reports blocks the PR
@@ -181,6 +155,11 @@ jobs:
       || (
         !contains(github.event.pull_request.labels.*.name, 'ci pause')
         && !startsWith(github.event.pull_request.head.ref, 'release-please--')
+        && !(
+          inputs.skip-when-full
+          && github.event.pull_request.base.ref == 'main'
+          && contains(github.event.pull_request.labels.*.name, 'ci run full')
+        )
       )
     timeout-minutes: 20
     strategy:
@@ -189,9 +168,10 @@ jobs:
       fail-fast: false
       max-parallel: ${{ inputs.max-parallel }}
       matrix:
-        # From the `legs` job. `name` is the status check branch protection matches
-        # on; `slug` keys the caches and the artifact, where a space would be awkward.
-        include: ${{ fromJSON(needs.legs.outputs.include) }}
+        # Straight from the input. The job name above is the status check branch
+        # protection matches on; `<browser>-<channel>` keys the caches and the
+        # artifacts, where a space would be awkward.
+        include: ${{ fromJSON(inputs.legs) }}
     steps:
       # Full history: the changed-paths action diffs against the base commit.
       - uses: actions/checkout@v7
@@ -219,7 +199,7 @@ jobs:
         with:
           # Both legs of the matrix are the same `github.job`, so without this
           # they would share a key and race to save it on a cold cache.
-          key-suffix: "-${{ matrix.slug }}"
+          key-suffix: "-${{ matrix.browser }}-${{ matrix.channel }}"
       - name: npm ci
         if: steps.changed.outputs.code == 'true'
         id: npm
@@ -249,7 +229,7 @@ jobs:
           # legs are cold at once on a fresh key, and both would try to save.
           # The system libraries do not depend on which Firefox runs, so the
           # prefix lets either leg restore whatever the other one cached.
-          key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}-${{ matrix.slug }}
+          key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}-${{ matrix.browser }}-${{ matrix.channel }}
           restore-keys: |
             firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}-
       - name: Firefox libraries
@@ -436,7 +416,7 @@ jobs:
         if: always()
         env:
           LEG: ${{ matrix.channel }}
-          NAME: ${{ matrix.name }}
+          NAME: ${{ matrix.browser == 'chrome' && 'Chrome' || 'Firefox' }} ${{ matrix.channel }}
           BROWSER: ${{ matrix.browser }}
           # The resolved number for Firefox; what the binary said for Chrome.
           VERSION: ${{ steps.ffver.outputs.version || steps.browser.outputs.version }}
@@ -468,7 +448,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: e2e-leg-${{ matrix.slug }}
+          name: e2e-leg-${{ matrix.browser }}-${{ matrix.channel }}
           path: e2e-artifacts/leg.json
 
       - uses: actions/upload-artifact@v7
@@ -481,7 +461,7 @@ jobs:
         with:
           # One name per leg. Two uploads under the same name in one run is an
           # error, and when a version fails you want its artifacts on their own.
-          name: e2e-artifacts-${{ matrix.slug }}
+          name: e2e-artifacts-${{ matrix.browser }}-${{ matrix.channel }}
           path: e2e-artifacts/
           if-no-files-found: ignore
 
@@ -498,7 +478,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref_name }}
           REASON: ${{ steps.changed.outputs.reason }}
-          WHO: ${{ matrix.name }}
+          WHO: ${{ matrix.browser == 'chrome' && 'Chrome' || 'Firefox' }} ${{ matrix.channel }}
           EMOJI: ${{ matrix.browser == 'chrome' && '🌐' || '🦊' }}
           # Empty when nothing resolved, which the heading allows for.
           VERSION: ${{ steps.ffver.outputs.version || steps.browser.outputs.version }}
