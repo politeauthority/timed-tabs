@@ -99,6 +99,32 @@ looking at. They are nothing to do with the desktop notifications in
 [features.md](features.md), which come from your operating system when a tab is closed,
 need a permission, and show up whether or not Timed Tabs is open.
 
+### Interactive toolbar clock
+
+Changes what the Timed Tabs button draws. Normally it is a ring that drains
+clockwise from twelve as the tab you are on runs out of time. With this on, the
+clock face itself empties: a full face is a tab with all its time ahead of it, a
+sliver is one about to go, and the hands are cut out of the face so it still
+reads as a clock rather than a pie chart.
+
+It also gains two looks the ring has no way to show:
+
+- **A stopped clock.** The face freezes where it stopped and the hands give way
+  to a pause bar, in slate rather than a colour off the green-to-red ramp. You
+  will see this on the tab you are using if you have **Only count time while a
+  tab is in the background** on — the button now says so, instead of showing a
+  timer that looks stuck.
+- **A tab that will never expire**, pinned or set that way by hand: a hollow
+  blue rim with nothing draining inside it.
+
+One more difference: the button follows the tab you are looking at. Normally
+every tab carries its own painted button, which you only ever see one of
+anyway; with this on, only the active tab is painted.
+
+This is the **Timer ring on the toolbar button** indicator either way — the same
+entry under **Show remaining time with** turns it on and off, and turning the
+flag off puts the ring straight back.
+
 ## 🧹 When a flag goes away
 
 A flag is temporary by nature. When the work behind it is finished, the feature

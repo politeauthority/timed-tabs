@@ -14,15 +14,24 @@
  * `BUCKETS` steps, which is finer than the eye can follow on a 16px circle,
  * so a window full of tabs shares a handful of images; and a tab whose
  * bucket has not changed is not pushed to the browser at all.
+ *
+ * Behind the `primary-icon-interactive` flag the same indicator paints a
+ * different mark: a clock face that empties rather than a ring that drains,
+ * with a look of its own for a stopped clock and for a tab that never
+ * expires, and only for the tab in front of you. See `iconKey`.
  */
 import { api } from "../../shared/browser.js";
-import { rampColor, toHex } from "../../shared/color.js";
-import { IDENTITY_PROGRESS, dialShapes, paintShapes } from "../../shared/icon-art.js";
+import { STATE_COLORS, rampColor, toHex } from "../../shared/color.js";
+import { IDENTITY_PROGRESS, dialShapes, faceShapes, paintShapes } from "../../shared/icon-art.js";
+import { featureOn } from "../../shared/flags.js";
 
 export const id = "action-icon";
 export const label = "Timer ring on the toolbar button";
 export const description =
   "The Timed Tabs button draws a ring that empties as the tab you are on runs out of time. Works on pages the other indicators cannot reach.";
+
+/** The flag that swaps the draining ring for the interactive clock. */
+const FLAG = "primary-icon-interactive";
 
 /** The sizes Firefox and Chrome pick between for the toolbar button. */
 const SIZES = [16, 32];
@@ -36,11 +45,32 @@ const cache = new Map();
 /** The icon key last pushed for a tab, so unchanged tabs cost nothing. */
 const painted = new Map();
 
+/** True while the flag is on: the clock face, following the active tab. */
+let interactive = false;
+/** Set when the mark changes, so the next paint starts from a clean toolbar. */
+let pendingReset = false;
+
 export function supported() {
   return Boolean(action()?.setIcon) && Boolean(makeCanvas(SIZES[0]));
 }
 
-export async function start() {
+export async function start(ctx) {
+  cache.clear();
+  painted.clear();
+  interactive = featureOn(ctx?.settings, FLAG);
+}
+
+/**
+ * The flag can be turned on or off while the indicator is running, and the
+ * two marks share neither artwork nor which tabs they paint. Clearing the
+ * caches repaints every tab; `pendingReset` puts back the icons the other
+ * mode painted, which nothing else would ever come back to.
+ */
+export function configure(settings) {
+  const next = featureOn(settings, FLAG);
+  if (next === interactive) return;
+  interactive = next;
+  pendingReset = true;
   cache.clear();
   painted.clear();
 }
@@ -67,12 +97,25 @@ export async function update(tabs) {
 
 async function paint(tabs) {
   const a = action();
-  const live = new Set(tabs.map((t) => t.tabId));
-  for (const tabId of painted.keys()) if (!live.has(tabId)) painted.delete(tabId);
+  if (pendingReset) {
+    pendingReset = false;
+    await resetIcons();
+  }
+  // The interactive mark is the state of the tab you are looking at, so only
+  // the active tab of each window carries one.
+  const targets = interactive ? tabs.filter((t) => t.active) : tabs;
+  const live = new Set(targets.map((t) => t.tabId));
+  for (const tabId of painted.keys()) {
+    if (live.has(tabId)) continue;
+    painted.delete(tabId);
+    // A tab that has stopped being the active one keeps its icon until it is
+    // taken off; a tab missing from the whole list has closed and needs nothing.
+    if (interactive && tabs.some((t) => t.tabId === tabId)) void clearIcon(tabId);
+  }
 
   await Promise.all(
-    tabs.map(async (t) => {
-      const key = iconKey(t, blinkOn);
+    targets.map(async (t) => {
+      const key = iconKey(t, blinkOn, interactive);
       if (painted.get(t.tabId) === key) return;
       try {
         await a.setIcon({ tabId: t.tabId, imageData: iconFor(key) });
@@ -89,40 +132,76 @@ export async function stop() {
   if (blinkTimer) clearInterval(blinkTimer);
   blinkTimer = null;
   blinkOn = true;
-  const a = action();
-  const resting = iconFor(iconKey({ quiet: true }));
-  await Promise.all(
-    // Every tab, not just the ones this instance remembers painting: on Chrome
-    // the service worker restarts and forgets, but the icons stay.
-    [...new Set([...painted.keys(), ...(await api.tabs.query({}).catch(() => [])).map((t) => t.id)])].map(async (tabId) => {
-      // Firefox drops a per-tab icon when handed null. A browser that will
-      // not gets the resting mark instead, which is the packaged icon redrawn.
-      try {
-        await a.setIcon({ tabId, imageData: null });
-      } catch {
-        try {
-          await a.setIcon({ tabId, imageData: resting });
-        } catch {
-          // Tab has gone; nothing to put back.
-        }
-      }
-    }),
-  );
+  pendingReset = false;
+  await resetIcons();
   painted.clear();
   cache.clear();
 }
 
+/** Take the painted icon off every tab, leaving the packaged one. */
+async function resetIcons() {
+  const tabIds = new Set([
+    // Every tab, not just the ones this instance remembers painting: on Chrome
+    // the service worker restarts and forgets, but the icons stay.
+    ...painted.keys(),
+    ...(await api.tabs.query({}).catch(() => [])).map((t) => t.id),
+  ]);
+  await Promise.all([...tabIds].map((tabId) => clearIcon(tabId)));
+}
+
+async function clearIcon(tabId) {
+  const a = action();
+  // Firefox drops a per-tab icon when handed null. A browser that will not
+  // gets the resting mark instead, which is the packaged icon redrawn.
+  try {
+    await a.setIcon({ tabId, imageData: null });
+  } catch {
+    try {
+      await a.setIcon({ tabId, imageData: iconFor(iconKey({ quiet: true })) });
+    } catch {
+      // Tab has gone; nothing to put back.
+    }
+  }
+}
+
 /**
- * The state of one tab as a cache key: which mark, at which ring position.
- * A tab with no timer running gets the resting mark, so the button matches
- * the packaged icon rather than going blank.
+ * The state of one tab as a cache key: which mark, at which fill. A tab with
+ * no timer running gets the resting mark, so the button matches the packaged
+ * icon rather than going blank.
+ *
+ * The interactive clock keys apart two states the ring has no way to show. A
+ * tab that can never expire is `exempt` rather than resting, because "nothing
+ * is draining" is worth saying; a stopped clock is `paused` at the fill it
+ * stopped at, which is the state the active tab is in whenever the clock is
+ * set to pause on the tab you are using.
  */
-export function iconKey(tab, lit = true) {
-  if (tab.exempt || tab.quiet) return `idle:${Math.round(IDENTITY_PROGRESS * BUCKETS)}`;
+export function iconKey(tab, lit = true, live = false) {
+  const prefix = live ? "face-" : "";
+  if (live && tab.exempt) return "face-exempt";
+  if (tab.exempt || tab.quiet) return `${prefix}idle:${Math.round(IDENTITY_PROGRESS * BUCKETS)}`;
   const progress = Math.min(1, Math.max(0, tab.progress ?? 0));
-  if (progress >= 1) return "expired";
+  if (progress >= 1) return `${prefix}expired`;
   const bucket = Math.round(progress * BUCKETS);
-  return `${tab.flashing && !lit ? "flash" : "running"}:${bucket}`;
+  if (tab.flashing && !lit) return `${prefix}flash:${bucket}`;
+  if (live && tab.paused) return `face-paused:${bucket}`;
+  return `${prefix}running:${bucket}`;
+}
+
+/**
+ * What a cache key means: which artwork, how full, and in what colour.
+ * Pure, so the states a key can name are checkable without a canvas.
+ */
+export function specFor(key) {
+  const [name, bucket] = key.split(":");
+  const live = name.startsWith("face-");
+  const state = live ? name.slice("face-".length) : name;
+  const progress = state === "expired" ? 1 : Number(bucket ?? 0) / BUCKETS;
+  // The resting mark keeps the fresh green whatever its fill says.
+  const color =
+    state === "paused" ? STATE_COLORS.paused
+    : state === "exempt" ? STATE_COLORS.exempt
+    : rampColor(state === "idle" ? 0 : progress, "vivid");
+  return { live, state, progress, color: toHex(color) };
 }
 
 /** ImageData for every size a key needs, painted once and kept. */
@@ -130,18 +209,20 @@ function iconFor(key) {
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const [name, bucket] = key.split(":");
-  const progress = name === "expired" ? 1 : Number(bucket) / BUCKETS;
-  const state = name === "expired" ? "expired" : name === "flash" ? "flash" : "running";
-  // The resting mark keeps the fresh green whatever its ring says.
-  const color = toHex(rampColor(name === "idle" ? 0 : progress, "vivid"));
+  const { live, state, progress, color } = specFor(key);
+  // Both marks draw a resting tab as an ordinary running one; only the fill
+  // and the colour say it is not counting down.
+  const art = state === "idle" ? "running" : state;
 
   const images = {};
   for (const size of SIZES) {
     const canvas = makeCanvas(size);
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, size, size);
-    paintShapes(ctx, dialShapes({ progress, size, state }), size, color);
+    const shapes = live
+      ? faceShapes({ progress, size, state: art })
+      : dialShapes({ progress, size, state: art });
+    paintShapes(ctx, shapes, size, color);
     images[size] = ctx.getImageData(0, 0, size, size);
   }
   cache.set(key, images);

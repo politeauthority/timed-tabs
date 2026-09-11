@@ -656,6 +656,10 @@ async function tick() {
         exempt,
         quiet,
         flashing,
+        // A stopped clock: the tab you are on while the clock pauses on the
+        // active tab, or one a rule has parked. Indicators that can say so
+        // show it rather than leaving a frozen timer looking like a slow one.
+        paused: s.pausedAt !== null,
         indicators: eff.indicators ?? [],
         faviconStyle: eff.faviconStyle,
         remainingSeconds,
