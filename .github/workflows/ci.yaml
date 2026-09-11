@@ -45,6 +45,13 @@ jobs:
       - uses: ./.github/actions/changed-paths
         id: changed
 
+      # See e2e.yaml: the runner is CPU-bound, so the unpacked Node is cached.
+      - name: Cache the Node toolchain
+        if: steps.changed.outputs.code == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/node
+          key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-22
       - uses: actions/setup-node@v7
         if: steps.changed.outputs.code == 'true'
         with:
