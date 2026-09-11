@@ -22,6 +22,14 @@ No store listing yet. Grab a zip from [Releases](https://github.com/politeauthor
 - **Firefox 140+** (Android 142+) — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
 - **Chrome** — unzip `timed-tabs-chrome-*.zip`, then `chrome://extensions` → Developer mode → Load unpacked
 
+### Betas
+
+Betas are snapshots of `main` between releases, published as
+[pre-releases](https://github.com/politeauthority/timed-tabs/releases). They install
+the same way and replace a stable install. A beta shows a yellow BETA badge beside
+the title, and `about:addons` lists it as "Timed Tabs Beta". Details in
+[docs/developer/releasing.md](docs/developer/releasing.md).
+
 ## What you get
 
 - **Four ways to show the time left.** The favicon, a coloured dot in the page

@@ -429,6 +429,25 @@ textarea {
   color: var(--ink-2);
 }
 
+/* Beta and dev builds: a solid badge beside the title, hard to miss in either view. */
+.channel-badge {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #15141a;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+}
+
+body[data-channel="dev"] .channel-badge {
+  background: var(--ink-2);
+  color: var(--ground);
+}
+
 body:not([data-context="popup"]) .topbar {
   padding-bottom: var(--sp-3);
   border-bottom: 1px solid var(--line);
