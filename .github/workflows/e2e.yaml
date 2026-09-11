@@ -10,7 +10,7 @@ run-name: "E2E — ${{ github.ref_name }}"
 # tests and the build are green: a branch that does not compile never spends the
 # minutes. When it runs is decided there, and only there. It stays in its own file
 # because the Firefox plumbing below is long enough to bury the rest of CI, and it
-# keeps workflow_dispatch so a Firefox-only run is still one click.
+# keeps workflow_dispatch so a run on a branch is still one click.
 #
 # One vocabulary of channels for both browsers: `nightly`, `stable`, `previous`
 # and `previous-N` (N majors behind stable). Firefox resolves them from Mozilla's
