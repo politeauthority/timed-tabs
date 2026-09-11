@@ -513,7 +513,8 @@ body[data-context="popup"] .mini-nav {
 }
 
 .mini-nav button {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
   flex-direction: column;
   gap: 2px;
   min-height: 0;
@@ -521,6 +522,10 @@ body[data-context="popup"] .mini-nav {
   background: none;
   color: var(--ink-2);
   font-size: var(--fs-xs);
+  /* Labels may run to two lines rather than push the footer past the popup edge. */
+  white-space: normal;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .mini-nav button:hover {
@@ -1583,6 +1588,43 @@ body[data-context="page"] .version {
   align-self: center;
   margin-left: auto;
   padding: 0 var(--sp-1);
+}
+
+/* Link to the repository: an icon in the popup footer, a line at the foot of the page view. */
+.repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.repo-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.repo-link-mini {
+  flex: none;
+  align-self: center;
+  padding: 6px;
+  border-radius: var(--r-control);
+}
+
+.repo-link-mini:hover {
+  background: var(--control);
+  text-decoration: none;
+}
+
+.page-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  margin-top: var(--sp-5);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
 }
 
 body[data-context="popup"] .topbar .version {
