@@ -15,6 +15,7 @@ there is no account and no server.
 - [🪟 The popup](#-the-popup)
 - [📑 The Tabs page](#-the-tabs-page)
 - [📋 Rules](#-rules)
+- [🗂️ Site groups](#️-site-groups)
 - [⚙️ Settings](#-settings)
 - [🔒 Privacy and permissions](#-privacy-and-permissions)
 - [🦊 Firefox and Chrome](#-firefox-and-chrome)
@@ -125,6 +126,45 @@ picks up the other site's rules.
 The rules list is sorted by pattern. A filter box shows only the rules that match an
 address. **Make / edit rules for this page** in the popup opens the list filtered to
 the current site, and **Add rule** starts one for that site and scrolls to it.
+
+## 🗂️ Site groups
+
+Site groups are behind the **Site groups** feature flag under Settings, Feature
+flags. A group is a named list of address patterns, and a rule can target the group
+instead of one address. The rule then applies to every site in the group.
+
+![The Rules page with a rule targeting the news group, and the group's list of sites below](../assets/screenshots/site-groups.png)
+
+Take news sites as the example. You read five or six of them, none of them deserves
+more than fifteen minutes, and without groups that is six rules that all say the same
+thing. With groups it is one list and one rule:
+
+1. On the Rules page, press **Add group**, name it `news`, and list the sites one per
+   line:
+
+   ```
+   *.nytimes.com/*
+   *.theguardian.com/*
+   *.bbc.co.uk/*
+   news.ycombinator.com/*
+   ```
+
+2. Press **Add rule**, and in the picker beside the pattern field choose
+   **Group: news**. Set the lifetime to 15 minutes and the expiry action to close.
+
+A new news site is one more line in the group, not another rule. Group entries are
+wildcard patterns with the same rules as a rule's own pattern, so a pattern without
+`https://` matches any scheme.
+
+Some details worth knowing:
+
+- A rule stores its target as `@news`, which is how it appears in a backup and in the
+  popup's list of rules for the page. Renaming a group updates every rule that points
+  at it.
+- A group cannot be deleted while a rule still uses it.
+- Priority works as it does for any rule. A rule on one address can still beat the
+  group's rule by carrying a higher number.
+- With the flag off, rules that target a group match nothing, and their cards say so.
 
 ## ⚙️ Settings
 
