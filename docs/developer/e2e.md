@@ -2,7 +2,7 @@
 
 `npm run e2e` runs the extension in a real, headless Firefox and checks what it did.
 CI runs the same thing on the self-hosted runner for every push to `main` and every
-open PR, as the second half of the **CI** workflow.
+open PR, as the second half of the **CI** workflow, against two versions of Firefox.
 
 ## How a scenario works
 
@@ -78,7 +78,7 @@ compile never spends the minutes. It stays in its own file rather than becoming 
 second job in `ci.yaml` because the Firefox plumbing is long enough to bury
 everything around it.
 
-It runs on the `timed-tabs` runner. It restores Node's
+It runs on the `timed-tabs` runner, as a matrix of two jobs. It restores Node's
 tool directory and the Firefox libraries (on Ubuntu 24.04 the ALSA package is
 `libasound2t64`) from the Actions cache, fetches Firefox with
 `browser-actions/setup-firefox`, then runs `npm run e2e`.
@@ -103,13 +103,49 @@ read from it and from `main`. A manual run on a branch reads only that branch an
 `main`. So the first run on `main` after this lands is a cold one, and every PR after
 that reads `main`'s caches.
 
-The job is a required status check on `main`, under the name **E2E / headless
-Firefox**: GitHub prefixes a called workflow's jobs with the calling job's name, and
-the whole string is what branch protection matches. Renaming either half — `jobs.e2e`
-in `ci.yaml` or `jobs.e2e.name` here — silently stops the check being required.
+## Which Firefox
 
-A PR with the label **ci pause** skips it; GitHub counts a skipped required check as
-passed, so the label lets a PR merge without waiting for Firefox. CI does not wake on
+Two, in parallel, and both must pass:
+
+| Leg | What it is | Today |
+|---|---|---|
+| `Firefox latest` | the current release | 155.0.1 |
+| `Firefox previous` | the last release of the major before it | 154.0.1 |
+
+Neither is pinned. The `Resolve the Firefox version` step reads Mozilla's
+[product-details feed](https://product-details.mozilla.org/1.0/firefox.json), takes
+the shipped desktop releases from it (`major` and `stability`; betas, ESRs and
+devedition are filtered out), and picks the newest — or, for `previous`, the last
+point release one major back. So `previous` follows every Firefox release on its own,
+and the pair is always genuinely adjacent.
+
+Both legs resolve an exact version from that one feed rather than handing
+`setup-firefox` the string `latest`, which keeps `previous` defined relative to the
+version actually under test, and puts the number in the log and the job summary.
+
+To test a different pair, change the `firefox` matrix in the workflow and teach the
+resolve step the new label. Nothing in branch protection needs to change — see below.
+
+## The status check
+
+The check required on `main` is **E2E / headless Firefox**, and it is the `report`
+job, not a matrix leg. `report` `needs` the matrix and fails unless every leg
+succeeded.
+
+The indirection earns its keep: a matrix job's name carries its matrix values, so if
+the legs were the required check, `E2E / headless Firefox (latest)` would be the
+protected context and adding or renaming a version would silently stop the check
+being required. Behind `report`, the matrix can change freely.
+
+Both halves of the name are load-bearing — GitHub prefixes a called workflow's jobs
+with the calling job's name — so renaming `jobs.e2e` in `ci.yaml` or `jobs.report`
+here breaks the requirement without saying so.
+
+A PR with the label **ci pause** skips both the matrix and `report`; GitHub counts a
+skipped required check as passed, so the label lets a PR merge without waiting for
+Firefox. `report` carries the same condition as the matrix on purpose: skipped is the
+honest answer on a paused PR, where a green `report` would claim a pass for tests that
+never ran. CI does not wake on
 label events, so applying the label does not retroactively skip a run that already
 happened — the next push picks it up, and in the meantime the `Not paused` check is
 red and holding the merge anyway.
