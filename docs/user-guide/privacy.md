@@ -3,6 +3,9 @@
 Timed Tabs works entirely inside your browser. There is no account, no server, and
 nothing is sent anywhere.
 
+This page is the guided tour, with the controls to hand. The formal statement, for
+anyone who needs one, is the [privacy policy](../../PRIVACY.md).
+
 ## 📋 What is kept, and where
 
 | What | Where | Leaves your machine? |
@@ -58,8 +61,9 @@ writes the coloured versions. It sends nothing back, and nothing about the page 
 stored or transmitted.
 
 Firefox asks for this permission separately, so you can refuse it. If you do, the
-other two indicators still work: the toolbar badge, and the tint on the active tab.
-Settings shows a notice when access is off.
+three indicators that need nothing from the page still work: the timer ring on the
+toolbar button, the badge, and the tint on the active tab. Settings shows a notice
+when access is off.
 
 ## 📦 Backups
 
