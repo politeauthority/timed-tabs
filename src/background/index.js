@@ -10,7 +10,7 @@ import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
 import { createNotifier } from "./notify.js";
-import { iconForRecord } from "../shared/recent.js";
+import { recordFor } from "../shared/recent.js";
 import { findIndicators } from "./indicators/index.js";
 import { lastOutcome as faviconOutcome } from "./indicators/favicon.js";
 
@@ -75,16 +75,13 @@ function recordExpired(tab, action) {
   return serial(() => recordExpiredNow(tab, action));
 }
 async function recordExpiredNow(tab, action) {
+  // `recordFor` returns nothing for a tab from a private window: it is expired
+  // and closed like any other, but a record of it would outlive the session
+  // that promised not to keep one.
+  const entry = recordFor(tab, action);
+  if (!entry) return;
   const list = await loadRecent();
-  list.unshift({
-    id: `${tab.id}-${Date.now()}`,
-    tabId: tab.id,
-    title: tab.title || tab.url || "",
-    url: tab.url ?? "",
-    favIconUrl: iconForRecord({ url: tab.url, favIconUrl: tab.favIconUrl, originalIcon: tab.originalIcon }),
-    expiredAt: Date.now(),
-    action,
-  });
+  list.unshift(entry);
   list.splice(RECENT_MAX);
   await api.storage.local.set({ [RECENT_KEY]: list });
   if (IS_DEV_BUILD) console.log(`[timed-tabs] recorded ${tab.url} icon=${list[0].favIconUrl ? "yes" : "no"}`);
