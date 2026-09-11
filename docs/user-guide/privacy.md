@@ -66,8 +66,8 @@ Versions before this one did record them, and those rows cannot be told apart no
 you ran Timed Tabs in private windows before, use **Clear list** once to be sure.
 
 In Firefox, the setting is in `about:addons` → Timed Tabs → Details → "Run in Private
-Windows". In Chrome it is on `chrome://extensions` → Timed Tabs → Details → "Allow in
-Incognito".
+Windows". In the Chrome build, which is not yet supported, it is on `chrome://extensions`
+→ Timed Tabs → Details → "Allow in Incognito".
 
 ## 🌐 Why it asks for access to every site
 
