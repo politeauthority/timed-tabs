@@ -426,7 +426,7 @@ function renderTab() {
   $("act-never-paused").checked = tabState.neverExpire;
   $("act-ignore").checked = Boolean(tabState.ignoreRules);
   // The rules section only appears when a rule matches this page, or rules are already ignored.
-  $("tab-rules").hidden = !(tabState.rules?.length || tabState.ignoreRules);
+  $("tab-rules").hidden = !currentTab;
   renderTabRules();
   renderTabSettings();
   if (hideTimer) return;
@@ -453,6 +453,8 @@ function renderTabRules() {
   }
   const matched = tabState?.rules ?? [];
   const allOff = Boolean(tabState?.ignoreRules);
+  $("act-ignore-wrap").hidden = !matched.length;
+  $("tab-rules-note").hidden = !matched.length;
   if (!matched.length) {
     const p = document.createElement("p");
     p.className = "tab-rules-empty";
@@ -2073,6 +2075,12 @@ $("act-snooze").addEventListener("click", async () => {
 });
 
 // Dragging reports continuously; the commit waits until the drag is let go.
+// The way back to the Rules page for this site. It went with the bottom nav,
+// and this is the place for it: beside the rules it is about.
+$("tab-rules-open").addEventListener("click", () =>
+  openPageView("#rules", currentTab?.url ? { site: currentTab.url } : {}),
+);
+
 $("fuse-range").addEventListener("input", (e) => {
   fuseDrag = Number(e.target.value);
   $("fuse").classList.add("is-dragging");
