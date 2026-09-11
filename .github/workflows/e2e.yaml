@@ -17,10 +17,10 @@ run-name: "E2E — ${{ github.ref_name }}"
 # product-details feed and Chrome from the Chrome for Testing feed, at run time,
 # so nothing here is pinned and every leg follows the browser's own releases.
 # Nightly is Firefox Nightly and Chrome Canary, the two daily builds. The
-# `firefox` and `chrome` inputs are the two lists; Firefox defaults to stable and
-# previous, Chrome to nothing. ci.yaml adds Chrome stable, and full.yaml passes
-# nightly, stable, previous and previous-2 of each browser for the `ci run full`
-# label. This file runs what it is told and holds no opinion about branches. No
+# `firefox` and `chrome` inputs are the two lists; they default to Firefox stable
+# and previous plus Chrome stable, which is what CI and the beta gate run, and
+# full.yaml passes nightly, stable, previous and previous-2 of each browser for
+# the `ci run full` label. This file runs what it is told and holds no opinion about branches. No
 # Chrome leg is a required check yet; making one required is a branch protection
 # change, not a change here.
 #
@@ -75,12 +75,15 @@ on:
         required: false
         default: '["stable", "previous"]'
       chrome:
-        # The same for Chrome. Empty by default: the beta gate is Firefox-only,
-        # and every other caller says what it wants.
+        # The same for Chrome. Defaults to stable, so a caller that says nothing
+        # -- the beta gate, a bare dispatch -- tests the Chrome build it ships.
+        # `[]` runs no Chrome at all, at a price: a matrix job skipped at the job
+        # level is not expanded, so it reports once under the literal text of
+        # its name expression. Harmless, and odd to look at.
         description: 'JSON list of Chrome channels: nightly, stable, previous, previous-N. Empty for none.'
         type: string
         required: false
-        default: '[]'
+        default: '["stable"]'
       max-parallel:
         # Ten browsers at once starved one another on the runner node until a
         # scenario saw a single tick in its whole window. The scenarios time
@@ -125,7 +128,7 @@ on:
         description: 'JSON list of Chrome channels: nightly, stable, previous, previous-N. Empty for none.'
         type: string
         required: false
-        default: '[]'
+        default: '["stable"]'
       max-parallel:
         description: How many legs of each browser may run at once.
         type: number
@@ -161,7 +164,9 @@ jobs:
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     # Only when there is a list to run: an empty matrix is an error, not a no-op.
     # This is the one job-level `if` here, and it is safe because an empty list
-    # never comes from a caller whose Firefox legs are required checks.
+    # never comes from a caller whose Firefox legs are required checks. (It
+    # does leave one skipped check named with the literal `name` expression,
+    # which is why the defaults leave no list empty.)
     #
     # Everything else that skips a leg -- the `ci pause` label, the release PR,
     # and CI's legs when the full run covers them -- is decided by the `skip`
@@ -464,7 +469,9 @@ jobs:
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     # Only when there is a list to run: an empty matrix is an error, not a no-op.
     # This is the one job-level `if` here, and it is safe because an empty list
-    # never comes from a caller whose Chrome legs are required checks.
+    # never comes from a caller whose Chrome legs are required checks. (It
+    # does leave one skipped check named with the literal `name` expression,
+    # which is why the defaults leave no list empty.)
     #
     # Everything else that skips a leg -- the `ci pause` label, the release PR,
     # and CI's legs when the full run covers them -- is decided by the `skip`
