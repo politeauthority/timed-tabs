@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHART_DAYS, DAYS_KEPT, dayKey, emptyStats, mergeStats, record, summarise } from "../src/shared/stats.js";
+import { CHART_DAYS, DAYS_KEPT, clearStats, dayKey, emptyStats, mergeStats, record, restoreKilled, summarise } from "../src/shared/stats.js";
 
 /** A fixed local noon, so a day key never depends on the hour the suite runs. */
 const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -34,6 +34,19 @@ describe("record", () => {
     const s = emptyStats();
     expect(record(s, { type: "expired", action: "none" }, DAY)).toBe(s);
     expect(record(s, { type: "expired" }, DAY)).toBe(s);
+  });
+
+  describe("the lifetime count of tabs killed", () => {
+    it("counts a closed tab there too", () => {
+      const s = from([closed, closed]);
+      expect(s.killed).toBe(2);
+      expect(s.closed).toBe(2);
+    });
+
+    it("does not count an unload or a reload as a kill", () => {
+      const s = from([{ type: "expired", action: "discard" }, { type: "expired", action: "reload" }]);
+      expect(s.killed).toBe(0);
+    });
   });
 
   it("counts a snooze and the time it bought", () => {
@@ -122,6 +135,42 @@ describe("record", () => {
   });
 });
 
+describe("clearStats", () => {
+  it("empties everything but the tabs killed", () => {
+    const s = from([closed, closed, { type: "snoozed", seconds: 60 }, { type: "reset" }, { type: "tabs", open: 9 }]);
+    const cleared = clearStats(s);
+    expect(cleared).toEqual({ ...emptyStats(), killed: 2 });
+  });
+
+  it("makes an empty tally of nothing at all", () => {
+    expect(clearStats(undefined)).toEqual(emptyStats());
+  });
+});
+
+describe("restoreKilled", () => {
+  it("takes a bigger count from a backup", () => {
+    const s = restoreKilled(from([closed]), 40);
+    expect(s.killed).toBe(40);
+    // Only the lifetime count moves: the window on recent weeks is this profile's.
+    expect(s.closed).toBe(1);
+  });
+
+  // A total that can shrink is not a total.
+  it("hands back the very same object rather than lower the count", () => {
+    const s = from([closed, closed, closed]);
+    expect(restoreKilled(s, 2)).toBe(s);
+    expect(restoreKilled(s, 3)).toBe(s);
+  });
+
+  it("shrugs off a count that is not one", () => {
+    const s = from([closed]);
+    expect(restoreKilled(s, -4)).toBe(s);
+    expect(restoreKilled(s, "many")).toBe(s);
+    expect(restoreKilled(s, NaN)).toBe(s);
+    expect(restoreKilled(emptyStats(), 2.9).killed).toBe(2);
+  });
+});
+
 describe("mergeStats", () => {
   it("makes an empty tally of nothing at all", () => {
     expect(mergeStats(undefined)).toEqual(emptyStats());
@@ -131,6 +180,11 @@ describe("mergeStats", () => {
 
   it("keeps counts it recognises", () => {
     expect(mergeStats({ closed: 7, snoozes: 2 }).closed).toBe(7);
+    expect(mergeStats({ killed: 12 }).killed).toBe(12);
+  });
+
+  it("reads a tally stored before the lifetime count existed as never having killed", () => {
+    expect(mergeStats({ closed: 7 }).killed).toBe(0);
   });
 
   it("floors a count rather than trusting it", () => {
@@ -162,6 +216,15 @@ describe("summarise", () => {
   it("stops being empty as soon as anything happens", () => {
     expect(summarise(from([{ type: "reset" }]), DAY).empty).toBe(false);
     expect(summarise(from([{ type: "tabs", open: 3 }]), DAY).empty).toBe(false);
+  });
+
+  // After a clear the lifetime count is all that is left, and it still counts.
+  it("is not empty while the tabs killed remain", () => {
+    expect(summarise(clearStats(from([closed])), DAY).empty).toBe(false);
+  });
+
+  it("carries the lifetime count through", () => {
+    expect(summarise(from([closed, closed]), DAY).killed).toBe(2);
   });
 
   it("adds the three expiry actions into one total", () => {

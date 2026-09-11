@@ -3,14 +3,20 @@
  * Pure: storage is handled by the caller.
  *
  * { "timedTabs": 1, "version": "0.8.0", "settings": { ...DEFAULTS keys... },
- *   "rules": [ ...rules ], "groups": [ ...site groups ] }
+ *   "rules": [ ...rules ], "groups": [ ...site groups ], "stats": { "killed": 0 } }
  *
  * The two numbers say different things. `timedTabs` is the shape of the file,
  * which changes only when the shape does; `version` is the Timed Tabs that
  * wrote it, which is there to be read by a person and to catch a bundle
  * arriving from a build newer than the one loading it. Neither is required:
- * "groups" is missing from backups written before site groups existed, and
- * "version" from any written before this stamp, and both load as before.
+ * "groups" is missing from backups written before site groups existed,
+ * "version" from any written before this stamp, and "stats" from any written
+ * before the lifetime count travelled, and all load as before.
+ *
+ * "stats" carries one number, the tabs Timed Tabs has ever killed. It is the
+ * only part of the tally in here: the rest is a window on recent weeks that
+ * belongs to the profile, while a lifetime total is the kind of thing that
+ * should outlive one. Loading it never lowers the count already in force.
  *
  * Nothing is ever loaded *from* `version` — it is a note about where the file
  * came from, not a setting. A bundle exported again carries whichever build
@@ -24,8 +30,11 @@ import { compareVersions } from "./version.js";
 
 export const FORMAT_VERSION = 1;
 
-/** `version` is the build writing the file; leave it out and the stamp is too. */
-export function exportBundle(settings, rules, groups = [], version = "") {
+/**
+ * `version` is the build writing the file; leave it out and the stamp is too.
+ * `stats` is the tally, of which only the lifetime `killed` count is written.
+ */
+export function exportBundle(settings, rules, groups = [], version = "", stats = null) {
   const out = {};
   for (const key of Object.keys(DEFAULTS)) out[key] = settings[key] ?? DEFAULTS[key];
   const stamp = typeof version === "string" ? version.trim() : "";
@@ -35,11 +44,17 @@ export function exportBundle(settings, rules, groups = [], version = "") {
     settings: out,
     rules: (rules ?? []).map(cleanRule),
     groups: (groups ?? []).map(cleanGroup),
+    stats: { killed: cleanCount(stats?.killed) },
   };
 }
 
-export function exportText(settings, rules, groups = [], version = "") {
-  return JSON.stringify(exportBundle(settings, rules, groups, version), null, 2) + "\n";
+export function exportText(settings, rules, groups = [], version = "", stats = null) {
+  return JSON.stringify(exportBundle(settings, rules, groups, version, stats), null, 2) + "\n";
+}
+
+/** A non-negative whole number, or zero for anything that is not one. */
+function cleanCount(v) {
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 }
 
 function cleanGroup(g) {
@@ -49,8 +64,9 @@ function cleanGroup(g) {
 
 /**
  * Parse and validate a backup. Returns
- * { version, settings, rules, groups, warnings }, where `version` is the build
- * that wrote the file, or "" for one written before the stamp existed.
+ * { version, settings, rules, groups, stats, warnings }, where `version` is the
+ * build that wrote the file, or "" for one written before the stamp existed,
+ * and `stats` is `{ killed }`, zero when the file carries no count.
  *
  * Unknown settings are dropped with a warning; wrong types fall back to the
  * default with a warning. Throws only when the text is not a backup at all.
@@ -135,7 +151,14 @@ export function parseBundle(text, currentVersion = "") {
       }
     }
   }
-  return { version, settings, rules, groups, warnings };
+  let killed = 0;
+  if (data.stats !== undefined) {
+    const raw = data.stats && typeof data.stats === "object" ? data.stats.killed : undefined;
+    if (raw === undefined) warnings.push("Statistics were not in the expected shape and were ignored.");
+    else if (!Number.isFinite(raw) || raw < 0) warnings.push("The count of tabs killed was not a number and was ignored.");
+    else killed = Math.floor(raw);
+  }
+  return { version, settings, rules, groups, stats: { killed }, warnings };
 }
 
 

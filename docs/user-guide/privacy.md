@@ -14,7 +14,7 @@ anyone who needs one, is the [privacy policy](../../PRIVACY.md).
 | Rules and site groups | Local storage | No |
 | Each tab's timer | With the tab, for as long as it is open | No |
 | **Recently expired tabs** | Local storage | No |
-| Statistics (counts and dates) | Local storage | No |
+| Statistics (counts and dates) | Local storage | Only the all-time count of tabs killed, in a backup you export |
 
 ## 🕯️ The recently expired list
 
@@ -49,7 +49,7 @@ once, and a per-day count of expiries for the last 30 days.
 The section is behind a feature flag, but **the counting is not**: the tally is kept
 whether the flag is on or off, and the flag only decides whether the section is there
 to read. Turning it off is not a way to stop the counting — **Clear statistics**,
-inside the section, is what empties it.
+inside the section, is what empties it, all but the all-time count of tabs killed.
 
 It holds **numbers and dates and nothing else**. No address, no title, no icon —
 so unlike the list above, there is nothing in it that could say which pages you had
@@ -57,7 +57,8 @@ open, and a private tab is counted without leaving any trace that it existed.
 
 The one thing it does show is which days you were busy. If you would rather it did
 not, **Clear statistics** at the foot of the section empties it. It never leaves your
-machine and is not carried in a backup.
+machine. One number is carried in a backup: the all-time count of tabs killed, which
+says how many and nothing about which.
 
 ## 🕵️ Private windows
 
@@ -92,8 +93,8 @@ when access is off.
 ## 📦 Backups
 
 **Backup**, a pill on the Settings page, exports every setting and every rule as one JSON file,
-plus the version of Timed Tabs that wrote it. What you have been reading is not in
-there — no addresses of closed tabs, no titles.
+plus the version of Timed Tabs that wrote it and the all-time count of tabs killed.
+What you have been reading is not in there — no addresses of closed tabs, no titles.
 
 The rules are, though, and a rule is a site you cared enough to write a rule about.
 The file is plain text. Keep it somewhere you would keep a bookmarks export.

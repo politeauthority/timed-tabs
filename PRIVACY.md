@@ -59,8 +59,10 @@ notification counts one it may not name.
 
 It is worth being straight about the one thing it does reveal: a per-day count says
 which days you were busy, even though it cannot say what you were doing. It stays in
-local storage, never syncs, and is not included in a backup. **Clear statistics**, at
-the foot of the section, empties it.
+local storage and never syncs. One number from it goes into a backup: the all-time
+count of tabs killed, which says how many and nothing about which. **Clear
+statistics**, at the foot of the section, empties everything else and leaves that
+count standing.
 
 ### Private windows
 
@@ -119,7 +121,8 @@ Tabs; making Chrome ask is [an open item](docs/developer/security-notes.md).
 ## Backups
 
 **Backup** exports your settings, rules and site groups as one JSON file, to a
-location you choose. The list of closed tabs is not in it — no addresses, no titles.
+location you choose, along with the all-time count of tabs killed. The list of closed
+tabs is not in it — no addresses, no titles.
 
 Your rules are, though, and a rule names a site you cared enough to write a rule
 about. The file is plain text. Keep it where you would keep a bookmarks export.

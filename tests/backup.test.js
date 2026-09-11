@@ -98,6 +98,39 @@ describe("site groups in backups", () => {
   });
 });
 
+describe("the tabs killed in a backup", () => {
+  it("round-trips the lifetime count and nothing else of the tally", () => {
+    const text = exportText({ ...DEFAULTS }, [], [], "", { killed: 17, closed: 17, snoozes: 3 });
+    const bundle = JSON.parse(text);
+    expect(bundle.stats).toEqual({ killed: 17 });
+    expect(parseBundle(text).stats).toEqual({ killed: 17 });
+  });
+
+  it("writes a zero when there is no tally to hand", () => {
+    expect(JSON.parse(exportText({ ...DEFAULTS }, [], [])).stats).toEqual({ killed: 0 });
+    expect(JSON.parse(exportText({ ...DEFAULTS }, [], [], "", { killed: "lots" })).stats).toEqual({ killed: 0 });
+  });
+
+  it("takes a backup written before the count travelled", () => {
+    const parsed = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [] }));
+    expect(parsed.stats).toEqual({ killed: 0 });
+    expect(parsed.warnings).toEqual([]);
+  });
+
+  it("ignores a count that is not one, with a warning", () => {
+    const bad = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [], stats: { killed: -1 } }));
+    expect(bad.stats.killed).toBe(0);
+    expect(bad.warnings.some((w) => w.includes("tabs killed"))).toBe(true);
+    const shapeless = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [], stats: 5 }));
+    expect(shapeless.stats.killed).toBe(0);
+    expect(shapeless.warnings.some((w) => w.includes("Statistics"))).toBe(true);
+  });
+
+  it("floors a fraction rather than trusting it", () => {
+    expect(parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [], stats: { killed: 4.6 } })).stats.killed).toBe(4);
+  });
+});
+
 describe("validation on import", () => {
   it("refuses a choice outside its options and a number outside its range, with a warning each", () => {
     const { settings, warnings } = parseBundle(JSON.stringify({ timedTabs: 1, settings: { onExpire: "nuke", quietUntilPercent: 500, tabLifetimeSeconds: 600 }, rules: [] }));
