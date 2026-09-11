@@ -117,6 +117,12 @@ body[data-context="page"] #app {
   padding: var(--sp-6) var(--gutter) 48px;
 }
 
+/* A rule is a row of controls, not a paragraph, so the rules page is given
+   more width than the measure the prose pages want. */
+body[data-context="page"][data-page="rules"] #app {
+  max-width: 1040px;
+}
+
 #app {
   display: flex;
   flex-direction: column;
@@ -1480,7 +1486,7 @@ body:not([data-context="popup"]) .field {
 
 .rules-list {
   display: grid;
-  gap: var(--sp-5);
+  gap: var(--sp-2);
 }
 
 /* A feature flag that needs another one on first. */
@@ -1495,6 +1501,10 @@ body:not([data-context="popup"]) .field {
 /* Site groups: cards like rules, with a name in the head and the patterns below. */
 .site-groups {
   margin-top: var(--sp-5);
+}
+
+.rule.group {
+  --rule-indent: 36px;
 }
 
 .group-name {
@@ -1522,7 +1532,7 @@ body:not([data-context="popup"]) .field {
 /* A rule's target: an address pattern, or one of the site groups. */
 .rule-target {
   flex: none;
-  max-width: 40%;
+  max-width: 150px;
 }
 
 .rule-group-note {
@@ -1532,9 +1542,16 @@ body:not([data-context="popup"]) .field {
 }
 
 .rule {
-  padding: var(--sp-1) var(--gutter) 6px;
+  /* Everything below the head lines up under the pattern, past the chevron
+     and the priority badge. */
+  --rule-indent: 70px;
+  padding: 0 var(--sp-3) var(--sp-1);
   border: 1px solid var(--line);
   border-radius: var(--r-card);
+}
+
+.rule:hover {
+  border-color: var(--line-strong);
 }
 
 .rule.is-target {
@@ -1542,8 +1559,16 @@ body:not([data-context="popup"]) .field {
   outline-offset: 2px;
 }
 
-.rule.is-disabled {
-  opacity: 0.6;
+/* A rule switched off still has to be read and switched back on, so the card
+   keeps its contrast and only what it would have done is greyed. */
+.rule.is-disabled .rule-pattern-mirror,
+.rule.is-disabled .rule-target,
+.rule.is-disabled .rule-summary {
+  opacity: 0.55;
+}
+
+.rule.is-disabled .rule-priority {
+  color: var(--ink-3);
 }
 
 .rule.is-filtered-out {
@@ -1553,8 +1578,45 @@ body:not([data-context="popup"]) .field {
 .rule-head {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) 0;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+}
+
+/* Priority, where the list can be scanned for it. The list is ordered by
+   pattern, so nothing else says which rule wins. */
+.rule-priority {
+  flex: none;
+  min-width: 26px;
+  height: 22px;
+  min-height: 0;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule-priority:hover {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+.rule-group-count {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.rule-group-count.is-problem {
+  color: var(--danger);
+}
+
+/* Held right whether or not a pattern box is there to push it. */
+.rule-enable {
+  flex: none;
+  margin-left: auto;
 }
 
 .rule-pattern-wrap {
@@ -1625,11 +1687,22 @@ body:not([data-context="popup"]) .field {
   color: var(--ink-2);
 }
 
+.rule-delete:hover {
+  color: var(--danger);
+}
+
+/* Armed, the icon grows the word it needs: an icon alone cannot say "armed". */
+.rule-delete.is-armed {
+  width: auto;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
 .rule-description-wrap {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin: calc(var(--sp-1) * -1) 0 10px;
+  margin: 0 0 10px;
 }
 
 .rule-description {
@@ -1651,6 +1724,12 @@ body:not([data-context="popup"]) .field {
 .rule-description:focus-visible {
   outline: none;
   border-bottom-color: var(--focus);
+}
+
+/* Everything the card holds hangs under the pattern, so a card reads as one
+   column rather than two things stacked. */
+.rule-body {
+  padding-left: var(--rule-indent);
 }
 
 .rule .field {
@@ -1711,10 +1790,13 @@ body:not([data-context="popup"]) .field {
 /* Collapsed rule cards. */
 .rule-summary {
   display: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-2);
   width: 100%;
   min-height: 0;
-  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
-  padding: var(--sp-1) 2px var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  padding: 0 2px var(--sp-1) var(--rule-indent);
   justify-content: flex-start;
   text-align: left;
   white-space: normal;
@@ -1723,6 +1805,32 @@ body:not([data-context="popup"]) .field {
   font-size: var(--fs-sm);
   line-height: 1.4;
   border-radius: var(--r-control);
+}
+
+.rule-meta {
+  color: var(--ink-2);
+}
+
+.rule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+/* One chip per setting the rule changes, so the list can be read for what a
+   rule does rather than parsed out of a sentence. */
+.rule-chip {
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.rule-chip.is-empty {
+  border-style: dashed;
+  font-style: italic;
 }
 
 .rule-summary:hover {
@@ -1739,7 +1847,12 @@ body:not([data-context="popup"]) .field {
 }
 
 .rule.is-collapsed {
-  padding-bottom: 2px;
+  padding-bottom: 0;
+}
+
+/* The "Saved" tick lands at the end of the head row. */
+.rule-head .saved-mark {
+  flex: none;
 }
 
 /* ---- Backup and diagnostics --------------------------------------------------- */

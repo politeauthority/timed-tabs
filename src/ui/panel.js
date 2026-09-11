@@ -1308,6 +1308,14 @@ const groupsOn = () => featureOn(settings, "site-groups");
 const activeGroups = () => (groupsOn() ? groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
 const expandedRules = new Set();
+/**
+ * The priority a rule had before its on/off switch zeroed it, so switching it
+ * back on restores what the user chose rather than a default. Only for this
+ * session: a rule left off is off, and its old priority is not worth storing.
+ */
+const offPriorities = new Map();
+/** What a rule starts at, and what an off rule returns to with nothing remembered. */
+const DEFAULT_RULE_PRIORITY = 5;
 /** The rule "Add rule" just set up; its card flashes until this is cleared. */
 let justAddedRuleId = null;
 let justAddedTimer = null;
@@ -1413,6 +1421,45 @@ function describeGroupTarget(rule) {
   if (!g) return `Targets site group “${name}”, which does not exist, so this rule matches nothing`;
   const n = g.patterns.length;
   return `Site group “${g.name}”, ${n} site${n === 1 ? "" : "s"}`;
+}
+
+/** Why a group rule currently matches nothing, or null when it is fine. */
+function groupTargetProblem(rule) {
+  const name = groupNameOf(rule.pattern);
+  if (!groupsOn())
+    return "Site groups are off in Settings \u2192 Feature flags, so this rule matches nothing";
+  if (!findGroup(groups, name))
+    return `There is no site group \u201c${name}\u201d, so this rule matches nothing`;
+  return null;
+}
+
+/**
+ * A toggle override worded for a chip. A chip has no room for "Timer off: on",
+ * so both readings are written out; every other type reads well enough as
+ * "Label: value" and falls through to `ruleFieldLabel`.
+ */
+const RULE_CHIP_TOGGLE_TEXT = {
+  resetOnActivate: { on: "Restarts on focus", off: "No restart on focus" },
+  pauseWhileActive: { on: "Background time only", off: "Counts time while active" },
+  neverExpire: { on: "Timer off", off: "Timer on" },
+  hideWhileGreen: { on: "Leaves fresh tabs alone", off: "Shows from the start" },
+  flashBeforeExpiry: { on: "Flashes before expiry", off: "No flash" },
+};
+
+/** Field labels that are sentences; a chip has no room for them. */
+const RULE_CHIP_LABEL = {
+  onExpire: "On expiry",
+  indicators: "Shows with",
+  faviconStyle: "Favicon",
+  quietUntilPercent: "Shows after",
+  flashLeadSeconds: "Flash lead",
+};
+
+function ruleChipText(key, value) {
+  const pair = RULE_CHIP_TOGGLE_TEXT[key];
+  if (pair) return value ? pair.on : pair.off;
+  const label = RULE_CHIP_LABEL[key] ?? ruleFieldLabel(key);
+  return `${label}: ${formatRuleValue(key, value)}`;
 }
 
 /** Group ids expanded this session. New groups start open. */
@@ -1651,7 +1698,8 @@ function renderRule(rule) {
   el.classList.toggle("is-collapsed", !open);
   el.classList.toggle("is-just-added", rule.id === justAddedRuleId);
 
-  // Header: expand toggle, pattern field, delete button.
+  // Header: one row that says which rule this is and what it is worth --
+  // expand, priority, what it targets, on/off, delete.
   const head = document.createElement("div");
   head.className = "rule-head";
   const toggle = document.createElement("button");
@@ -1664,6 +1712,23 @@ function renderRule(rule) {
   toggle.addEventListener("click", () =>
     setRuleExpanded(rule.id, !expandedRules.has(rule.id)),
   );
+
+  // Priority decides which rule wins, and the list is ordered by pattern
+  // rather than by it, so it has to be readable without opening a card.
+  const prio = document.createElement("button");
+  prio.type = "button";
+  prio.className = "rule-priority";
+  prio.textContent = rule.priority === 0 ? "off" : String(rule.priority);
+  prio.title =
+    rule.priority === 0
+      ? "Priority 0: this rule is switched off. Click to change it."
+      : `Priority ${rule.priority}: when two rules disagree, the higher number wins. Click to change it.`;
+  prio.setAttribute("aria-label", prio.title);
+  prio.addEventListener("click", () => {
+    setRuleExpanded(rule.id, true);
+    el.querySelector('[data-row-key="priority"] input')?.focus();
+  });
+
   const pattern = document.createElement("input");
   pattern.className = "rule-pattern";
   pattern.placeholder = "Type an address pattern, e.g. example.com/*";
@@ -1680,7 +1745,7 @@ function renderRule(rule) {
     target = document.createElement("select");
     target.className = "rule-target";
     target.setAttribute("aria-label", "What this rule applies to");
-    target.add(new Option("Address pattern", ""));
+    target.add(new Option("Address", ""));
     for (const g of groups) target.add(new Option(`Group: ${g.name}`, groupRef(g.name)));
     const current = targetsGroup ? groupRef(groupNameOf(rule.pattern)) : "";
     if (targetsGroup && !findGroup(groups, groupNameOf(rule.pattern))) {
@@ -1693,27 +1758,59 @@ function renderRule(rule) {
     });
   }
   patternWrap.hidden = targetsGroup;
+  // A group rule hides the pattern box, so the head says how big the group is
+  // in its place; without it the row would be a bare picker.
+  let groupCount = null;
+  if (targetsGroup) {
+    groupCount = document.createElement("span");
+    groupCount.className = "rule-group-count";
+    const g = groupsOn() ? findGroup(groups, groupNameOf(rule.pattern)) : null;
+    const n = g?.patterns.length ?? 0;
+    groupCount.textContent = g
+      ? `${n} site${n === 1 ? "" : "s"}`
+      : "matches nothing";
+    groupCount.classList.toggle("is-problem", !g);
+  }
+
+  // Switching a rule off is zeroing its priority; the switch says so without
+  // making the user find the number field first.
+  const enabled = rule.priority > 0;
+  const enable = makeSwitch(enabled, (on) => {
+    if (!on) offPriorities.set(rule.id, rule.priority);
+    const next = on
+      ? (offPriorities.get(rule.id) || DEFAULT_RULE_PRIORITY)
+      : 0;
+    updateRule(rule.id, { priority: next }, true, "head");
+  });
+  enable.el.classList.add("rule-enable");
+  enable.el.title = enabled
+    ? "On. Switch off to park the rule without deleting it."
+    : "Off (priority 0). Switch on to use it again.";
+  enable.input.setAttribute("aria-label", "Rule on");
+
   const del = document.createElement("button");
   del.type = "button";
-  del.className = "rule-delete quiet";
-  del.replaceChildren(svgIcon("trash"), document.createTextNode("Delete rule"));
-  // Two clicks within a few seconds; the first only arms the button.
+  del.className = "rule-delete quiet icon-btn";
+  // Two clicks within a few seconds; the first only arms the button, which is
+  // where the icon grows a word, since an icon alone cannot say "armed".
+  const rest = () => {
+    del.replaceChildren(svgIcon("trash"));
+    del.title = "Delete rule";
+    del.setAttribute("aria-label", "Delete rule");
+    del.classList.remove("is-armed");
+  };
+  rest();
   let armed = null;
   const disarm = () => {
     clearTimeout(armed);
     armed = null;
-    del.replaceChildren(
-      svgIcon("trash"),
-      document.createTextNode("Delete rule"),
-    );
-    del.classList.remove("is-armed");
+    rest();
   };
   del.addEventListener("click", () => {
     if (!armed) {
-      del.replaceChildren(
-        svgIcon("trash"),
-        document.createTextNode("Click again to delete"),
-      );
+      del.replaceChildren(svgIcon("trash"), document.createTextNode("Click again"));
+      del.title = "Click again to delete this rule";
+      del.setAttribute("aria-label", "Click again to delete this rule");
       del.classList.add("is-armed");
       armed = setTimeout(disarm, 4000);
       return;
@@ -1725,26 +1822,53 @@ function renderRule(rule) {
   del.addEventListener("blur", () => {
     if (armed) setTimeout(disarm, 200);
   });
-  head.append(toggle, ...(target ? [target] : []), patternWrap, del);
+  head.append(
+    toggle,
+    prio,
+    ...(target ? [target] : []),
+    patternWrap,
+    ...(groupCount ? [groupCount] : []),
+    enable.el,
+    del,
+  );
   el.append(head);
 
-  // Collapsed summary: description and what the rule changes, in one line.
+  // Collapsed summary, in two lines: what the rule is for and how it matches,
+  // then a chip for each setting it changes. One sentence held all of this
+  // before, and nothing in it could be found at a glance.
   const summary = document.createElement("button");
   summary.type = "button";
   summary.className = "rule-summary";
-  const summaryParts = [];
+  const meta = document.createElement("span");
+  meta.className = "rule-meta";
+  const metaParts = [];
   if (isEmptyRule(rule))
-    summaryParts.push("No pattern yet, so this rule matches nothing");
-  else if (targetsGroup) summaryParts.push(describeGroupTarget(rule));
-  if (rule.description) summaryParts.push(rule.description);
-  summaryParts.push(
-    `${rule.match === "prefix" ? "starts with" : "wildcard"}, priority ${rule.priority}`,
-  );
-  const sets = Object.entries(rule.set ?? {}).map(
-    ([k, v]) => `${ruleFieldLabel(k)}: ${formatRuleValue(k, v)}`,
-  );
-  summaryParts.push(sets.length ? sets.join(" · ") : "changes nothing yet");
-  summary.textContent = summaryParts.join(" — ");
+    metaParts.push("No pattern yet, so this rule matches nothing");
+  const problem = targetsGroup ? groupTargetProblem(rule) : null;
+  if (problem) metaParts.push(problem);
+  if (rule.description) metaParts.push(rule.description);
+  if (!targetsGroup)
+    metaParts.push(rule.match === "prefix" ? "starts with" : "wildcard");
+  meta.textContent = metaParts.join(" \u00b7 ");
+  meta.hidden = !metaParts.length;
+  summary.append(meta);
+
+  const chips = document.createElement("span");
+  chips.className = "rule-chips";
+  const sets = Object.entries(rule.set ?? {});
+  if (!sets.length) {
+    const none = document.createElement("span");
+    none.className = "rule-chip is-empty";
+    none.textContent = "changes nothing yet";
+    chips.append(none);
+  }
+  for (const [k, v] of sets) {
+    const chip = document.createElement("span");
+    chip.className = "rule-chip";
+    chip.textContent = ruleChipText(k, v);
+    chips.append(chip);
+  }
+  summary.append(chips);
   summary.title = "Expand rule";
   summary.addEventListener("click", () => setRuleExpanded(rule.id, true));
   el.append(summary);
@@ -2074,7 +2198,7 @@ $("rule-add").addEventListener("click", async () => {
   );
   let rule = existing;
   if (!rule) {
-    rule = newRule({ pattern: pattern || NEW_RULE_PATTERN, priority: 5 });
+    rule = newRule({ pattern: pattern || NEW_RULE_PATTERN, priority: DEFAULT_RULE_PRIORITY });
     rules = [...rules, rule];
     expandedRules.add(rule.id);
     // Draw the eye to the card that was just set up for this click; renders
