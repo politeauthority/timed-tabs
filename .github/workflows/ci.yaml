@@ -46,18 +46,8 @@ jobs:
       - uses: ./.github/actions/changed-paths
         id: changed
 
-      # See e2e.yaml: the runner is CPU-bound, so the unpacked Node is cached.
-      - name: Cache the Node toolchain
+      - uses: ./.github/actions/node-toolcache
         if: steps.changed.outputs.code == 'true'
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.tool_cache }}/node
-          key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-22
-      - uses: actions/setup-node@v7
-        if: steps.changed.outputs.code == 'true'
-        with:
-          node-version: 22
-          cache: npm
       - if: steps.changed.outputs.code == 'true'
         run: npm ci
       - name: Lint
@@ -86,9 +76,9 @@ jobs:
             {
               echo "### ⏭️ 🧪 Lint, test & build skipped"
               echo ""
-              echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`."
+              echo "> ▶️ **Why this ran:** ${EVENT} on \`${REF}\`."
               echo ""
-              echo "${{ steps.changed.outputs.reason }} Nothing here can change what lint, the tests or the build would say, so they did not run."
+              echo "${REASON} Nothing here can change what lint, the tests or the build would say, so they did not run."
               echo ""
               echo "The job still reports, because it is a required check."
             } >> "$GITHUB_STEP_SUMMARY"
@@ -98,9 +88,9 @@ jobs:
           {
             echo "$head"
             echo ""
-            echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`."
+            echo "> ▶️ **Why this ran:** ${EVENT} on \`${REF}\`."
             echo ""
-            echo "${{ steps.changed.outputs.reason }}"
+            echo "${REASON}"
             echo ""
             echo "🔬 \`npm run lint\`: \`${{ steps.lint.outcome }}\` · 🧪 \`npm test\`: \`${{ steps.test.outcome }}\` · 🏗️ \`npm run build\`: \`${{ steps.build.outcome }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

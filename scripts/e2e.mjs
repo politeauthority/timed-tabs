@@ -97,6 +97,7 @@ process.exit(failed ? 1 : 0);
 function run(cmd, args, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd: ROOT, stdio: "inherit", env: { ...process.env, ...env } });
+    child.on("error", (e) => reject(new Error(`${cmd} could not start: ${e.message}`)));
     child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(" ")} exited ${code}`))));
   });
 }
@@ -132,8 +133,14 @@ function runFor(cmd, args, ms, env) {
     child.stdout.on("data", onData);
     child.stderr.on("data", onData);
     timer = setTimeout(stop, 90_000 + ms);
-    child.on("exit", () => {
+    child.on("error", (e) => {
       clearTimeout(timer);
+      resolve(out + `\n[e2e] ${cmd} could not start: ${e.message}\n`);
+    });
+    child.on("exit", (code, signal) => {
+      clearTimeout(timer);
+      // Stopped by us is the normal end; anything else is worth seeing in the log.
+      if (signal !== "SIGTERM" && code !== 0) out += `\n[e2e] ${cmd} exited with ${code ?? signal}\n`;
       resolve(out);
     });
   });

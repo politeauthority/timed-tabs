@@ -46,7 +46,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: .gh-cli
-          sparse-checkout: .github/actions/gh-cli
+          sparse-checkout: |
+            .github/actions/gh-cli
+            .github/actions/node-toolcache
+            .github/actions/step-times
           sparse-checkout-cone-mode: false
       # The ARC image has no gh; GitHub-hosted ones do. A no-op on those.
       - uses: ./.gh-cli/.github/actions/gh-cli
@@ -72,7 +75,7 @@ jobs:
           if [ "$N" -eq 0 ]; then
             echo "::error::main is exactly ${LAST}; nothing to beta."; exit 1
           fi
-          TITLE=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json title,headRefName \
+          TITLE=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json title,headRefName \
                     --jq '[.[] | select(.headRefName | startswith("release-please--"))][0].title // empty')
           NEXT=$(printf '%s' "$TITLE" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
           if [ -z "$NEXT" ]; then
@@ -94,11 +97,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "::notice::${TAG} (manifest ${STABLE}.${N}) from $(git rev-parse --short HEAD)"
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.gh-cli/.github/actions/node-toolcache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - name: Lint
         run: npm run lint
       - name: Test
@@ -112,10 +112,14 @@ jobs:
           ZIP_VERSION: ${{ steps.ver.outputs.zip }}
         run: |
           npm run package
+          # Lint what ships, not src/: the built manifest carries the beta
+          # name and the four-part version.
+          npx web-ext lint --source-dir dist/firefox
           ls -la web-ext-artifacts
           cat dist/firefox/build.json
 
       - name: Tag and publish the prerelease
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.ver.outputs.tag }}
@@ -135,10 +139,14 @@ jobs:
             echo ""
             git log --no-merges --pretty='- %s (%h)' "${RANGE}"
           } > "$NOTES"
-          # `gh release create` makes the tag on the given commit; no PAT needed
-          # because nothing downstream has to be re-triggered by the push.
+          # `gh release create` makes the tag on the given commit: the one this
+          # job checked out and built, not GITHUB_SHA, which is the dispatch
+          # ref and may be another branch. No PAT needed, nothing downstream
+          # has to be re-triggered by the push.
+          BUILT=$(git rev-parse HEAD)
+          echo "built=${BUILT}" >> "$GITHUB_OUTPUT"
           gh release create "$TAG" web-ext-artifacts/*.zip \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --repo "$GITHUB_REPOSITORY" --target "$BUILT" \
             --prerelease --title "$TAG" --notes-file "$NOTES"
 
       # From the sparse checkout of this ref, not the `main` tree it built.

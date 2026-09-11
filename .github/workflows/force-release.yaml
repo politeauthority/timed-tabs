@@ -53,9 +53,12 @@ jobs:
 
       - name: Compute target version
         id: ver
+        env:
+          IN_VERSION: ${{ inputs.version }}
+          IN_BUMP: ${{ inputs.bump }}
         run: |
           set -euo pipefail
-          IN="${{ inputs.version }}"
+          IN="${IN_VERSION}"
           if [ -n "$IN" ]; then
             echo "$IN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::'$IN' is not a valid X.Y.Z version"; exit 1; }
             NEXT="$IN"
@@ -63,13 +66,13 @@ jobs:
           else
             CUR=$(jq -r '."."' .release-please-manifest.json)
             IFS=. read -r MA MI PA <<< "$CUR"
-            case "${{ inputs.bump }}" in
+            case "${IN_BUMP}" in
               patch) PA=$((PA+1));;
               minor) MI=$((MI+1)); PA=0;;
               major) MA=$((MA+1)); MI=0; PA=0;;
             esac
             NEXT="${MA}.${MI}.${PA}"
-            echo "::notice::Current ${CUR} -> ${{ inputs.bump }} -> ${NEXT}"
+            echo "::notice::Current ${CUR} -> ${IN_BUMP} -> ${NEXT}"
           fi
           echo "next=${NEXT}" >> "$GITHUB_OUTPUT"
 
