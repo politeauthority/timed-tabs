@@ -65,6 +65,7 @@ export const GROUPS = [
   { id: "notifications", emoji: "🔔", title: "Notifications", short: "Notifications", help: "What Timed Tabs tells you about, and when." },
   { id: "appearance", emoji: "🎨", title: "Appearance", short: "Appearance", help: "How remaining time is shown in the browser." },
   { id: "advanced", emoji: "🔧", title: "Advanced", short: "Advanced", help: "Rarely needed." },
+  { id: "flags", emoji: "🚩", title: "Feature flags", short: "Flags", help: "Work that is not finished enough to be on for everyone." },
 ];
 
 /**
@@ -198,10 +199,10 @@ export const FIELDS = [
   },
   {
     key: "featureFlags",
-    group: "advanced",
+    group: "flags",
     type: "flags",
-    label: "Feature flags",
-    help: "Work that is not finished enough to be on for everyone. Expect rough edges.",
+    label: "Switches",
+    help: "Expect rough edges.",
   },
   {
     key: "tickSeconds",

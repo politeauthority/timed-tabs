@@ -2,7 +2,7 @@
 
 Some parts of Timed Tabs work well enough to use but are not finished enough to be on
 for everyone. They sit behind feature flags: switches you turn on yourself, under
-Settings, Advanced, Feature flags.
+Settings, Feature flags.
 
 > 🚧 Expect rough edges. What a flag does, and what its screens look like, can change
 > between builds — and a flag can be withdrawn once the work behind it lands properly
@@ -15,7 +15,7 @@ Every beta feature needs **two** switches on: **Beta features**, which is the ma
 switch, and the feature's own switch below it. On its own, neither does anything.
 
 1. Open **Full page** from the popup header, then **Settings**.
-2. Scroll to **Advanced**, and find **Feature flags**.
+2. Pick the **Flags** pill.
 3. Turn on **Beta features**.
 4. Turn on the feature you want.
 

@@ -2725,7 +2725,7 @@ function renderFlagsNote() {
   $("flags-note-text").textContent =
     `${names.length === 1 ? "1 beta feature" : `${names.length} beta features`} on: ${names.join(", ")}`;
   note.title =
-    "Timed Tabs may not match the user guide while a beta feature is on. Settings \u2192 Advanced \u2192 Feature flags.";
+    "Timed Tabs may not match the user guide while a beta feature is on. Settings \u2192 Feature flags.";
 }
 
 /** Every part of the UI a feature flag can show or hide. */
@@ -3143,7 +3143,7 @@ const FLAGS_GROUP = FIELDS.find((f) => f.key === "featureFlags")?.group;
  * group and a scroll.
  *
  * The group is the part that is easy to miss. Settings shows one group at a
- * time and the flags are in Advanced, so on any other group the row is inside
+ * time and the flags have a group of their own, so on any other group the row is inside
  * a hidden section -- and `scrollIntoView` on one of those does nothing at
  * all, which lands you on Settings with no idea what you were sent to look at.
  */
