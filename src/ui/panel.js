@@ -613,7 +613,12 @@ function setSectionFold(section, open, persist = true) {
 }
 
 for (const section of ["settings", "rules"]) {
-  const flip = () => setSectionFold(section, $(`tab-${section}`).classList.contains("is-collapsed"));
+  const flip = () => {
+    const el = $(`tab-${section}`);
+    // Nothing under the heading, nothing to fold.
+    if (el.classList.contains("is-empty")) return;
+    setSectionFold(section, el.classList.contains("is-collapsed"));
+  };
   $(`tab-${section}-toggle`).addEventListener("click", flip);
   document.querySelector(`.settings-title[data-toggles="tab-${section}"]`)?.addEventListener("click", flip);
 }
@@ -662,9 +667,11 @@ function renderTabRules() {
   }
   const matched = tabState?.rules ?? [];
   const allOff = Boolean(tabState?.ignoreRules);
-  // The count in the heading says it all; with none, the section is just the heading.
+  // The count in the heading says it all; with none, the section is just the
+  // heading, so there is nothing to fold and the chevron goes (see .is-empty).
   $("tab-rules-count").textContent = String(matched.length);
   $("tab-rules-count").classList.toggle("is-zero", !matched.length);
+  $("tab-rules").classList.toggle("is-empty", !matched.length);
   $("act-ignore-wrap").hidden = !matched.length;
   $("tab-rules-note").hidden = !matched.length;
   if (!matched.length) {
