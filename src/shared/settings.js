@@ -7,6 +7,11 @@ import { DEFAULT_TAB_SORT } from "./tab-sort.js";
  * rendered on the settings page. Keep the shape flat and JSON-serialisable.
  */
 export const DEFAULTS = Object.freeze({
+  /**
+   * The master switch. Off, Timed Tabs touches no tab at all: no timers run,
+   * nothing expires, and every visible mark it made is taken back off.
+   */
+  tabManagement: true,
   /** Seconds a tab may stay open before it is considered expired. */
   tabLifetimeSeconds: 30 * 60,
   /** One press of Snooze adds this share of the tab's own lifetime. */
@@ -44,6 +49,11 @@ export const DEFAULTS = Object.freeze({
 
 /** Settings page sections, in order. Each FIELDS entry names its group. */
 export const GROUPS = [
+  {
+    id: "master",
+    title: "Timed Tabs",
+    help: "Whether Timed Tabs does anything to your tabs at all.",
+  },
   { id: "timing", title: "Timing", help: "How long tabs live and when the clock runs." },
   { id: "expiry", title: "When a tab expires", help: "What happens to a background tab once its time is up." },
   { id: "appearance", title: "Appearance", help: "How remaining time is shown in the browser." },
@@ -58,6 +68,13 @@ export const GROUPS = [
  * setting can be switched on; it is turned back off if they are ever revoked.
  */
 export const FIELDS = [
+  {
+    key: "tabManagement",
+    group: "master",
+    type: "toggle",
+    label: "Manage tabs",
+    help: "Turn this off and Timed Tabs leaves your tabs completely alone: no timers, nothing closed, no colours or badges. Turn it back on and every tab starts its life afresh from that moment.",
+  },
   {
     key: "tabLifetimeSeconds",
     group: "timing",

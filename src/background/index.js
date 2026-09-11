@@ -14,6 +14,16 @@ import { lastOutcome as faviconOutcome } from "./indicators/favicon.js";
 
 const TICK_ALARM = "timed-tabs:tick";
 
+/**
+ * The master switch. Everything that touches a tab goes through here, so
+ * turning it off leaves the browser exactly as if Timed Tabs were not
+ * installed. Settings may not have loaded yet, and an older profile will not
+ * have the key at all, so anything but an explicit false counts as on.
+ */
+function managing() {
+  return Boolean(settings) && settings.tabManagement !== false;
+}
+
 const tracker = createTabTracker();
 const notifier = createNotifier();
 notifier.start();
@@ -98,6 +108,15 @@ watchSettings(async (next) => {
   await ready;
   notifier.configure(settings);
 
+  if (!managing()) {
+    await standDown();
+    return;
+  }
+  // Coming back on, every tab gets a fresh clock: time spent switched off is
+  // not time the tab was sitting unread, and nothing should expire the moment
+  // the switch flips.
+  if (previous && previous.tabManagement === false) await restartAllClocks();
+
   await syncIndicators();
 
   if (previous?.pauseWhileActive !== settings.pauseWhileActive) await applyPauseSetting();
@@ -108,9 +127,29 @@ watchSettings(async (next) => {
   await tick();
 });
 
+/**
+ * Put the browser back how we found it: stop every indicator, which is what
+ * takes the favicon, title and theme marks back off, and stop the clock that
+ * would otherwise expire something while we are meant to be idle.
+ */
+async function standDown() {
+  await Promise.all(active.map((i) => i.stop().catch(() => {})));
+  active = [];
+  expired.clear();
+  await api.alarms.clear(TICK_ALARM);
+}
+
+/** Start every tab's lifetime again from now, dropping any snooze with it. */
+async function restartAllClocks() {
+  const now = Date.now();
+  const tabs = await api.tabs.query({});
+  await Promise.all(tabs.map((t) => tracker.reset(t.id, now)));
+  expired.clear();
+}
+
 watchRules(async (next) => {
   rules = next;
-  if (!settings) return;
+  if (!managing()) return;
   await ready;
   await syncIndicators();
   await applyPauseSetting();
@@ -161,8 +200,9 @@ api.alarms.onAlarm.addListener((alarm) => {
 });
 
 api.tabs.onCreated.addListener(async (tab) => {
+  if (!managing()) return;
   const st = await tracker.track(tab.id);
-  if (tab.active && settings && settingsFor(tab, st).pauseWhileActive) await tracker.pause(tab.id);
+  if (tab.active && settingsFor(tab, st).pauseWhileActive) await tracker.pause(tab.id);
   tick();
 });
 
@@ -172,7 +212,7 @@ api.tabs.onRemoved.addListener((tabId) => {
 });
 
 api.tabs.onActivated.addListener(async ({ tabId, previousTabId }) => {
-  if (!settings) return;
+  if (!managing()) return;
   const tab = await api.tabs.get(tabId).catch(() => ({ id: tabId }));
   const eff = settingsFor(tab, await tracker.track(tabId));
   if (eff.resetOnActivate) await tracker.reset(tabId);
@@ -186,7 +226,7 @@ api.tabs.onActivated.addListener(async ({ tabId, previousTabId }) => {
 // the active tab's pause state in line with the rules that now apply.
 api.tabs.onUpdated.addListener(
   async (tabId, change, tab) => {
-    if (!change.url || !settings) return;
+    if (!change.url || !managing()) return;
     expired.delete(tabId);
     if (tab?.active) {
       const eff = settingsFor(tab, await tracker.track(tabId));
@@ -199,7 +239,7 @@ api.tabs.onUpdated.addListener(
 
 api.tabs.onUpdated.addListener(
   (_tabId, change) => {
-    if (change.status === "complete") tick();
+    if (change.status === "complete" && managing()) tick();
   },
   { properties: ["status"] },
 );
@@ -309,6 +349,7 @@ async function allTabs() {
 }
 
 async function tabAction({ tabId, action, value }) {
+  if (!managing()) return;
   switch (action) {
     case "reset":
       await tracker.reset(tabId);
@@ -379,7 +420,7 @@ function devLogLook(tab, eff, quiet) {
 
 let ticking = false;
 async function tick() {
-  if (!settings || ticking) return;
+  if (!managing() || ticking) return;
   ticking = true;
   try {
     const now = Date.now();

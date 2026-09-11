@@ -333,9 +333,19 @@ function makeSwitch(checked, onChange) {
   return { el, input };
 }
 
+/**
+ * Reflect the master switch on the body, which is what hides the readouts and
+ * shows the banner. Doing it with a data attribute rather than the `hidden`
+ * attribute keeps it clear of the show/hide the popup and the pages already do.
+ */
+function applyManagementState() {
+  document.body.dataset.managing = settings.tabManagement === false ? "off" : "on";
+}
+
 async function save(partial) {
   await saveSettings(partial);
   settings = { ...settings, ...partial };
+  if ("tabManagement" in partial) applyManagementState();
   updateFieldVisibility();
   for (const key of Object.keys(partial)) {
     const row = $("fields").querySelector(
@@ -904,6 +914,9 @@ function renderSortControl() {
 $("overview-sort").addEventListener("change", (e) =>
   save({ tabSort: e.target.value }),
 );
+
+// The banner's own way back, so the switch is reachable from the popup.
+$("off-resume").addEventListener("click", () => save({ tabManagement: true }));
 
 $("overview").addEventListener("toggle", (e) => {
   clearInterval(overviewTimer);
@@ -1918,6 +1931,7 @@ getDisplayVersion().then((v) => {
   }
   renderFields();
   renderSortControl();
+  applyManagementState();
   refreshPermissionWarning();
   syncPermissionFields();
   if (isPopup) {
