@@ -1,0 +1,32 @@
+{
+  "openWindows": [
+    [
+      "https://example.org/",
+      "https://example.com/"
+    ]
+  ],
+  "settings": {
+    "tabLifetimeSeconds": 1800,
+    "tickSeconds": 2,
+    "indicators": [
+      "favicon"
+    ]
+  },
+  "rules": [
+    {
+      "id": "r1",
+      "description": "gone in seconds",
+      "pattern": "example.com/*",
+      "match": "wildcard",
+      "priority": 5,
+      "set": {
+        "tabLifetimeSeconds": 5,
+        "onExpire": "close"
+      }
+    }
+  ],
+  "captureAfterMs": 12000,
+  "openUrls": [
+    "ui/panel.html?view=page#tabs"
+  ]
+}
