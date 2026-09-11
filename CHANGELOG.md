@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.0](https://github.com/politeauthority/timed-tabs/compare/v0.7.0...v0.8.0) (2026-09-11)
+
+
+### Features
+
+* a master switch for tab management ([bb7b105](https://github.com/politeauthority/timed-tabs/commit/bb7b105dbbc34b98343112b9387c791fe9378d97))
+* link the repository from the UI and reword the full-page button ([67dd1ec](https://github.com/politeauthority/timed-tabs/commit/67dd1ecff70475cf26741cb68df7e3f4c96f4c88))
+* rules page polish ([07a9827](https://github.com/politeauthority/timed-tabs/commit/07a982799b4d1c91d81cb339c1f70f067e243ed9))
+
+
+### Bug Fixes
+
+* appearance is set by rules only, with globals as the default ([fc32346](https://github.com/politeauthority/timed-tabs/commit/fc323462f4d8e7117f3abea7eb284acb62979f67))
+
 ## [0.7.0](https://github.com/politeauthority/timed-tabs/compare/v0.6.0...v0.7.0) (2026-09-11)
 
 
