@@ -14,6 +14,17 @@ inputs:
       rather than folded away. 0 disables the call-out.
     required: false
     default: "60"
+  timeouts:
+    description: >
+      "Step name=minutes, ..." matching the steps' timeout-minutes. A step that
+      failed or was cancelled at or past its limit is reported as timed out, at
+      the top of the summary rather than as a bare failure in the table.
+    required: false
+    default: ""
+  job-timeout:
+    description: The job's timeout-minutes; a cancelled job that ran that long is reported as timed out.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -22,6 +33,8 @@ runs:
       env:
         API_TOKEN: ${{ inputs.token }}
         SLOW_OVER: ${{ inputs.slow-over }}
+        TIMEOUTS: ${{ inputs.timeouts }}
+        JOB_TIMEOUT: ${{ inputs.job-timeout }}
       run: |
         set -uo pipefail
         # Best effort throughout. Anything missing means no table, not a failure.
@@ -66,6 +79,31 @@ runs:
         if not rows:
             sys.exit(0)
 
+        # "name=minutes, name=minutes": the limits the workflow gave its steps.
+        # GitHub stops a step at its timeout-minutes and records it as failed
+        # (or cancelled); a duration at the limit is the tell.
+        limits = {}
+        for part in os.environ.get("TIMEOUTS", "").split(","):
+            if "=" in part:
+                name, mins = part.rsplit("=", 1)
+                try:
+                    limits[name.strip()] = float(mins) * 60
+                except ValueError:
+                    pass
+        timed_out = []
+        for i, (name, secs, note) in enumerate(rows):
+            limit = limits.get(name)
+            if limit and secs is not None and note in ("failure", "cancelled") and secs >= limit * 0.97:
+                rows[i] = (name, secs, f"⏰ timed out at {int(limit // 60)} min")
+                timed_out.append((name, int(limit // 60)))
+        job_limit = os.environ.get("JOB_TIMEOUT")
+        ja, jb = when(mine.get("started_at")), when(mine.get("completed_at"))
+        job_secs = (jb - ja).total_seconds() if ja and jb else total
+        if job_limit and not timed_out and mine.get("conclusion") in ("cancelled", None) and job_secs >= float(job_limit) * 60 * 0.97:
+            timed_out.append(("the whole job", int(float(job_limit))))
+        for name, mins in timed_out:
+            print(f"> ⏰ **Timed out:** {name} hit its {mins}-minute limit. That is the failure; everything after it was skipped.\n")
+
         def clock(s):
             return f"{s:.0f}s" if s < 60 else f"{int(s // 60)}m {int(s % 60):02d}s"
 
@@ -87,7 +125,8 @@ runs:
             share = (secs / total * 100) if total else 0
             bar = "█" * round(share / 10)
             mark = " 🐌" if (slow_over and secs > slow_over) else ""
-            print(f"| {name}{mark} | {clock(secs)} | {bar} {share:.0f}% |")
+            tag = f" _{note}_" if note and note != "success" else ""
+            print(f"| {name}{mark} | {clock(secs)} | {bar} {share:.0f}%{tag} |")
         print(f"| **Total** | **{clock(total)}** | |")
         if slow:
             worst = ", ".join(f"**{n}** ({clock(s)})" for n, s in sorted(slow, key=lambda r: -r[1]))

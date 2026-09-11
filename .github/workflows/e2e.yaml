@@ -55,10 +55,15 @@ jobs:
           path: ${{ runner.tool_cache }}/node
           key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-22
       - uses: actions/setup-node@v7
+        id: node
+        timeout-minutes: 4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: npm ci
+        id: npm
+        timeout-minutes: 4
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       # Firefox's system libraries. Installed once, then cached as a tarball of
       # every file the install put down, so later runs untar instead of running
@@ -71,6 +76,8 @@ jobs:
           path: ~/firefox-libs.tar
           key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ env.FIREFOX_LIBS_KEY }}
       - name: Firefox libraries
+        id: firefox-libs
+        timeout-minutes: 6
         env:
           PACKAGES: libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils
         run: |
@@ -81,9 +88,13 @@ jobs:
             echo "restored $(tar -tf ~/firefox-libs.tar | wc -l) files from the cache"
             exit 0
           fi
-          # The runner pod has no IPv6 route, but apt tries the mirror's AAAA
-          # record first and waits out a timeout per package. Force IPv4.
-          APT="-o Acquire::ForceIPv4=true"
+          # The runner pod cannot reach the Ubuntu mirrors on port 80 (no IPv6
+          # route, and IPv4 connections fail too), while HTTPS is fine. Point
+          # apt at an HTTPS mirror and keep it on IPv4.
+          sudo sed -i -E 's#https?://(archive|security)\.ubuntu\.com/ubuntu/?#https://mirrors.kernel.org/ubuntu/#g' \
+            /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
+          grep -h "^URIs:\|^deb " /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null | sort -u | head -3
+          APT="-o Acquire::ForceIPv4=true -o Acquire::Retries=3"
           sudo apt-get $APT update -qq
           # shellcheck disable=SC2086
           sudo DEBIAN_FRONTEND=noninteractive apt-get $APT install -y -qq $PACKAGES > /dev/null
@@ -99,11 +110,14 @@ jobs:
       # the smallest cost here, so it is left alone until a version is pinned.
       - uses: browser-actions/setup-firefox@v1
         id: firefox
+        timeout-minutes: 3
         with:
           firefox-version: latest
       - run: '"${{ steps.firefox.outputs.firefox-path }}" --version'
 
       - name: Run the scenarios
+        id: scenarios
+        timeout-minutes: 8
         env:
           FIREFOX: ${{ steps.firefox.outputs.firefox-path }}
         run: npm run e2e
@@ -124,7 +138,11 @@ jobs:
         env:
           ARTIFACT_URL: ${{ steps.artifacts.outputs.artifact-url }}
         run: |
-          if [ "${{ job.status }}" = "success" ]; then head="### ✅ 🦊 E2E passed"; else head="### ❌ 🦊 E2E failed"; fi
+          case "${{ job.status }}" in
+            success) head="### ✅ 🦊 E2E passed" ;;
+            cancelled) head="### ⏹️ 🦊 E2E cancelled (the job timed out, or a newer run took over)" ;;
+            *) head="### ❌ 🦊 E2E failed" ;;
+          esac
           {
             echo "$head"
             echo ""
@@ -141,3 +159,7 @@ jobs:
         with:
           token: ${{ github.token }}
           slow-over: 60
+          # The same numbers as the steps' timeout-minutes, so a step that hit
+          # its limit is named as timed out rather than shown as a bare failure.
+          timeouts: "Run actions/setup-node@v7=4, npm ci=4, Firefox libraries=6, Run browser-actions/setup-firefox@v1=3, Run the scenarios=8"
+          job-timeout: 20
