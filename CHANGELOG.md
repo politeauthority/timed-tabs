@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/politeauthority/timed-tabs/compare/v0.3.0...v0.4.0) (2026-09-11)
+
+
+### Features
+
+* flash indicators when a tab is about to expire ([9766b0e](https://github.com/politeauthority/timed-tabs/commit/9766b0e179a4961ca567df33b0437fd2e93de51d))
+* show the running version in the UI, with optional build tags ([fe9d371](https://github.com/politeauthority/timed-tabs/commit/fe9d371d6597b4c83297b158deb4f9925cda8461))
+
+
+### Bug Fixes
+
+* regenerate lockfile with platform bindings, raise minimum Firefox to 140 (Android 142) ([f9b25b5](https://github.com/politeauthority/timed-tabs/commit/f9b25b5acf68d69518b99002e79a678798543550))
+
+
+### Dependencies
+
+* bump the npm-deps group with 4 updates ([3f38fb1](https://github.com/politeauthority/timed-tabs/commit/3f38fb1f92cd67ece06823fcde7b452668db83a0))
+
 ## [0.3.0](https://github.com/politeauthority/timed-tabs/compare/v0.2.0...v0.3.0) (2026-09-10)
 
 
