@@ -215,7 +215,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RUN: ${{ needs.plan.outputs.run }}
         run: |
-          set -uo pipefail
+          # +e explicitly: GitHub runs this under `bash -e`, and the script's
+          # exit 3 (a leg that counts failed) must reach the case below, not
+          # abort the step -- which left the status unposted and the PR
+          # pending rather than red the first time a leg failed.
+          set -u +e -o pipefail
           gh run view "$RUN" --json jobs > jobs.json || echo '{"jobs": []}' > jobs.json
           # stdout is the table; stderr is one line per browser, "Firefox: passed"
           # or "Chrome: stable failed", which becomes the status description.
