@@ -1,0 +1,37 @@
+name: Node with a cached toolchain
+description: >
+  setup-node, with the unpacked Node tool directory restored from the Actions
+  cache first. The self-hosted runner is short of CPU, not bandwidth: unpacking
+  Node took two minutes there, restoring the directory takes seconds. The cache
+  is saved even when the job fails, since that is when people iterate.
+
+inputs:
+  node-version:
+    description: Node major version.
+    required: false
+    default: "22"
+
+runs:
+  using: composite
+  steps:
+    - id: os
+      shell: bash
+      # The key carries the OS release: a cached tool directory from one image
+      # must not be handed to another.
+      run: |
+        . /etc/os-release 2>/dev/null || true
+        echo "id=${ID:-unknown}-${VERSION_ID:-unknown}" >> "$GITHUB_OUTPUT"
+    - id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.tool_cache }}/node
+        key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}
+    - uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+    - if: always() && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.tool_cache }}/node
+        key: ${{ steps.restore.outputs.cache-primary-key }}

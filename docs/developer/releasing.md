@@ -178,8 +178,10 @@ Set `BUILD_TAG=rc1` on its own for a stable-versioned build that shows `0.8.0-rc
 
 ## ⚠️ Things that are easy to break
 
-`npm run lint` runs `web-ext lint`, which rejects a manifest version with anything but
-digits and dots, so a bad `MANIFEST_VERSION` fails in CI before it can be tagged. The
+`npm run lint` runs `web-ext lint` on `src/`, so it never sees a built manifest. The
+release jobs therefore lint `dist/firefox` after packaging, which is where a bad
+`MANIFEST_VERSION` or beta name would show; `scripts/build.mjs` also refuses a
+version that is not one to four dot-separated integers. The
 two release workflows share the `release-please-main` concurrency group, which stops a
 beta and a stable from racing. The stable pipeline needs the `PAT` secret so that its
 own merge re-triggers the workflow; the beta pipeline runs on the default token, since
