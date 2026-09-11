@@ -65,12 +65,14 @@ const params = new URLSearchParams(location.search);
 // The full page and the preferences pane show one page at a time, chosen by
 // the URL hash: #tabs (default), #rules, #settings.
 
-const PAGES = ["tabs", "rules", "settings", "backup"];
+const PAGES = ["tabs", "rules", "settings"];
 
 function pageFromHash() {
   const h = location.hash.replace(/^#/, "");
   if (h.startsWith("rule-")) return "rules";
   if (PAGES.includes(h)) return h;
+  // Backup was a page of its own once; an old link to it lands on its pill.
+  if (h === "backup") return "settings";
   return context === "options" ? "settings" : "tabs";
 }
 
@@ -78,11 +80,8 @@ function route() {
   if (isPopup) return;
   const page = pageFromHash();
   document.body.dataset.page = page;
-  // Backup hangs off Settings and has no nav item of its own, so Settings
-  // stays marked while you are on it rather than nothing being current.
-  const nav = page === "backup" ? "settings" : page;
   for (const a of document.querySelectorAll("[data-page-link]")) {
-    if (a.dataset.pageLink === nav) a.setAttribute("aria-current", "page");
+    if (a.dataset.pageLink === page) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
   onPageShown(page);
@@ -167,6 +166,33 @@ function renderFields() {
   showGroup(currentGroup());
 }
 
+/**
+ * Pills on the Settings page that are not settings. Their sections are
+ * written in panel.html rather than rendered from FIELDS, and they are shown
+ * and hidden by showGroup like any group. Kept out of shared/settings.js,
+ * which describes user preferences and nothing else.
+ */
+const EXTRA_GROUPS = [
+  {
+    id: "backup",
+    emoji: "💾",
+    title: "Backup",
+    short: "Backup",
+    help: "Every setting and every rule as one JSON document, to keep or to restore.",
+    onShow: () => showBackup(),
+  },
+  {
+    id: "diagnostics",
+    emoji: "🩺",
+    title: "Diagnostics",
+    short: "Diagnostics",
+    help: "What the background is doing for each tab.",
+    onShow: () => refreshDiag(),
+  },
+];
+/** Every pill, in order: the settings groups, then the extras. */
+const PILLS = [...GROUPS, ...EXTRA_GROUPS];
+
 /** Which group of settings is on show. Remembered like the folds are. */
 const GROUP_KEY = "settings-group";
 function currentGroup() {
@@ -176,7 +202,7 @@ function currentGroup() {
   } catch {
     // Private window or blocked storage: fall back to the first group.
   }
-  return GROUPS.some((g) => g.id === stored) ? stored : GROUPS[0].id;
+  return PILLS.some((g) => g.id === stored) ? stored : GROUPS[0].id;
 }
 
 function showGroup(id) {
@@ -188,6 +214,16 @@ function showGroup(id) {
   for (const sec of $("fields").querySelectorAll(".group")) {
     sec.hidden = sec.id !== `group-${id}`;
   }
+  // An extra refreshes as it comes into view, not on every call: renderFields
+  // lands here on any settings change, and refilling the backup box then
+  // would throw away text pasted into it but not yet loaded.
+  for (const extra of EXTRA_GROUPS) {
+    const sec = $(`group-${extra.id}`);
+    const on = extra.id === id;
+    const arriving = on && sec.hidden;
+    sec.hidden = !on;
+    if (arriving) extra.onShow();
+  }
   for (const pill of $("settings-jump").querySelectorAll("[data-group]")) {
     const on = pill.dataset.group === id;
     pill.classList.toggle("is-selected", on);
@@ -198,16 +234,15 @@ function showGroup(id) {
 
 /**
  * The pills over the settings. They switch which group is shown rather than
- * scrolling to it, so the page is only ever as long as one group.
- *
- * Backup and Diagnostics are deliberately not pills: they are not settings,
- * and they keep their own places below.
+ * scrolling to it, so the page is only ever as long as one group. Backup and
+ * Diagnostics come last: they are not settings, but they live on this page
+ * and are reached the same way.
  */
 function renderGroupTabs() {
   const nav = $("settings-jump");
   nav.setAttribute("role", "tablist");
   nav.replaceChildren(
-    ...GROUPS.map((g) => {
+    ...PILLS.map((g) => {
       const pill = document.createElement("button");
       pill.type = "button";
       pill.className = "jump-pill";
@@ -222,8 +257,8 @@ function renderGroupTabs() {
         const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
         if (!step) return;
         e.preventDefault();
-        const at = GROUPS.findIndex((x) => x.id === g.id);
-        const next = GROUPS[(at + step + GROUPS.length) % GROUPS.length];
+        const at = PILLS.findIndex((x) => x.id === g.id);
+        const next = PILLS[(at + step + PILLS.length) % PILLS.length];
         showGroup(next.id);
         nav.querySelector(`[data-group="${next.id}"]`)?.focus();
       });
@@ -1659,9 +1694,13 @@ function onPageShown(page) {
     applyRulesFilter();
   } else if (page === "settings") {
     renderFields();
+    // `#backup` was a page of its own once. It still opens the Backup pill,
+    // then reads as the Settings page it now is.
+    if (location.hash === "#backup") {
+      showGroup("backup");
+      history.replaceState(null, "", "#settings");
+    }
     refreshPermissionWarning();
-  } else if (page === "backup") {
-    showBackup();
   }
 }
 
@@ -2727,7 +2766,7 @@ watchSettings((next) => {
   // "Change" uses to send the popup somewhere specific. After renderFields,
   // which otherwise restores the last group looked at.
   const group = params.get("group");
-  if (!isPopup && GROUPS.some((g) => g.id === group)) showGroup(group);
+  if (!isPopup && PILLS.some((g) => g.id === group)) showGroup(group);
   renderSortControl();
   renderFlagged();
 });
@@ -3193,20 +3232,10 @@ $("flags-note-manage").addEventListener("click", () => {
   });
 });
 
-// Backup has a page of its own; these are the ways in and out of it.
-$("open-backup").addEventListener("click", () => {
-  location.hash = "#backup";
-});
-$("backup-back").addEventListener("click", () => {
-  location.hash = "#settings";
-});
 $("diag-refresh").addEventListener("click", refreshDiag);
 $("diag-tick").addEventListener("click", async () => {
   await api.runtime.sendMessage({ type: "timed-tabs:tick" }).catch(() => {});
   refreshDiag();
-});
-$("diagnostics").addEventListener("toggle", (e) => {
-  if (e.target.open) refreshDiag();
 });
 api.permissions.onAdded?.addListener(refreshPermissionWarning);
 api.permissions.onRemoved?.addListener(() => {

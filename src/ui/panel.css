@@ -834,8 +834,7 @@ body:not([data-context="popup"]) [data-pages] {
 
 body[data-page="tabs"]:not([data-context="popup"]) [data-pages="tabs"],
 body[data-page="rules"]:not([data-context="popup"]) [data-pages="rules"],
-body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"],
-body[data-page="backup"]:not([data-context="popup"]) [data-pages="backup"] {
+body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"] {
   display: block;
 }
 
@@ -1508,19 +1507,6 @@ body:not([data-context="popup"]) .trow {
   padding: var(--sp-3) var(--gutter) var(--sp-2);
 }
 
-/* The way through to the backup page, at the foot of the settings. */
-.settings-links {
-  margin: 0;
-  padding: var(--sp-3) var(--gutter) var(--sp-4);
-  border-top: 1px solid var(--line);
-}
-
-/* Groups no longer need a rule between them: only one is ever on show, and a
-   hidden sibling still matches `+`, so this would draw a line above it. */
-.backup + .diagnostics {
-  border-top: 1px solid var(--line);
-}
-
 .group-help {
   margin: 2px 0 var(--sp-1);
 }
@@ -2035,10 +2021,6 @@ body:not([data-context="popup"]) .field {
 
 /* ---- Backup and diagnostics --------------------------------------------------- */
 
-.backup {
-  padding: var(--sp-4) var(--gutter) var(--sp-3);
-}
-
 .backup-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2066,23 +2048,7 @@ body:not([data-context="popup"]) .field {
 }
 
 .diagnostics {
-  padding: var(--sp-3) var(--gutter) var(--sp-4);
   color: var(--ink-2);
-  scroll-margin-top: var(--sp-3);
-}
-
-.diagnostics > summary {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: var(--control-h);
-  cursor: pointer;
-  list-style: none;
-  font-weight: 600;
-}
-
-.diagnostics > summary::-webkit-details-marker {
-  display: none;
 }
 
 .diag-actions {
