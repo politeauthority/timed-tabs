@@ -81,8 +81,20 @@ downloads take seconds, but unpacking Node took two minutes and installing the
 libraries with dpkg took nine on a busy day. The Node cache is the extracted tool
 directory, which `setup-node` then finds without extracting anything. The library
 cache, via `awalsh128/cache-apt-pkgs-action`, is the installed files, restored with
-one untar. Bump its `version` input after changing the package list. Firefox itself
-is not cached: its download and extraction took 14 seconds.
+one untar. Bump `FIREFOX_LIBS_KEY` in the workflow after changing the package list. Firefox
+itself is not cached: its download and extraction take under half a minute.
+
+Two things about the install that look like problems and are not. apt prints
+"debconf: delaying package configuration, since apt-utils is not installed"; that is
+debconf noting it will configure packages at the end of the run instead of one by one,
+and nothing needs apt-utils. And the runner pod cannot reach the Ubuntu mirrors on
+port 80 at all, so the workflow points apt at an HTTPS mirror on IPv4 before
+installing; without that the install took nine minutes or failed outright.
+
+Caches are scoped by GitHub: a pull request's runs save under the PR's merge ref and
+read from it and from `main`. A manual run on a branch reads only that branch and
+`main`. So the first run on `main` after this lands is a cold one, and every PR after
+that reads `main`'s caches.
 
 The job is a required status check on `main`. A PR with the label **ci pause** skips
 it; GitHub counts a skipped required check as passed, so the label lets a PR merge
