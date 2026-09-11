@@ -65,15 +65,6 @@ Everything else is at your defaults and lives on the Settings page.
 Both this section and **Rules for this page** fold away with the chevron beside
 their heading, and each tab remembers the folds until it closes.
 
-### New rules display
-
-The reworked Rules page. Each rule is one row: its priority as a badge on the left, the
-address or site group it targets, an on/off switch that parks the rule without
-deleting it, and a chip for each setting it changes. The chips and the headings inside
-a card carry the same emoji as the Settings page, so ⏳ is timing, 🚪 is what happens
-at expiry and 🎨 is appearance, and the target picker shows 🔗 for an address and 🗂️
-for a site group. Off, the Rules page keeps the original cards.
-
 ### Site groups
 
 Name a list of sites once and point rules at the whole list: a `news` group can hold

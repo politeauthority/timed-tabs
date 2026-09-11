@@ -146,23 +146,20 @@ picks up the other site's rules.
 The rules list is sorted by pattern. A filter box shows only the rules that match an
 address, and **Add rule** starts one for the filtered site and scrolls to it.
 
-### New rules display
+Each rule is a row that can be read without opening it:
 
-The reworked Rules page is behind the **New rules display** feature flag under
-Settings, Feature flags. With it off the page is as described above. With it on,
-each rule becomes a row that can be read without opening it:
-
-- **Priority** moves to a badge at the left of the rule, so the list says which rule
-  wins at a glance. Clicking the badge opens that rule at its priority field.
+- **Priority** is a badge at the left of the rule, so the list says which rule wins
+  at a glance. Clicking the badge opens that rule at its priority field.
 - **A switch** at the right parks a rule without deleting it. Switching it off sets
   the priority to 0; switching it back on restores the priority the rule had.
-- **What the rule changes** is a chip per setting rather than a sentence, and the
-  description and match mode sit on the line above them.
-- **Delete** becomes an icon, and still takes two clicks.
+- **What the rule changes** is a chip per setting, and the description and match mode
+  sit on the line above them.
+- **Delete** is an icon, and takes two clicks.
 - A rule targeting a site group shows how many sites the group holds.
 
-The page is also wider and the cards are tighter, so a screen holds roughly twice as
-many rules.
+The chips and the headings inside a card carry the same emoji as the Settings page,
+so ⏳ is timing, 🚪 is what happens at expiry and 🎨 is appearance, and the target
+picker shows 🔗 for an address and 🗂️ for a site group.
 
 ## 🗂️ Site groups
 

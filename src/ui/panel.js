@@ -1651,13 +1651,6 @@ function fieldEmoji(key) {
   return GROUPS.find((g) => g.id === group)?.emoji ?? "";
 }
 
-/**
- * The reworked Rules page (flag "new-rules-display"). Off, `renderRule` builds
- * the original head and one-line summary, and the stylesheet keeps the cards
- * it had; the body -- description, match, priority, overrides -- is the same
- * either way, so only the two parts that differ are written twice.
- */
-const newRulesDisplay = () => featureOn(settings, "new-rules-display");
 const activeGroups = () => (groupsOn() ? groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
 const expandedRules = new Set();
@@ -2037,19 +2030,16 @@ function mirrorWildcards(input) {
 }
 
 /**
- * Delete, armed by the first click and fired by the second. The new display
- * has no room for a worded button, so it takes an icon that grows the word
- * only once armed; an icon on its own cannot say "armed".
+ * Delete, armed by the first click and fired by the second. The head row has
+ * no room for a worded button, so it is an icon that grows the word only once
+ * armed; an icon on its own cannot say "armed".
  */
-function ruleDeleteButton(rule, { icon }) {
+function ruleDeleteButton(rule) {
   const del = document.createElement("button");
   del.type = "button";
-  del.className = icon ? "rule-delete quiet icon-btn" : "rule-delete quiet";
+  del.className = "rule-delete quiet icon-btn";
   const rest = () => {
-    del.replaceChildren(
-      svgIcon("trash"),
-      ...(icon ? [] : [document.createTextNode("Delete rule")]),
-    );
+    del.replaceChildren(svgIcon("trash"));
     del.title = "Delete rule";
     del.setAttribute("aria-label", "Delete rule");
     del.classList.remove("is-armed");
@@ -2063,10 +2053,7 @@ function ruleDeleteButton(rule, { icon }) {
   };
   del.addEventListener("click", () => {
     if (!armed) {
-      del.replaceChildren(
-        svgIcon("trash"),
-        document.createTextNode(icon ? "Click again" : "Click again to delete"),
-      );
+      del.replaceChildren(svgIcon("trash"), document.createTextNode("Click again"));
       del.title = "Click again to delete this rule";
       del.setAttribute("aria-label", "Click again to delete this rule");
       del.classList.add("is-armed");
@@ -2122,26 +2109,20 @@ function ruleHead(rule, el, targetsGroup, open) {
     target = document.createElement("select");
     target.className = "rule-target";
     target.setAttribute("aria-label", "What this rule applies to");
-    // The new display names targets with the same marks as the rest of the
-    // UI: 🔗 for an address, 🗂️ for a site group (its page heading's emoji).
-    const fresh = newRulesDisplay();
-    target.add(new Option(fresh ? "🔗 Address" : "Address pattern", ""));
-    for (const g of groups) target.add(new Option(fresh ? `🗂️ ${g.name}` : `Group: ${g.name}`, groupRef(g.name)));
+    // A target carries the same mark as the rest of the UI: 🔗 for an
+    // address, 🗂️ for a site group (its page heading's emoji).
+    target.add(new Option("🔗 Address", ""));
+    for (const g of groups) target.add(new Option(`🗂️ ${g.name}`, groupRef(g.name)));
     const current = targetsGroup ? groupRef(groupNameOf(rule.pattern)) : "";
     if (targetsGroup && !findGroup(groups, groupNameOf(rule.pattern))) {
       const missing = groupNameOf(rule.pattern);
-      target.add(new Option(fresh ? `🗂️ ${missing} (missing)` : `Group: ${missing} (missing)`, current));
+      target.add(new Option(`🗂️ ${missing} (missing)`, current));
     }
     target.value = current;
     target.addEventListener("change", () => {
       const next = target.value || NEW_RULE_PATTERN;
       updateRule(rule.id, { pattern: next, match: "wildcard" }, true, "head");
     });
-  }
-
-  if (!newRulesDisplay()) {
-    head.append(toggle, ...(target ? [target] : []), patternWrap, ruleDeleteButton(rule, { icon: false }));
-    return head;
   }
 
   // Priority decides which rule wins, and the list is ordered by pattern
@@ -2193,15 +2174,14 @@ function ruleHead(rule, el, targetsGroup, open) {
     patternWrap,
     ...(groupCount ? [groupCount] : []),
     enable.el,
-    ruleDeleteButton(rule, { icon: true }),
+    ruleDeleteButton(rule),
   );
   return head;
 }
 
 /**
- * What a collapsed card says. The original packs all of it into one sentence;
- * the new display splits it into what the rule is for and a chip per setting
- * it changes, which is what makes a page of rules readable at a glance.
+ * What a collapsed card says: what the rule is for, then a chip per setting it
+ * changes, which is what makes a page of rules readable at a glance.
  */
 function ruleSummary(rule, targetsGroup) {
   const summary = document.createElement("button");
@@ -2209,22 +2189,6 @@ function ruleSummary(rule, targetsGroup) {
   summary.className = "rule-summary";
   summary.title = "Expand rule";
   summary.addEventListener("click", () => setRuleExpanded(rule.id, true));
-
-  if (!newRulesDisplay()) {
-    const parts = [];
-    if (isEmptyRule(rule)) parts.push("No pattern yet, so this rule matches nothing");
-    else if (targetsGroup) parts.push(describeGroupTarget(rule));
-    if (rule.description) parts.push(rule.description);
-    parts.push(
-      `${rule.match === "prefix" ? "starts with" : "wildcard"}, priority ${rule.priority}`,
-    );
-    const sets = Object.entries(rule.set ?? {}).map(
-      ([k, v]) => `${ruleFieldLabel(k)}: ${formatRuleValue(k, v)}`,
-    );
-    parts.push(sets.length ? sets.join(" \u00b7 ") : "changes nothing yet");
-    summary.textContent = parts.join(" \u2014 ");
-    return summary;
-  }
 
   const meta = document.createElement("span");
   meta.className = "rule-meta";
@@ -2354,8 +2318,8 @@ function renderRule(rule) {
     commit: (set) => updateRule(rule.id, { set }, false),
   };
   body.append(
-    renderOverrideGroup(newRulesDisplay() ? "⏳ Timer settings this rule changes" : "Timer settings this rule changes", defsFor(RULE_TIMING_FIELDS), store),
-    renderOverrideGroup(newRulesDisplay() ? "🎨 How matching tabs look" : "How matching tabs look", defsFor(RULE_VISUAL_FIELDS), store),
+    renderOverrideGroup("⏳ Timer settings this rule changes", defsFor(RULE_TIMING_FIELDS), store),
+    renderOverrideGroup("🎨 How matching tabs look", defsFor(RULE_VISUAL_FIELDS), store),
   );
   return el;
 }
@@ -2770,30 +2734,11 @@ function renderFlagged() {
   // With the toasts switched off there is no host on the page any more, so
   // anything still showing would sit there unreachable.
   if (!toastsOn()) toasts.clear();
-  applyRulesDisplay();
   if (!isPopup) {
     renderGroups();
     renderRules();
   }
   if (isPopup) renderTab();
-}
-
-/**
- * Which Rules page the stylesheet should draw, and which help sentence goes
- * with it. A data attribute rather than a class, like the other whole-UI
- * switches (`data-context`, `data-page`, `data-managing`).
- */
-function applyRulesDisplay() {
-  const on = newRulesDisplay();
-  document.body.dataset.rulesDisplay = on ? "new" : "classic";
-  const classic = $("rules-help-classic");
-  const fresh = $("rules-help-new");
-  if (classic) classic.hidden = on;
-  if (fresh) fresh.hidden = !on;
-  const filter = $("rules-filter");
-  if (filter) {
-    filter.placeholder = (on ? "🔍 " : "") + "Show rules matching an address, e.g. https://github.com/foo";
-  }
 }
 
 watchGroups((next) => {

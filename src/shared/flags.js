@@ -32,13 +32,6 @@ export const FLAGS = [
     requires: "beta-features",
   },
   {
-    id: "new-rules-display",
-    label: "New rules display",
-    help: "The reworked Rules page: each rule is a row with its priority as a badge, an on/off switch, and a chip for each setting it changes. Off, the Rules page keeps the original cards.",
-    default: false,
-    requires: "beta-features",
-  },
-  {
     id: "site-groups",
     label: "Site groups",
     help: "Name a list of sites once and point rules at it: a \"news\" group can hold every news site, and one rule covers them all. Adds a Site groups section to the Rules page. While this is off, rules that target a group match nothing.",
