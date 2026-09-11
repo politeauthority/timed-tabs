@@ -163,17 +163,22 @@ browser's own feed:
 
 | Channel | Firefox | Chrome | CI | Full run |
 |---|---|---|---|---|
-| `nightly` | Firefox Nightly (`latest-nightly`) | Chrome Canary | — | advisory |
-| `stable` | the current release, 155.0.1 today | the current stable, 153.x | required (Firefox), advisory (Chrome) | counts |
-| `stable-1` | the last release of the major before it, 154.0.1 | one major behind stable, 152 | required (Firefox) | counts |
-| `stable-2` | two majors back, 153.x | two majors back, 151 | — | counts |
+| `nightly` | Firefox Nightly (`latest-nightly`) | Chrome Canary | advisory (Chrome) | advisory |
+| `stable` | the current release, 155.0.1 today | the current stable, 153.x | required (Firefox), advisory (Chrome) | counts (Firefox), advisory (Chrome) |
+| `stable-1` | the last release of the major before it, 154.0.1 | one major behind stable, 152 | required (Firefox) | counts (Firefox) |
+| `stable-2` | two majors back, 153.x | two majors back, 151 | — | counts (Firefox) |
 
-CI runs Firefox stable and stable-1, which are the required checks, and Chrome stable
-beside them. The full run, on a PR labelled `ci run full`, runs all four channels in
-both browsers. Nightly is shown and flagged but never holds the merge, since a daily
-build breaking is worth knowing and not worth blocking on — and while Chrome is being
-proven on the runner, the same goes for every Chrome leg (`chrome-advisory`, on by
-default). An advisory leg that fails is a warning on its job rather than a red.
+Chrome runs only `nightly` and `stable`, in CI and in the full run alike, while it is
+planned rather than supported; `stable-1` and `stable-2` are Firefox-only until then.
+
+CI runs Firefox stable and stable-1, which are the required checks, and Chrome nightly
+and stable beside them. The full run, on a PR labelled `ci run full`, runs all four
+Firefox channels and the same two Chrome ones. Nightly is shown and flagged but never
+holds the merge, since a daily build breaking is worth knowing and not worth blocking
+on — and while Chrome is planned rather than supported (see the
+[road map](../../road-map.md)), the same goes for every Chrome leg (`chrome-advisory`,
+on by default), and no older Chrome major runs at all. An advisory leg that fails is a
+warning on its job rather than a red.
 
 On a PR to `main` that carries `ci run full`, CI's legs skip: the full run covers the
 same versions and the `CI run full` status holds the merge until it passes. The
@@ -207,9 +212,9 @@ The legs come from two inputs, `firefox` and `chrome`, each a JSON list of chann
 that is that browser's matrix directly; the workflow has one job per browser, near
 copies of each other, and a leg is named `<Browser> <channel>`. `stable-N` is N
 majors behind stable. The defaults are Firefox stable
-and stable-1 plus Chrome stable, which is what CI and the beta gate run, and the
-**CI run full** workflow passes all four channels of each
-browser when a PR carries the `ci run full` label — see
+and stable-1 plus Chrome stable, which is what the beta gate runs; CI adds Chrome
+nightly, and the **CI run full** workflow passes all four Firefox channels and Chrome
+nightly and stable when a PR carries the `ci run full` label — see
 [README.md](README.md#the-full-run). To change
 the default pair, change the input's default and update branch protection in the same
 change, because those two legs are the required checks. See below.
@@ -222,7 +227,8 @@ alongside **Lint, test & build**, **Not paused** and **CI run full**:
 - **E2E / Firefox stable**
 - **E2E / Firefox stable-1**
 
-`E2E / Chrome stable` reports too but is not required yet.
+`E2E / Chrome nightly` and `E2E / Chrome stable` report too but are not required
+while Chrome is planned rather than supported.
 
 Both halves of each name are load-bearing. GitHub prefixes a called workflow's jobs
 with the calling job's name, so the context is `jobs.e2e` in `ci.yaml` (named `E2E`)

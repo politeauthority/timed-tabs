@@ -2,7 +2,8 @@
 
 Firefox is the supported browser. Chrome is planned and not yet supported. The Chrome
 build is packaged and attached to every release, everything below was run against it,
-and its end-to-end legs run in CI as advisory checks. It is not on the Chrome Web Store,
+and its end-to-end legs, nightly and stable, run in CI as advisory checks. It is not on
+the Chrome Web Store,
 and nothing gates a release on it. See the [road map](../road-map.md).
 
 This page is what differs, and what to watch for. [building.md](building.md) covers the
