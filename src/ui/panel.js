@@ -396,15 +396,14 @@ function renderField(field) {
     const list = document.createElement("div");
     list.className = "field-group-rows";
     const switches = new Map();
-    // A flag that requires another is greyed out until that one is on; its
-    // own value is kept, so turning the parent back on restores it.
+    // A flag that requires another is hidden until that one is on: with the
+    // master switch off there is nothing to choose, and a list of greyed-out
+    // switches only invites reading. Its own value is kept, so turning the
+    // parent back on shows the switches exactly as they were left.
     const syncDependents = () => {
       for (const [id, entry] of switches) {
         const parent = flagRequires(id);
-        const blocked = Boolean(parent) && !flagOn(settings, parent);
-        entry.input.disabled = blocked;
-        entry.row.classList.toggle("is-blocked", blocked);
-        entry.row.title = blocked ? `Needs “${FLAGS.find((f) => f.id === parent)?.label ?? parent}” on as well` : "";
+        entry.row.hidden = Boolean(parent) && !flagOn(settings, parent);
       }
     };
     for (const flag of FLAGS) {

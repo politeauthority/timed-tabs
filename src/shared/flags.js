@@ -21,7 +21,7 @@ export const FLAGS = [
   {
     id: "beta-features",
     label: "Beta features",
-    help: "The master switch for parts of Timed Tabs that are still settling down. Each beta feature below also has its own switch, and needs both to be on.",
+    help: "The master switch for parts of Timed Tabs that are still settling down. Turn it on to see the beta features; each has a switch of its own, and needs both to be on.",
     default: false,
   },
   {
