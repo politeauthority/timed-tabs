@@ -240,17 +240,13 @@
 
       <section id="settings" class="settings" data-pages="settings" data-page-only>
         <div id="fields" class="fields"></div>
-        <p class="settings-links">
-          <button type="button" id="open-backup" class="quiet"><svg class="icon" aria-hidden="true"><use href="#i-open" /></svg>💾 Backup and restore</button>
-        </p>
       </section>
 
-      <section id="backup" class="backup group" data-pages="backup" data-page-only>
-        <div class="section-head">
-          <h2 class="settings-title">💾 Backup</h2>
-          <button type="button" id="backup-back" class="quiet" title="Back to Settings">← Settings</button>
-        </div>
-        <p class="rules-help">
+      <!-- Backup and Diagnostics are pills on the Settings page like the groups above,
+           shown one at a time by showGroup; their pill text lives in panel.js (EXTRA_GROUPS). -->
+      <section id="group-backup" class="backup group" data-pages="settings" data-page-only hidden>
+        <h2 class="settings-title">💾 Backup</h2>
+        <p class="group-help">
           Every setting and every rule, as one JSON document. Copy or download it to keep,
           and paste or choose a file to restore. Loading replaces all current settings and rules.
         </p>
@@ -271,8 +267,9 @@
         <p id="backup-status" class="status" role="status"></p>
       </section>
 
-      <details id="diagnostics" class="diagnostics" data-pages="settings" data-page-only>
-        <summary class="chev">🩺 Diagnostics</summary>
+      <section id="group-diagnostics" class="diagnostics group" data-pages="settings" data-page-only hidden>
+        <h2 class="settings-title">🩺 Diagnostics</h2>
+        <p class="group-help">What the background is doing for each tab, for when an indicator does not seem to paint.</p>
         <p class="diag-actions">
           <button type="button" id="diag-refresh">Refresh</button>
           <button type="button" id="diag-tick">Force tick</button>
@@ -286,7 +283,7 @@
             <tbody></tbody>
           </table>
         </div>
-      </details>
+      </section>
 
       <footer class="page-foot" data-page-only>
         <span>Timed Tabs is open source.</span>

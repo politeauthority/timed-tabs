@@ -86,7 +86,7 @@ when access is off.
 
 ## 📦 Backups
 
-**Backup** on its own page exports every setting and every rule as one JSON file,
+**Backup**, a pill on the Settings page, exports every setting and every rule as one JSON file,
 plus the version of Timed Tabs that wrote it. What you have been reading is not in
 there — no addresses of closed tabs, no titles.
 
