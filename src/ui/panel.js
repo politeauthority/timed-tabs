@@ -94,6 +94,7 @@ function route() {
 
 window.addEventListener("hashchange", route);
 
+// @dev-only-start  (scripts/build.mjs removes everything down to @dev-only-end from release builds)
 // Dev build only (see background): dev.json may list UI actions to replay,
 // e.g. "uiActions": [{ "at": 3000, "click": "#tab-rules-list input" }] or
 // [{ "at": 3000, "set": "#fuse-range", "value": "80" }] to drive a control
@@ -123,6 +124,7 @@ if (typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@")) {
     })
     .catch(() => {});
 }
+// @dev-only-end
 const $ = (id) => document.getElementById(id);
 
 /** An <svg class="icon"> referencing the sprite in panel.html. */
