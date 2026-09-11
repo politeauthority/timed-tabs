@@ -2,11 +2,12 @@ name: CI run full
 run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
-# the E2E scenarios run on nightly, stable and the two stables before it, in
-# Firefox and in Chrome, instead of CI's three legs. Each browser is its own
+# the E2E scenarios run on nightly, stable and the two stables before it in
+# Firefox, and on nightly and stable in Chrome, instead of CI's four legs. Each
+# browser is its own
 # segment of the table with its own verdict. Nightly is advisory in both -- a
 # daily build breaking is worth seeing and not worth holding a merge for -- and
-# so is every Chrome leg while Chrome is being proven on this runner: the
+# so is every Chrome leg while Chrome is planned rather than supported: the
 # status is set by the Firefox stable legs alone.
 #
 # GitHub has no such thing as a required label, so the label is enforced by a
@@ -23,8 +24,8 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 #
 # Three jobs:
 #   - plan     decides what this event needs, on a hosted runner in seconds
-#   - Full     the eight legs, e2e.yaml called with a longer `legs` list, so
-#              they report as `Full / Firefox nightly` ... `Full / Chrome stable-2`
+#   - Full     the six legs, e2e.yaml called with a longer `legs` list, so
+#              they report as `Full / Firefox nightly` ... `Full / Chrome stable`
 #   - Full run gate   posts the `CI run full` status, which is the only thing
 #              branch protection reads. Its own check is not required and is
 #              named differently on purpose, so the two cannot be confused.
@@ -103,7 +104,7 @@ jobs:
             echo "$1: $2"
           }
 
-          # Older commits of this PR still running the eight legs are answering a
+          # Older commits of this PR still running the legs are answering a
           # question nobody will merge any more. Older only: two pushes in
           # quick succession start two runs, and the first one's plan must not
           # cancel the newer one that is about to cancel it.
@@ -167,7 +168,9 @@ jobs:
       # and the two stables before it. None of the legs is required on its own;
       # the status the gate posts is, and it ignores nightly.
       firefox: '["nightly", "stable", "stable-1", "stable-2"]'
-      chrome: '["nightly", "stable", "stable-1", "stable-2"]'
+      # Only nightly and stable while Chrome is planned rather than supported
+      # (docs/road-map.md), and both advisory; the older majors join when it is.
+      chrome: '["nightly", "stable"]'
       # Not all at once: ten at a time starved one another on the runner node
       # until three legs saw one tick in their whole window and failed on
       # timing alone. Two per browser, so four at a time across the two jobs,
