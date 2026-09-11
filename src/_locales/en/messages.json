@@ -1,7 +1,7 @@
 {
   "extensionName": {
     "message": "Timed Tabs",
-    "description": "Tab expiration on demand",
+    "description": "Tab expiration on demand"
   },
   "extensionDescription": {
     "message": "Put an expiration on tabs, and reep them or be visually aware.",
