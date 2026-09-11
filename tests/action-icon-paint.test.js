@@ -79,6 +79,25 @@ describe("the interactive clock", () => {
     expect(cleared()).toEqual([1]);
   });
 
+  it("takes the mark off the active tab once it goes quiet", async () => {
+    // "Leave fresh tabs alone", or a rule taking the toolbar off the page.
+    // The icon has to come off: a resting face is filled to 75% and would sit
+    // there looking like a reading of a tab nothing is being said about.
+    await icon.start({ settings: ON });
+    await icon.update([tab(1, { active: true, progress: 0.9 })]);
+    expect(painted()).toEqual([1]);
+    calls = [];
+    await icon.update([tab(1, { active: true, progress: 0.9, quiet: true })]);
+    expect(painted()).toEqual([]);
+    expect(cleared()).toEqual([1]);
+  });
+
+  it("never paints a quiet tab in the first place", async () => {
+    await icon.start({ settings: ON });
+    await icon.update([tab(1, { active: true, progress: 0.9, quiet: true })]);
+    expect(painted()).toEqual([]);
+  });
+
   it("says nothing about a tab that has closed", async () => {
     await icon.start({ settings: ON });
     await icon.update([tab(1, { active: true })]);
