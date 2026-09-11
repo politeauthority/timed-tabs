@@ -23,7 +23,7 @@ explaining why it is shaped the way it is; this section is the map over the top.
 | **E2E** (`e2e.yaml`) | called by CI; dispatch | The extension in a real headless Firefox, two versions in parallel. See [e2e.md](e2e.md). |
 | **CI run full** (`full.yaml`) | every PR, including every label change | Holds the merge — *pending*, not red — until the `ci run full` label is on and the E2E scenarios have passed on the last four Firefox releases. See [The full run](#the-full-run). |
 | **Not paused** (`pause.yaml`) | every PR, including every label change and review | Goes red while the `ci pause` label is on. Also dispatches Release Please when a review or the `release-approved` label lands on the release PR, so that workflow need not listen to PR events itself. |
-| **Auto-merge** (`automerge.yaml`) | the `automerge` label, both directions | Arms and disarms GitHub's auto-merge, and keeps the label and the state agreeing. |
+| **Auto-merge** (`automerge.yaml`) | the `automerge` label, both directions; every push to `main` | Arms and disarms GitHub's auto-merge, keeps the label and the state agreeing, and keeps every armed PR up to date with `main`. |
 | **Release Please** (`release-please.yaml`) | push to `main`, review, label, dispatch | Maintains the release PR, and on merge tags, packages and publishes. |
 | **Beta Release** (`beta-release.yaml`) | dispatch | Cuts a beta from a snapshot of `main`. |
 | **Force Release** (`force-release.yaml`) | dispatch | Pushes an empty `Release-As:` commit when nothing releasable has landed. |
@@ -142,6 +142,22 @@ finishes green having tested nothing. A new push cancels the legs still running 
 commit it replaced. A pull request against a branch other than `main` passes the gate
 without the label, and so does the release PR, whose branch never carries anything a
 scenario reads.
+
+## Keeping an armed PR current
+
+Auto-merge merges whatever the checks passed on, and the checks ran against the
+merge ref of the moment. A PR that then sits behind three other merges would land
+having been tested against none of them, so an armed PR is kept up to date: every
+push to `main` brings each open PR with auto-merge armed and behind `main` up to date
+(the same "Update branch" the PR page offers), and arming a PR does the same for that
+one. The update is a push with the `PAT` secret so CI and the full run see the new
+commit; without the secret nothing is updated, because an update pushed with
+`GITHUB_TOKEN` wakes no checks. A conflict is reported in the run summary and needs a
+hand.
+
+Each update costs a CI and a full run, which is the price of merging what was tested.
+Branch protection still does not *require* branches to be up to date (`strict: false`);
+turning that on would make the update mandatory for every PR, armed or not.
 
 ## Pausing a pull request
 
