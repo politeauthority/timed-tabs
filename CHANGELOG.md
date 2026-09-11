@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/politeauthority/timed-tabs/compare/v0.9.0...v0.9.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* point task run WT= at the worktrees directory ([b379b93](https://github.com/politeauthority/timed-tabs/commit/b379b93a73925bfeb489fe6869898eccafbcf4bd))
+
 ## [0.9.0](https://github.com/politeauthority/timed-tabs/compare/v0.8.0...v0.9.0) (2026-09-11)
 
 
