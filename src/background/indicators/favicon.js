@@ -19,7 +19,12 @@ export const description = "The tab's icon gets a coloured square, ring or dot. 
 export const lastOutcome = new Map();
 
 const injector = createInjector("content/favicon.js");
-let scheme = "light";
+/**
+ * The browser's colour scheme, or null where the background cannot read it.
+ * An MV3 service worker has no matchMedia, so on Chrome this stays null and
+ * the content script -- which has one -- picks the ink colour itself.
+ */
+let scheme = null;
 let mediaQuery = null;
 let lastTabs = [];
 let style = "square";
@@ -47,7 +52,10 @@ export function configure(settings) {
 
 export async function update(tabs) {
   lastTabs = tabs;
-  const textColor = scheme === "dark" ? "#ffffff" : "#15141a";
+  // Left undefined when the scheme is unknown, which is the content script's
+  // cue to decide. Sending a guess would paint dark-mode Chrome in ink meant
+  // for a light background.
+  const textColor = scheme === null ? undefined : scheme === "dark" ? "#ffffff" : "#15141a";
   await Promise.all(
     tabs.map(async (t) => {
       const msg = t.quiet
@@ -75,6 +83,7 @@ export async function update(tabs) {
 export async function stop() {
   mediaQuery?.removeEventListener("change", onSchemeChange);
   mediaQuery = null;
+  scheme = null;
   api.tabs.onRemoved.removeListener(onTabRemoved);
   await injector.broadcast({ type: "timed-tabs:reset" });
   injector.clear();

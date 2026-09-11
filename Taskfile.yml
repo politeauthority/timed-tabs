@@ -3,6 +3,7 @@
 #   task run                      run Firefox with the extension from this checkout
 #   task run WT=visual-language   ...from the worktree at worktrees/visual-language
 #   task run:dev DEV=path.json    dev build (seeded settings/rules, "-dev" version tag)
+#   task run:dev:chrome DEV=...   the same dev build, in Chrome
 #   task check                    lint + test
 #   task package                  release zips into web-ext-artifacts/
 #
@@ -47,6 +48,15 @@ tasks:
       - >-
         npx web-ext run --verbose --source-dir dist/dev --start-url "{{.URL}}" {{.PREFS}}
         --pref devtools.console.stdout.content=true --pref devtools.console.stdout.chrome=true
+
+  run:dev:chrome:
+    desc: "Build dist/chrome-dev (optional DEV=<dev.json> seed) and launch Chrome with it."
+    dir: "{{.ROOT}}"
+    cmds:
+      - DEV_JSON="{{.DEV}}" node scripts/build.mjs chrome-dev
+      # web-ext loads it over the DevTools protocol: --load-extension is ignored
+      # by branded Chrome now. See docs/developer/chrome.md.
+      - npx web-ext run --target chromium --source-dir dist/chrome-dev
 
   check:
     desc: "Lint and test. WT=<worktree> to check a worktree."

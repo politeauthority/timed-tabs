@@ -13,6 +13,7 @@
     "build:firefox": "node scripts/build.mjs firefox",
     "build:chrome": "node scripts/build.mjs chrome",
     "build:dev": "node scripts/build.mjs dev",
+    "build:dev:chrome": "node scripts/build.mjs chrome-dev",
     "icons": "node scripts/icons.mjs",
     "icons:check": "node scripts/icons.mjs --check",
     "e2e": "node scripts/e2e.mjs",

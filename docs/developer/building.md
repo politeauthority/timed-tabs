@@ -26,7 +26,8 @@ To load a build by hand instead:
 - 🦊 **Firefox** — `about:debugging` → This Firefox → Load Temporary Add-on, and pick
   `src/manifest.json`.
 - 🌐 **Chrome** — `npm run build:chrome`, then `chrome://extensions` → Developer mode
-  → Load unpacked, and pick `dist/chrome`.
+  → Load unpacked, and pick `dist/chrome`. [chrome.md](chrome.md) covers what that
+  build does differently.
 
 ## Checking it
 
@@ -43,11 +44,16 @@ use — the Firefox theme API and `sessions.setTabValue` in the Chrome build, fo
 instance.
 
 ```sh
-npm run build:firefox   # -> dist/firefox
-npm run build:chrome    # -> dist/chrome
-npm run build:dev       # -> dist/dev, the seeded dev build
-npm run package         # both zips, into web-ext-artifacts/
+npm run build:firefox     # -> dist/firefox
+npm run build:chrome      # -> dist/chrome
+npm run build:dev         # -> dist/dev, the seeded dev build
+npm run build:dev:chrome  # -> dist/chrome-dev, the same for Chrome
+npm run package           # both zips, into web-ext-artifacts/
 ```
+
+Which manifest each target gets lives in `scripts/manifest.js`, on its own because
+what the Chrome build asks the user for is a promise made in
+[security-notes.md](security-notes.md); `tests/manifest.test.js` holds it to it.
 
 ## The icons
 

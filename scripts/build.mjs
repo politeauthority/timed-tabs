@@ -1,9 +1,12 @@
 // Produces dist/<target>/ from src/ with a manifest adjusted for that browser.
-// Usage: node scripts/build.mjs [firefox|chrome|dev]   (default: firefox and chrome)
+// Usage: node scripts/build.mjs [firefox|chrome|dev|chrome-dev]
+//        (default: firefox and chrome)
 //
-// The "dev" target is a plain copy of src/ plus an optional dev.json taken
-// from DEV_JSON (a path) so test profiles can be seeded without ever putting
-// that file in src/, which the user's own profile loads directly.
+// A dev target ("dev" for Firefox, "chrome-dev" for Chrome) is a plain copy of
+// src/ plus an optional dev.json taken from DEV_JSON (a path) so test profiles
+// can be seeded without ever putting that file in src/, which the user's own
+// profile loads directly. The two exist so the same scenario can be run in
+// either browser; which manifest each one gets lives in scripts/manifest.js.
 //
 // Every target gets a build.json ({ version, semver, tag, channel, commit,
 // builtAt }). The UI shows `semver` (or the manifest version) plus `tag`, so
@@ -22,6 +25,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { execSync } from "node:child_process";
 import path from "node:path";
+import { TARGETS, TARGET_NAMES, adaptManifest } from "./manifest.js";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const SRC = path.join(ROOT, "src");
@@ -30,10 +34,11 @@ const DIST = path.join(ROOT, "dist");
 const targets = process.argv[2] ? [process.argv[2]] : ["firefox", "chrome"];
 
 for (const target of targets) {
-  if (!["firefox", "chrome", "dev"].includes(target)) {
-    console.error(`Unknown target "${target}". Use firefox, chrome or dev.`);
+  if (!TARGETS[target]) {
+    console.error(`Unknown target "${target}". Use ${TARGET_NAMES.join(", ")}.`);
     process.exit(1);
   }
+  const isDev = TARGETS[target].dev;
   const out = path.join(DIST, target);
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
@@ -42,15 +47,15 @@ for (const target of targets) {
   // Release builds carry none of the dev hook: the blocks between the
   // @dev-only markers only ever run under the dev id, but a reviewer should
   // not have to read them to know that.
-  if (target !== "dev") await stripDevOnly(out, ["background/index.js", "ui/panel.js"]);
-  if (target === "dev" && process.env.DEV_JSON) {
+  if (!isDev) await stripDevOnly(out, ["background/index.js", "ui/panel.js"]);
+  if (isDev && process.env.DEV_JSON) {
     await cp(process.env.DEV_JSON, path.join(out, "dev.json"));
   }
 
   const manifest = JSON.parse(
     await readFile(path.join(SRC, "manifest.json"), "utf8"),
   );
-  const channel = process.env.BUILD_CHANNEL ?? (target === "dev" ? "dev" : "");
+  const channel = process.env.BUILD_CHANNEL ?? (isDev ? "dev" : "");
   if (channel && !["beta", "dev"].includes(channel)) {
     console.error(`Unknown BUILD_CHANNEL "${channel}". Use beta or dev, or leave it unset.`);
     process.exit(1);
@@ -70,7 +75,7 @@ for (const target of targets) {
       {
         version: manifestVersion,
         semver: process.env.BUILD_SEMVER ?? "",
-        tag: process.env.BUILD_TAG ?? (target === "dev" ? "dev" : ""),
+        tag: process.env.BUILD_TAG ?? (isDev ? "dev" : ""),
         channel,
         commit: gitShortSha(),
         builtAt: new Date().toISOString(),
@@ -105,34 +110,4 @@ function gitShortSha() {
   } catch {
     return "";
   }
-}
-
-function adaptManifest(base, target, channel) {
-  const m = structuredClone(base);
-  if (target === "dev") {
-    // A distinct id keeps the dev build's storage separate and is what the
-    // background checks before reading dev.json.
-    m.browser_specific_settings.gecko.id = "timed-tabs-dev@alixfullerton";
-  }
-  if (channel === "beta") {
-    // Same id as the stable build: a beta replaces it and, once builds are
-    // signed, beta testers update to the next stable. The name says beta
-    // wherever the browser shows it.
-    m.name = "Timed Tabs Beta";
-    m.action.default_title = "Timed Tabs Beta";
-  } else if (channel === "dev") {
-    m.name = "Timed Tabs (dev)";
-    m.action.default_title = "Timed Tabs (dev)";
-  }
-  if (target === "chrome") {
-    // Chrome MV3 requires a service worker and has no dynamic theme API.
-    // `sessions` goes too: only setTabValue is used, which is Firefox-only, and
-    // tab-tracker falls back to storage.session everywhere else. Asking for it
-    // on Chrome would take the recently-closed-tabs privilege and spend it on
-    // nothing. See docs/developer/security-notes.md.
-    m.background = { service_worker: "background/index.js", type: "module" };
-    delete m.browser_specific_settings;
-    m.permissions = m.permissions.filter((p) => !["theme", "sessions"].includes(p));
-  }
-  return m;
 }

@@ -100,7 +100,12 @@ window.addEventListener("hashchange", route);
 // e.g. "uiActions": [{ "at": 3000, "click": "#tab-rules-list input" }] or
 // [{ "at": 3000, "set": "#fuse-range", "value": "80" }] to drive a control
 // that a bare click cannot work, like a slider.
-if (typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@")) {
+// The same two marks the background uses, for the same reason: Chrome has no
+// "-dev@" id to recognise a dev build by, so the manifest name carries it.
+if (
+  (typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@")) ||
+  api.runtime.getManifest().name.endsWith("(dev)")
+) {
   fetch(api.runtime.getURL("dev.json"), { cache: "no-store" })
     .then((r) => r.json())
     .then((dev) => {

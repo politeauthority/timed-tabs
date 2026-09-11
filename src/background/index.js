@@ -92,8 +92,23 @@ async function recordExpiredNow(tab, action) {
 
 const ready = tracker.seed();
 
-/** The dev build (scripts/build.mjs dev) stamps a "-dev@" extension id; a few log lines key off it. */
-const IS_DEV_BUILD = typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@");
+/**
+ * True in a dev build (scripts/build.mjs dev or chrome-dev), which is the gate
+ * on the hook below and on a few log lines.
+ *
+ * Two independent marks, and either one is enough. Firefox installs a dev build
+ * under a "-dev@" id, which is what docs/developer/security-notes.md records as
+ * the guarantee. Chrome has no such id to look at — it derives one from the key
+ * or the install path — so the manifest name carries it there instead;
+ * scripts/manifest.js is what writes it.
+ *
+ * Neither can fire in the user's own profile. A plain `src/` load is named
+ * `__MSG_extensionName__`, which resolves to "Timed Tabs", and carries the
+ * real add-on id.
+ */
+const IS_DEV_BUILD =
+  (typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@")) ||
+  api.runtime.getManifest().name.endsWith("(dev)");
 // @dev-only-start  (scripts/build.mjs removes everything down to @dev-only-end from release builds)
 // Development hook. Only the dev build reads dev.json, which can open extension
 // pages and seed settings/rules for a test profile:
