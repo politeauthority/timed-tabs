@@ -40,19 +40,33 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+
+      # The runner node is short of CPU, not bandwidth: unpacking Node took two
+      # minutes and apt nine on a busy day. So the caches below hold the
+      # unpacked results. Node's tool directory comes back with one zstd untar
+      # and setup-node then finds it without downloading or extracting; the
+      # Firefox libraries come back as installed files, skipping dpkg entirely.
+      - name: Cache the Node toolchain
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/node
+          key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-22
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Firefox libraries
-        # Ubuntu 24.04 on the runner; ALSA is libasound2t64 there.
-        run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 \
-            libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils > /dev/null
+        # Ubuntu 24.04 on the runner; ALSA is libasound2t64 there. Cached as
+        # installed files; bump `version` to invalidate after changing the list.
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils
+          version: 1.0
+
+      # setup-firefox downloads a ~90 MB tarball every run; that took 14s and is
+      # the smallest cost here, so it is left alone until a version is pinned.
       - uses: browser-actions/setup-firefox@v1
         id: firefox
         with:
