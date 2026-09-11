@@ -15,7 +15,7 @@ export const GROUP_PREFIX = "@";
 
 export function newGroup(partial = {}) {
   return {
-    id: partial.id ?? `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    id: typeof partial.id === "string" && partial.id ? partial.id : `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     name: cleanName(partial.name),
     patterns: cleanPatterns(partial.patterns),
   };
@@ -36,7 +36,8 @@ export function cleanPatterns(input) {
   const seen = new Set();
   const out = [];
   for (const raw of list) {
-    const p = String(raw ?? "").trim();
+    if (typeof raw !== "string") continue;
+    const p = raw.trim();
     const key = p.toLowerCase();
     if (!p || seen.has(key)) continue;
     seen.add(key);

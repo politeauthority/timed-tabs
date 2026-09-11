@@ -5,10 +5,9 @@
  * { "timedTabs": 1, "settings": { ...DEFAULTS keys... }, "rules": [ ...rules ], "groups": [ ...site groups ] }
  * "groups" is optional: backups written before site groups existed load as before.
  */
-import { DEFAULTS } from "./settings.js";
-import { clampPriority, newRule } from "./rules.js";
+import { DEFAULTS, coerceSetting } from "./settings.js";
+import { RULE_FIELDS, clampPriority, newRule } from "./rules.js";
 import { newGroup } from "./groups.js";
-import { mergeFlags } from "./flags.js";
 
 export const FORMAT_VERSION = 1;
 
@@ -56,7 +55,7 @@ export function parseBundle(text) {
       warnings.push(`Ignored unknown setting "${key}".`);
       continue;
     }
-    const v = coerce(key, value);
+    const v = coerceSetting(key, value);
     if (v === undefined) {
       warnings.push(`Setting "${key}" had an unexpected value and was left at its default.`);
       continue;
@@ -64,6 +63,7 @@ export function parseBundle(text) {
     settings[key] = v;
   }
   const rules = [];
+  const ruleIds = new Set();
   if (data.rules !== undefined) {
     if (!Array.isArray(data.rules)) warnings.push("Rules were not a list and were ignored.");
     else {
@@ -72,7 +72,14 @@ export function parseBundle(text) {
           warnings.push("Skipped a malformed rule.");
           continue;
         }
-        rules.push(cleanRule(r));
+        let rule = cleanRule(r);
+        // The editor finds a rule by id; two with the same id would be edited as one.
+        if (ruleIds.has(rule.id)) {
+          rule = { ...rule, id: newRule().id };
+          warnings.push(`Two rules shared the id "${r.id}"; one was given a new id.`);
+        }
+        ruleIds.add(rule.id);
+        rules.push(rule);
       }
     }
   }
@@ -81,7 +88,7 @@ export function parseBundle(text) {
     if (!Array.isArray(data.groups)) warnings.push("Site groups were not a list and were ignored.");
     else {
       for (const g of data.groups) {
-        const clean = g && typeof g === "object" ? cleanGroup(g) : null;
+        let clean = g && typeof g === "object" ? cleanGroup(g) : null;
         if (!clean?.name) {
           warnings.push("Skipped a site group without a name.");
           continue;
@@ -90,6 +97,10 @@ export function parseBundle(text) {
           warnings.push(`Skipped a second site group named "${clean.name}".`);
           continue;
         }
+        if (groups.some((x) => x.id === clean.id)) {
+          clean = { ...clean, id: newGroup().id };
+          warnings.push(`Two site groups shared the id "${g.id}"; one was given a new id.`);
+        }
         groups.push(clean);
       }
     }
@@ -97,20 +108,6 @@ export function parseBundle(text) {
   return { settings, rules, groups, warnings };
 }
 
-function coerce(key, value) {
-  const def = DEFAULTS[key];
-  if (Array.isArray(def)) return Array.isArray(value) && value.every((x) => typeof x === "string") ? value : undefined;
-  // Feature flags: keep the ones this build still declares and drop the rest,
-  // so a backup written either side of a flag being added or retired loads
-  // without a warning and without turning anything unexpected on.
-  if (key === "featureFlags") {
-    return value && typeof value === "object" && !Array.isArray(value) ? mergeFlags(value) : undefined;
-  }
-  if (typeof def === "boolean") return typeof value === "boolean" ? value : undefined;
-  if (typeof def === "number") return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
-  if (typeof def === "string") return typeof value === "string" ? value : undefined;
-  return undefined;
-}
 
 function cleanRule(r) {
   const rule = newRule({
@@ -120,12 +117,17 @@ function cleanRule(r) {
     match: r.match,
     priority: clampPriority(r.priority ?? 5),
   });
+  // Only what a rule can override; anything else would sit in storage
+  // invisibly, re-exported for ever and never shown in the editor.
   const set = {};
   for (const [k, v] of Object.entries(r.set ?? {})) {
-    if (k in DEFAULTS) {
-      const c = coerce(k, v);
-      if (c !== undefined) set[k] = c;
-    } else if (k === "neverExpire" && typeof v === "boolean") set[k] = v;
+    if (!RULE_FIELDS.includes(k)) continue;
+    if (k === "neverExpire") {
+      if (typeof v === "boolean") set[k] = v;
+      continue;
+    }
+    const c = coerceSetting(k, v);
+    if (c !== undefined) set[k] = c;
   }
   rule.set = set;
   return rule;

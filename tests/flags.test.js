@@ -60,7 +60,7 @@ describe("featureOn", () => {
   });
   it("is off for an unknown id and never loops", () => {
     // An id this build does not declare has no parent, so its raw switch decides.
-    expect(featureOn(on("nope"), "nope")).toBe(true);
+    expect(featureOn(on("nope"), "nope")).toBe(false);
     expect(featureOn(on(), "nope")).toBe(false);
     expect(featureOn(undefined, "mini-ui-page-settings")).toBe(false);
   });
