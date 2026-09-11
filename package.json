@@ -16,6 +16,7 @@
     "build:dev:chrome": "node scripts/build.mjs chrome-dev",
     "icons": "node scripts/icons.mjs",
     "icons:check": "node scripts/icons.mjs --check",
+    "icons:swatch": "node scripts/icon-swatch.mjs",
     "e2e": "node scripts/e2e.mjs",
     "e2e:chrome": "node scripts/e2e.mjs --browser=chrome",
     "package": "npm run package:firefox && npm run package:chrome",

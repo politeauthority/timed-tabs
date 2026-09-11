@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRID, dialShapes, faceMetrics, faceShapes, metrics, paintShapes } from "../src/shared/icon-art.js";
+import { GRID, IDENTITY_PROGRESS, dialShapes, faceMetrics, faceShapes, metrics, paintShapes } from "../src/shared/icon-art.js";
 import { decodePng, encodePng, rasterise } from "../scripts/icons.mjs";
 
 const arcs = (shapes) => shapes.filter((s) => s.kind === "arc");
@@ -31,19 +31,69 @@ describe("dialShapes", () => {
     expect(track.from).toBe(0);
     expect(track.to).toBe(1);
     expect(track.alpha).toBeLessThan(1);
+    expect(remaining.from).toBe(0);
     expect(remaining.to).toBeCloseTo(0.75);
     expect(remaining.alpha).toBeUndefined();
   });
 
   it("drains the ring as progress rises, and keeps both hands", () => {
+    // The legacy direction every user has: the remaining arc starts at twelve
+    // and its end creeps back anticlockwise.
     let previous = Infinity;
     for (const progress of [0, 0.2, 0.5, 0.8, 0.99]) {
       const shapes = dialShapes({ progress });
       const [, remaining] = arcs(shapes);
+      expect(remaining.from).toBe(0);
       expect(remaining.to).toBeLessThan(previous);
       previous = remaining.to;
       expect(hands(shapes)).toHaveLength(2);
     }
+  });
+
+  it("drains clockwise when asked, the spent part opening at twelve", () => {
+    let previous = -Infinity;
+    for (const progress of [0, 0.2, 0.5, 0.8, 0.99]) {
+      const [, remaining] = arcs(dialShapes({ progress, clockwise: true }));
+      expect(remaining.from).toBeGreaterThan(previous);
+      expect(remaining.to).toBe(1);
+      previous = remaining.from;
+    }
+    // Full and empty look the same either way round.
+    expect(arcs(dialShapes({ progress: 0, clockwise: true }))[1]).toEqual(arcs(dialShapes({ progress: 0 }))[1]);
+    expect(arcs(dialShapes({ progress: 1, clockwise: true }))).toEqual(arcs(dialShapes({ progress: 1 })));
+  });
+
+  it("leaves the ring bare when asked for no hands", () => {
+    const shapes = dialShapes({ progress: 0.4, hands: false, clockwise: true });
+    expect(hands(shapes)).toHaveLength(0);
+    const [track, remaining] = arcs(shapes);
+    expect(track.to - track.from).toBe(1);
+    expect(remaining.from).toBeCloseTo(0.4);
+    expect(remaining.to).toBe(1);
+  });
+
+  it("paints muted hands the way it paints the track", () => {
+    const faint = hands(dialShapes({ progress: 1, mutedHands: true }));
+    expect(faint).toHaveLength(2);
+    for (const hand of faint) expect(hand.alpha).toBe(arcs(dialShapes({ progress: 1 }))[0].alpha);
+    const tinted = hands(dialShapes({ progress: 1, mutedHands: true, trackColor: "#445566" }));
+    for (const hand of tinted) {
+      expect(hand.color).toBe("#445566");
+      expect(hand.alpha).toBeUndefined();
+    }
+  });
+
+  it("gives the track its own colour, solid, when one is passed", () => {
+    const [track, remaining] = arcs(dialShapes({ progress: 0.4, trackColor: "#445566" }));
+    expect(track.color).toBe("#445566");
+    expect(track.alpha).toBeUndefined();
+    expect(remaining.color).toBeUndefined();
+  });
+
+  it("rests on a full ring", () => {
+    const [, remaining] = arcs(dialShapes({ progress: IDENTITY_PROGRESS }));
+    expect(remaining.from).toBe(0);
+    expect(remaining.to).toBe(1);
   });
 
   it("leaves no arc at all once the ring is empty", () => {

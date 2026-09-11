@@ -213,9 +213,9 @@ export function iconKey(tab, lit = true, live = false) {
   // the packaged one. The clock has to say nothing rather than say the wrong
   // thing -- a quiet tab is one this indicator is not painting (still fresh
   // with "leave fresh tabs alone" on, or a rule has taken the toolbar off the
-  // page), and the resting mark is a *filled face at 75%*, which is not a
+  // page), and the resting mark is a *full filled face*, which is not a
   // resting look at all but a reading, and a false one: a tab with a sliver
-  // left showed three quarters full.
+  // left showed as full.
   //
   // The ring keeps the resting mark, because there it is the packaged icon
   // redrawn and reads as one. Only the face has to be withheld.
