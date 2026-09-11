@@ -73,7 +73,7 @@ so recently opened tabs look like ordinary tabs.
 
 The toolbar button opens a small panel for the current tab.
 
-![The popup: time left, a draggable bar, Restart timer, Snooze and Never expire](../assets/screenshots/popup.png)
+![The popup: time left, a draggable bar, Restart timer, Snooze and Never expire](../../assets/screenshots/popup.png)
 
 - The time left, with a bar you can drag to set the tab's used share anywhere
   between 2% and 100%.
@@ -89,7 +89,7 @@ The toolbar button opens a small panel for the current tab.
 
 ## 📑 The Tabs page
 
-![The Tabs page: every open tab with its bar, rule count and quick actions, and the recently expired list](../assets/screenshots/tabs.png)
+![The Tabs page: every open tab with its bar, rule count and quick actions, and the recently expired list](../../assets/screenshots/tabs.png)
 
 All open tabs, grouped by window, with the active window first. Each row shows the
 favicon, the title, how many rules match, the time left and a bar of the lifetime
@@ -106,7 +106,7 @@ the whole list cleared.
 
 ## 📋 Rules
 
-![The Rules page, with one rule expanded to show its pattern, match mode, priority and overrides](../assets/screenshots/rules.png)
+![The Rules page, with one rule expanded to show its pattern, match mode, priority and overrides](../../assets/screenshots/rules.png)
 
 A rule changes settings for tabs whose address matches a pattern. Rules are
 re-evaluated whenever a tab navigates, so a tab that moves from one site to another
@@ -132,7 +132,7 @@ Site groups are behind the **Site groups** feature flag under Settings, Feature
 flags. A group is a named list of address patterns, and a rule can target the group
 instead of one address. The rule then applies to every site in the group.
 
-![The Rules page with a rule targeting the news group, and the group's list of sites below](../assets/screenshots/site-groups.png)
+![The Rules page with a rule targeting the news group, and the group's list of sites below](../../assets/screenshots/site-groups.png)
 
 Take news sites as the example. You read five or six of them, none of them deserves
 more than fifteen minutes, and without groups that is six rules that all say the same
@@ -167,7 +167,7 @@ Some details worth knowing:
 
 ## ⚙️ Settings
 
-![The Settings page](../assets/screenshots/settings.png)
+![The Settings page](../../assets/screenshots/settings.png)
 
 Settings save as soon as they change and show a Saved mark. Settings sync
 through the browser's extension storage; rules are kept locally.
@@ -188,18 +188,18 @@ because the favicon and title indicators run a small script in each page to chan
 its icon or title; nothing is read from the page. Notifications are an optional
 permission, asked for only when the setting is turned on.
 
-[user-guide/privacy.md](user-guide/privacy.md) covers what is stored on your machine,
+[privacy.md](privacy.md) covers what is stored on your machine,
 how long the recently expired list keeps the addresses of closed tabs, and what to do
 about private windows.
 
 ## 🦊 Firefox and Chrome
 
 Firefox 140 or later is the primary target. Firefox for Android is not declared yet;
-see the [road map](road-map.md). Chrome builds are produced from the same source; the tab tint indicator is
+see the [road map](../road-map.md). Chrome builds are produced from the same source; the tab tint indicator is
 Firefox only because Chrome has no theme API for it.
 
 ## 🚧 Betas
 
 While the project is in development, each release is a beta. A beta shows a yellow
 BETA badge beside the title and is listed as "Timed Tabs Beta" in the add-ons
-manager. See [developer/releasing.md](developer/releasing.md).
+manager. See [developer/releasing.md](../developer/releasing.md).

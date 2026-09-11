@@ -5,6 +5,7 @@
 [![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)](https://www.mozilla.org/firefox/)
 [![Chrome](https://img.shields.io/badge/Chrome-supported-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![Data collected: none](https://img.shields.io/badge/data%20collected-none-success)](src/manifest.json)
+[![Licence: GPL v3](https://img.shields.io/badge/licence-GPLv3-blue)](LICENSE)
 
 > [!WARNING]
 > 🚧 **Timed Tabs is in beta.** Every release is a snapshot of `main`, published as a
@@ -16,8 +17,6 @@
 then red as the clock runs down, and at zero the tab can close itself.
 
 That tab you opened on Tuesday and swore you'd read? It's red now.
-
-![The tabs view, listing every open tab with a colour bar and the time it has left](assets/screenshots/tabs.png)
 
 ## 📦 Install
 
@@ -37,8 +36,6 @@ Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
 
 ## ✨ What you get
 
-The full tour, with screenshots, is in [docs/features.md](docs/features.md).
-
 - 🎨 **Four ways to show the time left.** The favicon, a coloured dot in the page
   title, the toolbar badge, or a tint over the Firefox theme. Pick any of them.
 - 📋 **Per-site rules.** Docs get an hour, news gets fifteen minutes, work repos
@@ -50,19 +47,13 @@ The full tour, with screenshots, is in [docs/features.md](docs/features.md).
   there is no server to talk to. [What is kept on your
   machine](docs/user-guide/privacy.md), and how to control it.
 
-![The rules view, with per-site patterns and the lifetime each one sets](assets/screenshots/rules.png)
+The full list, with screenshots, is in the user guide:
+[docs/user-guide/features.md](docs/user-guide/features.md).
 
-## 🔧 Build it yourself
+## 📚 Documentation
 
-```sh
-npm install
-npm start            # Firefox, with the extension loaded
-npm test
-npm run package      # -> web-ext-artifacts/timed-tabs-{firefox,chrome}-<version>.zip
-```
-
-## 📄 Licence
-
-Timed Tabs is free software under the [GNU General Public License v3.0](LICENSE).
-You may use, study, share and modify it; anything you distribute that is built from
-it must stay under the same licence, with its source available.
+- 📖 [User guide](docs/user-guide/) — [features](docs/user-guide/features.md) and
+  [privacy](docs/user-guide/privacy.md).
+- 🔧 [Developer docs](docs/developer/) — [build it
+  yourself](docs/developer/building.md), tests, releases and security notes.
+- 🛣️ [Road map](docs/road-map.md) — what is not there yet.
