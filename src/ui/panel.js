@@ -658,7 +658,13 @@ function updateReadout() {
   $("act-reset").disabled = exempt;
   const snooze = $("act-snooze");
   snooze.disabled = exempt;
-  snooze.title = exempt ? "" : `Adds ${formatRemaining(snoozeFor(tabState))}`;
+  // The button shows no words, so the tooltip has to carry both what it is
+  // and what it will do.
+  const snoozeLabel = exempt
+    ? "Snooze (this tab has no timer running)"
+    : `Snooze — adds ${formatRemaining(snoozeFor(tabState))}`;
+  snooze.title = snoozeLabel;
+  snooze.setAttribute("aria-label", snoozeLabel);
 }
 
 /**
@@ -2002,12 +2008,34 @@ async function refreshDiag() {
 
 // ---- Wire up ---------------------------------------------------------------
 
-$("act-reset").addEventListener("click", (e) =>
-  tabAction("reset", undefined, e.currentTarget),
-);
-$("act-snooze").addEventListener("click", (e) =>
-  tabAction("snooze", undefined, e.currentTarget),
-);
+/**
+ * A word about what just happened, next to the icon buttons. It replaces the
+ * "Saved" mark those two used to get, which would have stretched a button
+ * that is now only as wide as its icon.
+ */
+let actFlashTimer = null;
+function flashAction(text) {
+  const el = $("act-flash");
+  el.textContent = text;
+  clearTimeout(actFlashTimer);
+  el.classList.remove("is-shown");
+  void el.offsetWidth; // restart the fade when pressed again quickly
+  el.classList.add("is-shown");
+  actFlashTimer = setTimeout(() => el.classList.remove("is-shown"), 2200);
+}
+
+$("act-reset").addEventListener("click", async () => {
+  await tabAction("reset");
+  flashAction("Restarted");
+});
+
+$("act-snooze").addEventListener("click", async () => {
+  // Read the amount before the action lands, so the flash names what was
+  // granted rather than whatever the next state happens to say.
+  const added = snoozeFor(tabState);
+  await tabAction("snooze");
+  flashAction(`+${formatRemaining(added)}`);
+});
 
 // Dragging reports continuously; the commit waits until the drag is let go.
 $("fuse-range").addEventListener("input", (e) => {

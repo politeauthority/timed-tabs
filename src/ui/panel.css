@@ -792,6 +792,29 @@ body:not([data-context="popup"]) .settings-title {
   align-items: center;
 }
 
+/* Square, icon-sized: the label is in the tooltip. */
+.icon-btn {
+  flex: none;
+  width: var(--control-h);
+  padding: 0;
+}
+
+/* What just happened, said once and then faded out. */
+.act-flash {
+  font-size: var(--fs-sm);
+  color: var(--green);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+.act-flash.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
 .tab-never {
   width: 100%;
   margin-top: var(--sp-1);

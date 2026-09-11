@@ -11,6 +11,7 @@
       <symbol id="i-timer" viewBox="0 0 16 16"><circle cx="8" cy="9" r="5.25"/><path d="M8 6.5V9l1.75 1.5M6.5 1.75h3M8 1.75v2M12.5 4.5l1-1"/></symbol>
       <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13.25 8A5.25 5.25 0 1 1 11 3.7"/><path d="M11.25 1.5v2.75H8.5"/></symbol>
       <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+      <symbol id="i-snooze" viewBox="0 0 16 16"><path d="M9 2.5h4l-4 4h4"/><path d="M2.5 8.5h6l-6 5h6"/></symbol>
       <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
       <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.25 4.5l.6 8.5h6.3l.6-8.5M6.75 7v4M9.25 7v4"/></symbol>
       <symbol id="i-open" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 8 8M11 9.5v4h-8.5v-8.5h4"/></symbol>
@@ -72,8 +73,11 @@
         </div>
 
         <div class="tab-actions">
-          <button type="button" id="act-reset"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg>Restart timer</button>
-          <button type="button" id="act-snooze"><svg class="icon" aria-hidden="true"><use href="#i-timer" /></svg>Snooze</button>
+          <!-- Icon-only: the label lives in title/aria-label, and what just
+               happened is said once in #act-flash rather than on the button. -->
+          <button type="button" id="act-reset" class="icon-btn" title="Restart timer" aria-label="Restart timer"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg></button>
+          <button type="button" id="act-snooze" class="icon-btn" title="Snooze" aria-label="Snooze"><svg class="icon" aria-hidden="true"><use href="#i-snooze" /></svg></button>
+          <span id="act-flash" class="act-flash" role="status" aria-live="polite"></span>
           <label class="switch tab-never" data-saved-key="never">
             <input type="checkbox" id="act-never" />
             <span class="switch-track"></span>
