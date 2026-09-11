@@ -247,6 +247,6 @@ each on every push to `main`. Lint, the unit tests and the build still run there
 `package` job re-runs lint and the tests against the tag itself before anything is
 attached to a release.
 
-`workflow_dispatch` is still there, so a Firefox-only run on a branch is one click
-from the Actions tab. Dispatched rather than called, the job reports under its bare
-name, `headless Firefox`.
+`workflow_dispatch` is still there, so a run on a branch, with whatever channel lists
+you type, is one click from the Actions tab. Dispatched rather than called, the legs
+report under their bare names, `Firefox stable`, `Chrome nightly` and so on.
