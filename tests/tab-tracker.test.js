@@ -117,3 +117,23 @@ describe("ignoreRules", () => {
     expect(values.has("7:timedTabs")).toBe(false);
   });
 });
+
+describe("per-tab overrides", () => {
+  let tracker;
+  beforeEach(() => {
+    values.clear();
+    tracker = createTabTracker();
+  });
+  it("sets, replaces, removes and persists overrides", async () => {
+    await tracker.setOverride(1, "faviconStyle", "dot");
+    await tracker.setOverride(1, "indicators", ["badge"]);
+    expect(tracker.get(1).overrides).toEqual({ faviconStyle: "dot", indicators: ["badge"] });
+    await tracker.setOverride(1, "faviconStyle", null);
+    expect(tracker.get(1).overrides).toEqual({ indicators: ["badge"] });
+    const again = createTabTracker();
+    await again.track(1);
+    expect(again.get(1).overrides).toEqual({ indicators: ["badge"] });
+    await again.track(2);
+    expect(again.allOverrides()).toEqual([{ indicators: ["badge"] }, {}]);
+  });
+});

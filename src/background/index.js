@@ -4,7 +4,7 @@
  */
 import { api, withTimeout } from "../shared/browser.js";
 import { watchRules, watchSettings } from "../shared/settings.js";
-import { effectiveSettings } from "../shared/rules.js";
+import { RULE_FIELDS, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
 import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
@@ -98,11 +98,7 @@ watchSettings(async (next) => {
   await ready;
   notifier.configure(settings);
 
-  const wanted = findIndicators(settings.indicators);
-  await Promise.all(active.filter((i) => !wanted.includes(i)).map((i) => i.stop()));
-  await Promise.all(wanted.filter((i) => !active.includes(i)).map((i) => i.start({ api, tracker, settings })));
-  for (const i of wanted) if (active.includes(i)) i.configure?.(settings);
-  active = wanted;
+  await syncIndicators();
 
   if (previous?.pauseWhileActive !== settings.pauseWhileActive) await applyPauseSetting();
   void previous;
@@ -112,10 +108,26 @@ watchSettings(async (next) => {
   await tick();
 });
 
-watchRules((next) => {
+watchRules(async (next) => {
   rules = next;
-  if (settings) applyPauseSetting().then(tick);
+  if (!settings) return;
+  await ready;
+  await syncIndicators();
+  await applyPauseSetting();
+  await tick();
 });
+
+/**
+ * Start every indicator any tab could need (globals, rules, per-tab overrides)
+ * and stop the rest. Which of them paint a given tab is decided per tab in tick().
+ */
+async function syncIndicators() {
+  const wanted = findIndicators(wantedIndicatorIds(settings, rules, tracker.allOverrides()));
+  await Promise.all(active.filter((i) => !wanted.includes(i)).map((i) => i.stop()));
+  await Promise.all(wanted.filter((i) => !active.includes(i)).map((i) => i.start({ api, tracker, settings })));
+  for (const i of wanted) if (active.includes(i)) i.configure?.(settings);
+  active = wanted;
+}
 
 /** Settings that apply to one tab: globals, then matching rules, then per-tab overrides. */
 function settingsFor(tab, tabState) {
@@ -130,6 +142,7 @@ function settingsFor(tab, tabState) {
     eff.resetOnActivate = tabState.resetOnActivate;
   }
   if (tabState?.neverExpire) eff.neverExpire = true;
+  applyOverrides(eff, tabState?.overrides);
   return eff;
 }
 
@@ -252,13 +265,8 @@ async function tabState(tabId, tab) {
     resetOnActivate: s.resetOnActivate,
     ignoreRules: s.ignoreRules,
     ignoredRules: s.ignoredRules ?? [],
-    effective: {
-      tabLifetimeSeconds: eff.tabLifetimeSeconds,
-      onExpire: eff.onExpire,
-      resetOnActivate: eff.resetOnActivate,
-      pauseWhileActive: eff.pauseWhileActive,
-      neverExpire: eff.neverExpire,
-    },
+    overrides: { ...(s.overrides ?? {}) },
+    effective: Object.fromEntries(RULE_FIELDS.map((k) => [k, eff[k]])),
     rules: eff.allMatched.map((r) => ({
       id: r.id,
       description: r.description ?? "",
@@ -339,6 +347,13 @@ async function tabAction({ tabId, action, value }) {
     case "resetOnActivate":
       await tracker.setResetOnActivate(tabId, value);
       break;
+    case "override":
+      if (!RULE_FIELDS.includes(value?.key)) break;
+      await tracker.setOverride(tabId, value.key, value.value);
+      expired.delete(tabId);
+      await syncIndicators();
+      await applyPauseSetting();
+      break;
     case "ignoreRules":
       await tracker.setIgnoreRules(tabId, value);
       expired.delete(tabId);
@@ -362,6 +377,15 @@ async function tabAction({ tabId, action, value }) {
   await tick();
 }
 
+/** Dev build only: log a tab's effective appearance whenever it changes. */
+const lastLook = new Map();
+function devLogLook(tab, eff, quiet) {
+  const line = `ind=${(eff.indicators ?? []).join("+")} style=${eff.faviconStyle} quiet=${quiet} flash=${eff.flashBeforeExpiry}`;
+  if (lastLook.get(tab.id) === line) return;
+  lastLook.set(tab.id, line);
+  console.log(`[timed-tabs] look ${tab.id} ${tab.url} ${line}`);
+}
+
 let ticking = false;
 async function tick() {
   if (!settings || ticking) return;
@@ -381,17 +405,21 @@ async function tick() {
         0,
         tracker.lifetimeFor(tab.id, eff.tabLifetimeSeconds) - tracker.elapsedSeconds(tab.id, now),
       );
-      // quiet: the user asked for no visible change while a tab is still green.
       // quiet: show nothing for this tab. Always for tabs that cannot expire
       // (pinned, timer off), and while still green if the user asked for that.
-      const quietUntil = Math.min(0.99, Math.max(0.01, (settings.quietUntilPercent ?? 40) / 100));
-      const quiet = exempt || (settings.hideWhileGreen && progress < quietUntil);
+      // Appearance comes from the tab's effective settings, so rules and
+      // per-tab overrides can change how (and whether) a tab is painted.
+      const quietUntil = Math.min(0.99, Math.max(0.01, (eff.quietUntilPercent ?? 40) / 100));
+      const quiet = exempt || (eff.hideWhileGreen && progress < quietUntil);
       const flashing =
-        settings.flashBeforeExpiry && !quiet && remainingSeconds > 0 && remainingSeconds <= settings.flashLeadSeconds;
+        eff.flashBeforeExpiry && !quiet && remainingSeconds > 0 && remainingSeconds <= eff.flashLeadSeconds;
+      if (IS_DEV_BUILD) devLogLook(tab, eff, quiet);
       snapshot.push({
         exempt,
         quiet,
         flashing,
+        indicators: eff.indicators ?? [],
+        faviconStyle: eff.faviconStyle,
         remainingSeconds,
         tabId: tab.id,
         windowId: tab.windowId,
@@ -404,9 +432,12 @@ async function tick() {
       });
       if (progress >= 1 && !tab.active && !exempt) await expire(tab, eff.onExpire);
     }
+    // An indicator a tab does not use still sees the tab, marked quiet, so it
+    // undoes anything it painted before the tab's settings changed.
+    const viewFor = (i) => snapshot.map((t) => (t.indicators.includes(i.id) ? t : { ...t, quiet: true, hidden: true }));
     await Promise.all(
       active.map((i) =>
-        withTimeout(i.update(snapshot), 10_000, `${i.id}.update`).catch((e) =>
+        withTimeout(i.update(viewFor(i)), 10_000, `${i.id}.update`).catch((e) =>
           console.warn("[timed-tabs]", String(e)),
         ),
       ),

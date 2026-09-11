@@ -58,14 +58,15 @@ export async function update(tabs) {
             textColor,
             active: t.active,
             progress: t.progress,
-            style,
+            style: t.faviconStyle ?? style,
             flash: Boolean(t.flashing),
           };
       const r = await injector.send(t, msg);
       if (r.skipped) {
         if (r.skipped !== "unreachable") lastOutcome.set(t.tabId, `skipped: ${r.skipped}`);
       } else if (r.failed) lastOutcome.set(t.tabId, `failed: ${r.failed}`);
-      else if (t.quiet) lastOutcome.set(t.tabId, t.exempt ? "quiet (timer off)" : "quiet (still green)");
+      else if (t.quiet)
+        lastOutcome.set(t.tabId, t.hidden ? "quiet (not used here)" : t.exempt ? "quiet (timer off)" : "quiet (still green)");
       else lastOutcome.set(t.tabId, `${r.injectedNow ? "injected and " : ""}painted (${r.reply ?? "no reply"})`);
     }),
   );

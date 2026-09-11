@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { applicableRules, effectiveSettings, matchesRule, newRule, patternForUrl } from "../src/shared/rules.js";
+import {
+  RULE_VISUAL_FIELDS,
+  applicableRules,
+  applyOverrides,
+  effectiveSettings,
+  matchesRule,
+  newRule,
+  patternForUrl,
+  wantedIndicatorIds,
+} from "../src/shared/rules.js";
 
 const r = (p, extra = {}) => newRule({ pattern: p, priority: 5, ...extra });
 
@@ -84,5 +93,50 @@ describe("re-evaluation on navigation", () => {
     const rules = [newRule({ pattern: "docs.example.com/*", priority: 5, set: { tabLifetimeSeconds: 60 } })];
     expect(effectiveSettings(base, rules, "https://docs.example.com/a").tabLifetimeSeconds).toBe(60);
     expect(effectiveSettings(base, rules, "https://www.example.com/a").tabLifetimeSeconds).toBe(1800);
+  });
+});
+
+describe("visual overrides", () => {
+  const base = {
+    tabLifetimeSeconds: 1800,
+    onExpire: "none",
+    resetOnActivate: false,
+    pauseWhileActive: false,
+    indicators: ["favicon", "theme-tint"],
+    faviconStyle: "square",
+    hideWhileGreen: false,
+    quietUntilPercent: 40,
+    flashBeforeExpiry: true,
+    flashLeadSeconds: 60,
+  };
+  it("rules override appearance fields per field", () => {
+    const rules = [r("github.com/*", { set: { indicators: ["title-prefix"], faviconStyle: "dot", flashBeforeExpiry: false } })];
+    const eff = effectiveSettings(base, rules, "https://github.com/x");
+    expect(eff.indicators).toEqual(["title-prefix"]);
+    expect(eff.faviconStyle).toBe("dot");
+    expect(eff.flashBeforeExpiry).toBe(false);
+    expect(eff.hideWhileGreen).toBe(false);
+    expect(eff.quietUntilPercent).toBe(40);
+  });
+  it("a rule's indicator list replaces the global one outright", () => {
+    const eff = effectiveSettings(base, [r("*", { set: { indicators: [] } })], "https://a.b/");
+    expect(eff.indicators).toEqual([]);
+  });
+  it("per-tab overrides sit above rules and ignore unknown keys", () => {
+    const eff = effectiveSettings(base, [r("*", { set: { faviconStyle: "ring" } })], "https://a.b/");
+    applyOverrides(eff, { faviconStyle: "dot", bogus: 1, flashLeadSeconds: null });
+    expect(eff.faviconStyle).toBe("dot");
+    expect(eff.flashLeadSeconds).toBe(60);
+    expect(eff.bogus).toBeUndefined();
+  });
+  it("wantedIndicatorIds unions globals, enabled rules and tab overrides", () => {
+    const rules = [
+      r("*", { set: { indicators: ["badge"] } }),
+      r("*", { priority: 0, set: { indicators: ["title-prefix"] } }),
+    ];
+    expect(wantedIndicatorIds(base, rules, [{ indicators: ["favicon"] }, {}]).sort()).toEqual(
+      ["badge", "favicon", "theme-tint"],
+    );
+    expect(RULE_VISUAL_FIELDS).toContain("indicators");
   });
 });
