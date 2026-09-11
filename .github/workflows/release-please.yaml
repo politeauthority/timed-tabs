@@ -23,6 +23,13 @@ run-name: "Release Please — ${{ github.event_name == 'pull_request_review' && 
 #
 # ⚠️ PREREQ: the `PAT` secret must exist, and the repo must allow rebase merging
 # (Settings → General → Pull Requests).
+#
+# ⏸️ STABLE RELEASES ARE PAUSED while the project is still in development. The
+# release PR is still maintained (the Beta Release workflow reads the next version
+# from its title), but the gated merge only runs when the repository variable
+# STABLE_RELEASES is "true" (Settings → Secrets and variables → Actions → Variables).
+# Until then every release is a beta. Do not merge the release PR by hand: the next
+# run would tag it as a stable release.
 on:
   push:
     branches: ["main"]
@@ -82,13 +89,30 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  paused:
+    name: Stable releases paused
+    needs: release-please
+    if: always() && vars.STABLE_RELEASES != 'true' && needs.release-please.outputs.release_created != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📋 Summary
+        run: |
+          {
+            echo "## ⏸️ Stable releases are paused"
+            echo ""
+            echo "The release PR is kept up to date so **Beta Release** can name its builds, but it is not merged."
+            echo "Cut a beta from the Actions tab instead. To resume stable releases, set the repository"
+            echo "variable \`STABLE_RELEASES\` to \`true\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   gated-merge:
     name: Admin-gated merge
     needs: release-please
     # Runs on pushes to main AND on review submissions, so the release goes out
     # whichever happens last: the approval, or a later commit on an already-approved
-    # PR. Skipped on the post-merge run (a release was just cut — nothing to merge).
-    if: always() && needs.release-please.result != 'failure' && needs.release-please.outputs.release_created != 'true'
+    # PR. Skipped on the post-merge run (a release was just cut — nothing to merge),
+    # and skipped entirely while stable releases are paused (see the header).
+    if: always() && vars.STABLE_RELEASES == 'true' && needs.release-please.result != 'failure' && needs.release-please.outputs.release_created != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Merge the release PR if an admin has approved it

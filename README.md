@@ -17,18 +17,19 @@ That tab you opened on Tuesday and swore you'd read? It's red now.
 
 ## Install
 
-No store listing yet. Grab a zip from [Releases](https://github.com/politeauthority/timed-tabs/releases/latest):
+No store listing yet, and while the project is in development every release is a
+beta. Grab a zip from the newest pre-release under
+[Releases](https://github.com/politeauthority/timed-tabs/releases):
 
 - **Firefox 140+** (Android 142+) — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
 - **Chrome** — unzip `timed-tabs-chrome-*.zip`, then `chrome://extensions` → Developer mode → Load unpacked
 
 ### Betas
 
-Betas are snapshots of `main` between releases, published as
-[pre-releases](https://github.com/politeauthority/timed-tabs/releases). They install
-the same way and replace a stable install. A beta shows a yellow BETA badge beside
-the title, and `about:addons` lists it as "Timed Tabs Beta". Details in
-[docs/developer/releasing.md](docs/developer/releasing.md).
+Betas are snapshots of `main`, published as
+[pre-releases](https://github.com/politeauthority/timed-tabs/releases). A beta shows
+a yellow BETA badge beside the title, and `about:addons` lists it as "Timed Tabs
+Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
 
 ## What you get
 

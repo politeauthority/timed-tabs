@@ -40,6 +40,12 @@ jobs:
     name: Push Release-As commit
     runs-on: ubuntu-latest        # git-only; the packaging happens in Release Please
     steps:
+      - name: Refuse while stable releases are paused
+        if: vars.STABLE_RELEASES != 'true'
+        run: |
+          echo "::error::Stable releases are paused; cut a beta with the Beta Release workflow. Set the STABLE_RELEASES repository variable to 'true' to resume."
+          exit 1
+
       - uses: actions/checkout@v7
         with:
           ref: main
