@@ -37,6 +37,9 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      # The ARC image has no gh; GitHub-hosted ones do. A no-op on those.
+      - uses: ./.github/actions/gh-cli
+
       - name: Work out the beta version
         id: ver
         env:
