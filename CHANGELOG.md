@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/politeauthority/timed-tabs/compare/v0.6.0...v0.7.0) (2026-09-11)
+
+
+### Features
+
+* order the open-tabs list by time left ([c1acaca](https://github.com/politeauthority/timed-tabs/commit/c1acaca85aa6d4810bd639a95d0b293f44742556))
+* rules and single tabs can override how a tab is painted ([b407e2a](https://github.com/politeauthority/timed-tabs/commit/b407e2a74c8e9e785d09ddc55f7af82dd416483d))
+
 ## [0.6.0](https://github.com/politeauthority/timed-tabs/compare/v0.5.0...v0.6.0) (2026-09-11)
 
 
