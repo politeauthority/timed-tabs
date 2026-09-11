@@ -14,6 +14,7 @@ anyone who needs one, is the [privacy policy](../../PRIVACY.md).
 | Rules and site groups | Local storage | No |
 | Each tab's timer | With the tab, for as long as it is open | No |
 | **Recently expired tabs** | Local storage | No |
+| Statistics (counts and dates) | Local storage | No |
 
 ## 🕯️ The recently expired list
 
@@ -38,6 +39,20 @@ At most 200 tabs are kept whatever you choose, so the oldest fall off on a busy 
 If you would rather no record were kept at all, set the retention as low as it goes.
 There is no switch to turn the list off entirely; if you want one, say so on the
 issue tracker.
+
+## 📊 Statistics
+
+**Statistics** on the Tabs page is the tally: tabs closed, unloaded and reloaded,
+snoozes and the time they bought, timer restarts, the most tabs you have had open at
+once, and a per-day count of expiries for the last 30 days.
+
+It holds **numbers and dates and nothing else**. No address, no title, no icon —
+so unlike the list above, there is nothing in it that could say which pages you had
+open, and a private tab is counted without leaving any trace that it existed.
+
+The one thing it does show is which days you were busy. If you would rather it did
+not, **Clear statistics** at the foot of the section empties it. It never leaves your
+machine and is not carried in a backup.
 
 ## 🕵️ Private windows
 
