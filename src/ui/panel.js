@@ -54,6 +54,7 @@ import {
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
 import { FLAGS, featureOn, flagOn, flagRequires } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
+import { mountToasts } from "./toasts.js";
 
 // The same file serves three contexts: the toolbar popup (default), the
 // preferences pane (options.html sets data-context) and a full page
@@ -447,26 +448,102 @@ function applyManagementState() {
   document.body.dataset.managing = settings.tabManagement === false ? "off" : "on";
 }
 
+// ---- Saying whether it worked ----------------------------------------------
+// Two ways of reporting the same thing, chosen by the "settings-toasts" flag.
+// Off, a save confirms itself with a "Saved" tick on the row it changed and a
+// failure is only in the console. On, an outcome that has no natural home on
+// the page goes to a toast instead: a success fades, a failure stays until it
+// is dismissed, and the tick is left off so nothing is said twice.
+
+// The popup is 320px wide and only as tall as its content, so a pile deep
+// enough for the full page would cover most of it.
+const toasts = mountToasts(document.body, isPopup ? { max: 2 } : {});
+const toastsOn = () => featureOn(settings, "settings-toasts");
+
+/** The label of a settings field, for naming what was just saved. */
+function fieldLabel(key) {
+  return FIELDS.find((f) => f.key === key)?.label ?? key;
+}
+
+/** What a rejected write left behind, in a form worth showing a user. */
+function reasonFor(err) {
+  const text = err?.message ?? String(err ?? "");
+  return text.replace(/^Error:\s*/, "").trim();
+}
+
+/**
+ * Run a write and say whether it landed. Returns true on success; on failure
+ * it reports and answers false, so the caller can put back what is really in
+ * storage rather than leaving a value on screen that was never stored.
+ *
+ * `note` is what the toast can promise about the damage. One `set` either
+ * happened or did not, so the default is safe; a caller writing in several
+ * steps has to say something less certain.
+ */
+async function write(run, { what, key = null, note = "Nothing was changed." }) {
+  try {
+    await run();
+    return true;
+  } catch (err) {
+    console.warn(`[timed-tabs] could not save ${what}:`, err);
+    if (toastsOn()) {
+      const reason = reasonFor(err);
+      toasts.error(
+        `Could not save ${what}`,
+        [reason, note].filter(Boolean).join(" "),
+        key ? `save:${key}` : null,
+      );
+    }
+    return false;
+  }
+}
+
 async function save(partial) {
-  await saveSettings(partial);
+  const keys = Object.keys(partial);
+  const what =
+    keys.length === 1 ? `“${fieldLabel(keys[0])}”` : `${keys.length} settings`;
+  const ok = await write(() => saveSettings(partial), {
+    what,
+    key: keys.length === 1 ? keys[0] : "settings",
+  });
+  if (!ok) {
+    // The write did not land, so the controls are showing something storage
+    // does not have. Put them back to what is really there.
+    settings = await getSettings().catch(() => settings);
+    renderFields();
+    return false;
+  }
   settings = { ...settings, ...partial };
   if ("tabManagement" in partial) applyManagementState();
   // A flag can show or hide whole sections; the rules page depends on site-groups.
   if ("featureFlags" in partial) renderFlagged();
   updateFieldVisibility();
-  for (const key of Object.keys(partial)) {
-    const row = $("fields").querySelector(
-      `.field[data-key="${CSS.escape(key)}"]`,
-    );
-    if (row && !row.classList.contains("field-group")) markSaved(row);
+  if (toastsOn()) {
+    toasts.success("Saved", what, keys.length === 1 ? keys[0] : "settings");
+  } else {
+    for (const key of keys) {
+      const row = $("fields").querySelector(
+        `.field[data-key="${CSS.escape(key)}"]`,
+      );
+      if (row && !row.classList.contains("field-group")) markSaved(row);
+    }
   }
   if (isPopup) refreshTab();
   if ($("overview").open) refreshOverview();
+  return true;
 }
 
-/** Inline confirmation on the row whose value has just been written to storage. */
+/**
+ * Inline confirmation on the row whose value has just been written to storage.
+ *
+ * A settings row says nothing while the toasts are on, because `save` has
+ * already raised one naming the setting. Everywhere else the tick stays: on a
+ * rule card or a per-tab control it sits on the thing that changed, which a
+ * message at the bottom of the window cannot do.
+ */
 function markSaved(el, container = null) {
   if (!el) return;
+  if (toastsOn() && $("fields").contains(el)) return;
   container ??= el.querySelector(":scope > .field-control") ?? el;
   let mark = container.querySelector(":scope > .saved-mark");
   if (!mark) {
@@ -930,6 +1007,14 @@ async function tabAction(action, value, sourceEl = null) {
 
 let tabErrorTimer;
 function flashTabError() {
+  if (toastsOn()) {
+    toasts.error(
+      "Could not change this tab",
+      "Timed Tabs did not answer. Try again.",
+      "tab-action",
+    );
+    return;
+  }
   const note = $("remaining-note");
   const prev = note.textContent;
   note.textContent = "could not save, try again";
@@ -1551,8 +1636,13 @@ let groupsSaving = false;
 
 async function persistGroups() {
   groupsSaving = true;
-  await saveGroups(groups);
+  const ok = await write(() => saveGroups(groups), {
+    what: "the site groups",
+    key: "groups",
+  });
+  if (!ok) groups = await getGroups().catch(() => groups);
   groupsSaving = false;
+  return ok;
 }
 
 function renderGroups() {
@@ -2301,10 +2391,16 @@ let rulesSaving = false;
 /** Save all rules; optionally show "Saved" on one part ("head", "match", "priority") of one rule. */
 async function persistRules(rerender = true, saved = null) {
   rulesSaving = true;
-  await saveRules(rules);
+  const ok = await write(() => saveRules(rules), {
+    what: "the rules",
+    key: "rules",
+  });
+  // Nothing was stored, so what is in memory is an edit that never happened.
+  // Redrawing it would leave the page claiming a rule it does not have.
+  if (!ok) rules = await getRules().catch(() => rules);
   rulesSaving = false;
-  if (rerender) renderRules();
-  if (saved) {
+  if (rerender || !ok) renderRules();
+  if (ok && saved) {
     const card = $("rules-list").querySelector(
       `[data-rule-id="${CSS.escape(saved.id)}"]`,
     );
@@ -2315,6 +2411,7 @@ async function persistRules(rerender = true, saved = null) {
     }
   }
   if ($("overview").open) refreshOverview();
+  return ok;
 }
 
 // Two clicks, like delete. Removes every rule that has no usable pattern.
@@ -2441,6 +2538,9 @@ watchSettings((next) => {
 
 /** Every part of the UI a feature flag can show or hide. */
 function renderFlagged() {
+  // With the toasts switched off there is no host on the page any more, so
+  // anything still showing would sit there unreachable.
+  if (!toastsOn()) toasts.clear();
   applyRulesDisplay();
   if (!isPopup) {
     renderGroups();
@@ -2483,7 +2583,17 @@ function showBackup() {
   backupStatus.textContent = "";
 }
 
-function backupNote(text) {
+/**
+ * The outcome of a backup action. It has no row to sit on, so with the toasts
+ * on it goes to one; without them it stays on the small line under the box,
+ * where a failure has always been easy to miss.
+ */
+function backupNote(text, level = "info") {
+  if (toastsOn()) {
+    backupStatus.textContent = "";
+    toasts.show({ level, message: text, key: "backup" });
+    return;
+  }
   backupStatus.textContent = text;
 }
 
@@ -2493,11 +2603,12 @@ $("backup-copy").addEventListener("click", async () => {
   showBackup();
   try {
     await navigator.clipboard.writeText(backupText.value);
-    backupNote("Copied.");
+    backupNote("Copied.", "success");
   } catch {
     backupText.select();
     backupNote(
       "Could not access the clipboard. The text is selected; press Ctrl/Cmd+C.",
+      "error",
     );
   }
 });
@@ -2513,7 +2624,7 @@ $("backup-download").addEventListener("click", () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  backupNote("Downloaded.");
+  backupNote("Downloaded.", "success");
 });
 
 $("backup-file").addEventListener("change", async (e) => {
@@ -2550,13 +2661,11 @@ $("backup-reset").addEventListener("click", async () => {
   rules = [];
   groups = [];
   renderFields();
-  if (!isPopup) {
-    renderGroups();
-    renderRules();
-  }
+  renderFlagged();
   if ($("overview").open) refreshOverview();
   backupNote(
     "Reset. All settings are back to defaults and all rules are gone.",
+    "warning",
   );
   showBackupSoon();
 });
@@ -2566,26 +2675,35 @@ async function applyBackup() {
   try {
     parsed = parseBundle(backupText.value);
   } catch (err) {
-    backupNote(err.message);
+    backupNote(err.message, "error");
     return;
   }
-  await saveSettings({ ...DEFAULTS, ...parsed.settings });
-  settings = { ...DEFAULTS, ...parsed.settings };
+  const loaded = { ...DEFAULTS, ...parsed.settings };
+  const ok = await write(
+    async () => {
+      await saveSettings(loaded);
+      await saveRules(parsed.rules);
+      await saveGroups(parsed.groups ?? []);
+    },
+    {
+      what: "the backup",
+      key: "backup",
+      note: "Some of it may have been applied; check your settings.",
+    },
+  );
+  if (!ok) return;
+  settings = loaded;
   rules = parsed.rules;
-  await saveRules(rules);
   groups = parsed.groups ?? [];
-  await saveGroups(groups);
   renderFields();
-  if (!isPopup) {
-    renderGroups();
-    renderRules();
-  }
+  renderFlagged();
   if ($("overview").open) refreshOverview();
   const ruleCount = `${rules.length} rule${rules.length === 1 ? "" : "s"}`;
   backupNote(
     parsed.warnings.length
       ? `Loaded with ${ruleCount}. ${parsed.warnings.join(" ")}`
       : `Loaded settings and ${ruleCount}.`,
+    parsed.warnings.length ? "warning" : "success",
   );
   showBackupSoon();
 }
