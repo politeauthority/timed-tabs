@@ -762,6 +762,41 @@ body[data-managing="off"] .off-banner {
   flex: none;
 }
 
+/*
+ * Why the UI in front of you is not the UI in the docs. Quieter than the
+ * off-banner: nothing is wrong, something is merely different, and it is
+ * shown on every view for as long as a beta feature is on -- so it has to be
+ * bearable to look at rather than something to dismiss.
+ */
+.flags-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-card);
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+.flags-note .icon {
+  flex: none;
+  opacity: 0.75;
+}
+
+.flags-note button {
+  margin-left: auto;
+  flex: none;
+}
+
+/* The master switch takes the page; nothing under it is in force anyway. */
+body[data-managing="off"] .flags-note {
+  display: none;
+}
+
 body[data-managing="off"] #tab,
 body[data-managing="off"] #overview {
   display: none;
