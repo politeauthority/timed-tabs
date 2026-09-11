@@ -542,8 +542,12 @@ body:not([data-context="popup"]) .pages {
   text-overflow: ellipsis;
 }
 
+/* Stays the wrapping flex row the rest of the settings use. At popup width
+   there is no room for checkbox, label and help beside a badge and a control:
+   forcing them onto one line squeezes the label into a ladder of single words
+   and overruns the badge. The value wraps to its own line instead. */
 .tab-settings-list .field {
-  padding: var(--sp-1) 0;
+  padding: var(--sp-2) 0;
 }
 
 /* The badge leads the control column, so a row reads label - source - value. */
