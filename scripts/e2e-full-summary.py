@@ -33,13 +33,13 @@ def clock(seconds):
 
 
 def leg_order(leg):
-    """nightly, stable, previous, previous-2 ... in that order."""
+    """nightly, stable, stable-1, stable-2 ... in that order."""
     if leg == "nightly":
         return -1
-    if leg in ("latest", "stable"):
+    if leg == "stable":
         return 0
-    m = re.fullmatch(r"previous(?:-(\d+))?", leg)
-    return int(m.group(1) or 1) if m else 99
+    m = re.fullmatch(r"stable-(\d+)", leg)
+    return int(m.group(1)) if m else 99
 
 
 def counts(record):
@@ -49,7 +49,7 @@ def counts(record):
 
 
 def leg_name(record):
-    """'Firefox latest', 'Chrome previous-2': the leg's job name without the
+    """'Firefox stable', 'Chrome stable-2': the leg's job name without the
     caller's prefix. Records written before Chrome joined carry only `leg`, and
     those were all Firefox."""
     return record.get("name") or f"Firefox {record['leg']}"

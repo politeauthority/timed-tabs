@@ -12,14 +12,15 @@ run-name: "E2E — ${{ github.ref_name }}"
 # because the Firefox plumbing below is long enough to bury the rest of CI, and it
 # keeps workflow_dispatch so a run on a branch is still one click.
 #
-# One vocabulary of channels for both browsers: `nightly`, `stable`, `previous`
-# and `previous-N` (N majors behind stable). Firefox resolves them from Mozilla's
+# One vocabulary of channels for both browsers: `nightly`, `stable` and
+# `stable-N` (N majors behind stable: `stable-1` is the release before the
+# current one). Firefox resolves them from Mozilla's
 # product-details feed and Chrome from the Chrome for Testing feed, at run time,
 # so nothing here is pinned and every leg follows the browser's own releases.
 # Nightly is Firefox Nightly and Chrome Canary, the two daily builds. The
 # `firefox` and `chrome` inputs are the two lists; they default to Firefox stable
-# and previous plus Chrome stable, which is what CI and the beta gate run, and
-# full.yaml passes nightly, stable, previous and previous-2 of each browser for
+# and stable-1 plus Chrome stable, which is what CI and the beta gate run, and
+# full.yaml passes nightly, stable, stable-1 and stable-2 of each browser for
 # the `ci run full` label. This file runs what it is told and holds no opinion about branches. No
 # Chrome leg is a required check yet; making one required is a branch protection
 # change, not a change here.
@@ -33,7 +34,7 @@ run-name: "E2E — ${{ github.ref_name }}"
 # one job's plumbing is a change to both.
 #
 # Each leg is its own status check: called from CI they report as
-# `E2E / Firefox stable` and `E2E / Firefox previous`, GitHub prefixing a called
+# `E2E / Firefox stable` and `E2E / Firefox stable-1`, GitHub prefixing a called
 # workflow's jobs with the calling job's name. Both are required on main, so both
 # halves of each name are load-bearing -- and because a matrix leg's name carries its
 # matrix values, changing what the matrix covers renames a protected context.
@@ -67,20 +68,20 @@ on:
         default: ""
       firefox:
         # A JSON list, because a workflow input cannot be a real one. Each entry
-        # is a channel -- `nightly`, `stable`, `previous` or `previous-N` -- and
+        # is a channel -- `nightly`, `stable` or `stable-N` -- and
         # becomes one leg named `Firefox <channel>`, which is the status-check
         # context branch protection matches on. `[]` runs no Firefox at all.
-        description: 'JSON list of Firefox channels: nightly, stable, previous, previous-N.'
+        description: 'JSON list of Firefox channels: nightly, stable, stable-N (N majors back).'
         type: string
         required: false
-        default: '["stable", "previous"]'
+        default: '["stable", "stable-1"]'
       chrome:
         # The same for Chrome. Defaults to stable, so a caller that says nothing
         # -- the beta gate, a bare dispatch -- tests the Chrome build it ships.
         # `[]` runs no Chrome at all, at a price: a matrix job skipped at the job
         # level is not expanded, so it reports once under the literal text of
         # its name expression. Harmless, and odd to look at.
-        description: 'JSON list of Chrome channels: nightly, stable, previous, previous-N. Empty for none.'
+        description: 'JSON list of Chrome channels: nightly, stable, stable-N (N majors back). Empty for none.'
         type: string
         required: false
         default: '["stable"]'
@@ -120,12 +121,12 @@ on:
         required: false
         default: ""
       firefox:
-        description: 'JSON list of Firefox channels: nightly, stable, previous, previous-N.'
+        description: 'JSON list of Firefox channels: nightly, stable, stable-N (N majors back).'
         type: string
         required: false
-        default: '["stable", "previous"]'
+        default: '["stable", "stable-1"]'
       chrome:
-        description: 'JSON list of Chrome channels: nightly, stable, previous, previous-N. Empty for none.'
+        description: 'JSON list of Chrome channels: nightly, stable, stable-N (N majors back). Empty for none.'
         type: string
         required: false
         default: '["stable"]'
@@ -267,7 +268,7 @@ jobs:
           leg: firefox-${{ matrix.channel }}
 
       # Which Firefox this leg tests, as an exact number from Mozilla's feed
-      # rather than by asking setup-firefox for "latest": that keeps "previous"
+      # rather than by asking setup-firefox for "latest": that keeps "stable-1"
       # defined relative to the version actually under test, and puts the
       # number in the log. Nightly is the exception -- there is no number to
       # resolve, so setup-firefox is asked for today's build by name and the
@@ -313,11 +314,11 @@ jobs:
               sys.exit(0)
 
           # N majors back, and the last point release of that major: with 155.0.1
-          # current, `previous` is 154.0.1 and `previous-2` is 153.x.
-          m = re.fullmatch(r"previous(?:-([1-9]\d*))?", want)
+          # current, `stable-1` is 154.0.1 and `stable-2` is 153.x.
+          m = re.fullmatch(r"stable-([1-9]\d*)", want)
           if not m:
-              sys.exit(f"unknown Firefox channel {want!r}: use nightly, stable, previous or previous-N")
-          major = int(stable.split(".")[0]) - int(m.group(1) or 1)
+              sys.exit(f"unknown Firefox channel {want!r}: use nightly, stable or stable-N")
+          major = int(stable.split(".")[0]) - int(m.group(1))
           earlier = [v for v in versions if int(v.split(".")[0]) == major]
           if not earlier:
               sys.exit(f"no shipped release found for Firefox {major}")
@@ -572,7 +573,7 @@ jobs:
           leg: chrome-${{ matrix.channel }}
 
       # Which Chrome this leg tests, from the Chrome for Testing feed. `stable`
-      # is the current stable's exact number; `previous-N` a bare major N behind
+      # is the current stable's exact number; `stable-N` a bare major N behind
       # it, which setup-chrome installs as the latest build of that major.
       # Nightly is Chrome Canary -- and not by channel name: setup-chrome
       # installs a named channel from Google's .deb feeds, which carry no Linux
@@ -602,10 +603,10 @@ jobs:
           if want == "nightly":
               print(channels["Canary"]["version"])
               sys.exit(0)
-          m = re.fullmatch(r"previous(?:-([1-9]\d*))?", want)
+          m = re.fullmatch(r"stable-([1-9]\d*)", want)
           if not m:
-              sys.exit(f"unknown Chrome channel {want!r}: use nightly, stable, previous or previous-N")
-          print(major - int(m.group(1) or 1))
+              sys.exit(f"unknown Chrome channel {want!r}: use nightly, stable or stable-N")
+          print(major - int(m.group(1)))
           PY
           )
           echo "version=${version}" >> "$GITHUB_OUTPUT"

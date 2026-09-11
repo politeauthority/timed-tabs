@@ -145,7 +145,7 @@ jobs:
       # and is advisory until branch protection says otherwise.
       # The defaults, spelled out: the two Firefoxes are the required checks,
       # Chrome stable reports beside them and is advisory.
-      firefox: '["stable", "previous"]'
+      firefox: '["stable", "stable-1"]'
       chrome: '["stable"]'
       # A PR to main carrying `ci run full` runs these same versions inside the
       # full run, and the `CI run full` status holds the merge until they pass.
