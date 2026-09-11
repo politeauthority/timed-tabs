@@ -71,10 +71,18 @@ particular binary; without it, web-ext finds the installed one.
 
 ## The CI job
 
-`.github/workflows/e2e.yaml` runs on the `timed-tabs` runner. It installs Firefox's
-libraries with apt (on Ubuntu 24.04 the ALSA package is `libasound2t64`), fetches
-Firefox with `browser-actions/setup-firefox`, then runs `npm run e2e`. About six
-minutes, most of it the install.
+`.github/workflows/e2e.yaml` runs on the `timed-tabs` runner. It restores Node's
+tool directory and the Firefox libraries (on Ubuntu 24.04 the ALSA package is
+`libasound2t64`) from the Actions cache, fetches Firefox with
+`browser-actions/setup-firefox`, then runs `npm run e2e`.
+
+The caches exist because the runner node is short of CPU rather than bandwidth:
+downloads take seconds, but unpacking Node took two minutes and installing the
+libraries with dpkg took nine on a busy day. The Node cache is the extracted tool
+directory, which `setup-node` then finds without extracting anything. The library
+cache, via `awalsh128/cache-apt-pkgs-action`, is the installed files, restored with
+one untar. Bump its `version` input after changing the package list. Firefox itself
+is not cached: its download and extraction took 14 seconds.
 
 The job is a required status check on `main`. A PR with the label **ci pause** skips
 it; GitHub counts a skipped required check as passed, so the label lets a PR merge
