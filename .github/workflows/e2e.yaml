@@ -612,7 +612,10 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "${WANT} -> Chrome ${version}"
 
-      - uses: browser-actions/setup-chrome@v1
+      # v2: it runs on Node 24 (v1 targeted Node 20, which the runner now
+      # warns about on every leg) and installs from Chrome for Testing by
+      # default, which is where every version this job asks for comes from.
+      - uses: browser-actions/setup-chrome@v2
         if: steps.go.outputs.run == 'true'
         id: install
         timeout-minutes: 3
@@ -744,5 +747,5 @@ jobs:
           slow-over: 60
           # The same numbers as the steps' timeout-minutes, so a step that hit
           # its limit is named as timed out rather than shown as a bare failure.
-          timeouts: "Run ./.github/actions/node-toolcache=4, npm ci=4, Run ./.github/actions/browser-libs=6, Resolve the Chrome version=2, Run browser-actions/setup-chrome@v1=3, Run the scenarios=8"
+          timeouts: "Run ./.github/actions/node-toolcache=4, npm ci=4, Run ./.github/actions/browser-libs=6, Resolve the Chrome version=2, Run browser-actions/setup-chrome@v2=3, Run the scenarios=8"
           job-timeout: 20
