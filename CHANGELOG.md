@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/politeauthority/timed-tabs/compare/v0.9.1...v0.9.2) (2026-09-11)
+
+
+### Bug Fixes
+
+* recently expired list keeps the site's icon and groups repeats ([51980cc](https://github.com/politeauthority/timed-tabs/commit/51980cc5c9e73cbc6a69e28b8d6d75236f7e4610))
+
 ## [0.9.1](https://github.com/politeauthority/timed-tabs/compare/v0.9.0...v0.9.1) (2026-09-11)
 
 
