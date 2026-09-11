@@ -1033,6 +1033,17 @@ function onPageShown(page) {
 let rules = [];
 /** Rule ids the user has expanded this session (cards start collapsed). */
 const expandedRules = new Set();
+/** The rule "Add rule" just set up; its card flashes until this is cleared. */
+let justAddedRuleId = null;
+let justAddedTimer = null;
+function markJustAdded(id) {
+  clearTimeout(justAddedTimer);
+  justAddedRuleId = id;
+  justAddedTimer = setTimeout(() => {
+    justAddedRuleId = null;
+    document.querySelector(".rule.is-just-added")?.classList.remove("is-just-added");
+  }, 2600);
+}
 
 /** What a rule may override: the global field definitions, reworded for a rule. */
 const RULE_FIELD_TEXT = {
@@ -1091,10 +1102,23 @@ const RULE_FIELD_DEFS = RULE_FIELDS.map((key) => {
 const defsFor = (keys) =>
   keys.map((k) => RULE_FIELD_DEFS.find((d) => d.key === k)).map((d) => ({ ...d, help: wordFor(d.help ?? "") }));
 
-/** A rule with no usable pattern: blank, or a host-less "/*" left over from a bad add. */
+/** What a brand-new rule starts with, so the scheme is explicit from the first keystroke. */
+const NEW_RULE_PATTERN = "https://";
+
+/** A rule with no usable pattern: blank, the untouched new-rule stub, or a host-less "/*" left over from a bad add. */
 function isEmptyRule(r) {
   const p = (r.pattern ?? "").trim();
-  return p === "" || p === "/*";
+  return p === "" || p === "/*" || p === NEW_RULE_PATTERN;
+}
+
+/** Rules in display order: alphabetical by pattern, with the ones still being typed first. */
+function sortedRules() {
+  return [...rules].sort((a, b) => {
+    const ea = isEmptyRule(a);
+    const eb = isEmptyRule(b);
+    if (ea !== eb) return ea ? -1 : 1;
+    return a.pattern.localeCompare(b.pattern, undefined, { sensitivity: "base" });
+  });
 }
 
 function renderRules() {
@@ -1108,11 +1132,11 @@ function renderRules() {
     const p = document.createElement("p");
     p.className = "rules-empty";
     p.textContent =
-      "No rules yet. Add one here, or open “Rules for this site” from the popup.";
+      "No rules yet. Add one here, or open “Make / edit rules for this page” from the popup.";
     list.replaceChildren(p);
     return;
   }
-  list.replaceChildren(...rules.map(renderRule));
+  list.replaceChildren(...sortedRules().map(renderRule));
   if ($("rules-filter").value.trim()) applyRulesFilter();
   const target = location.hash.startsWith("#rule-")
     ? location.hash.slice(6)
@@ -1132,6 +1156,38 @@ function renderRules() {
   }
 }
 
+/**
+ * Wrap a pattern input so its text is drawn by a mirror span behind it, with
+ * every "*" in its own colour. An input cannot colour part of its value, so
+ * the input's own text is transparent and only its caret and selection show.
+ */
+function mirrorWildcards(input) {
+  const wrap = document.createElement("span");
+  wrap.className = "rule-pattern-wrap";
+  const mirror = document.createElement("span");
+  mirror.className = "rule-pattern-mirror";
+  mirror.setAttribute("aria-hidden", "true");
+  const text = document.createElement("span");
+  mirror.append(text);
+  const paint = () => {
+    text.replaceChildren(
+      ...input.value.split(/(\*)/).filter(Boolean).map((part) => {
+        const s = document.createElement("span");
+        if (part === "*") s.className = "wildcard";
+        s.textContent = part;
+        return s;
+      }),
+    );
+    text.style.marginLeft = `-${input.scrollLeft}px`;
+  };
+  input.addEventListener("input", paint);
+  input.addEventListener("scroll", paint);
+  input.addEventListener("blur", paint);
+  paint();
+  wrap.append(mirror, input);
+  return wrap;
+}
+
 function renderRule(rule) {
   const el = document.createElement("div");
   el.className = "rule";
@@ -1140,6 +1196,7 @@ function renderRule(rule) {
 
   const open = expandedRules.has(rule.id);
   el.classList.toggle("is-collapsed", !open);
+  el.classList.toggle("is-just-added", rule.id === justAddedRuleId);
 
   // Header: expand toggle, pattern field, delete button.
   const head = document.createElement("div");
@@ -1162,6 +1219,7 @@ function renderRule(rule) {
   pattern.addEventListener("change", () =>
     updateRule(rule.id, { pattern: pattern.value.trim() }, true, "head"),
   );
+  const patternWrap = mirrorWildcards(pattern);
   const del = document.createElement("button");
   del.type = "button";
   del.className = "rule-delete quiet";
@@ -1194,7 +1252,7 @@ function renderRule(rule) {
   del.addEventListener("blur", () => {
     if (armed) setTimeout(disarm, 200);
   });
-  head.append(toggle, pattern, del);
+  head.append(toggle, patternWrap, del);
   el.append(head);
 
   // Collapsed summary: description and what the rule changes, in one line.
@@ -1202,7 +1260,7 @@ function renderRule(rule) {
   summary.type = "button";
   summary.className = "rule-summary";
   const summaryParts = [];
-  if (!rule.pattern.trim())
+  if (isEmptyRule(rule))
     summaryParts.push("No pattern yet, so this rule matches nothing");
   if (rule.description) summaryParts.push(rule.description);
   summaryParts.push(
@@ -1522,11 +1580,15 @@ $("rule-add").addEventListener("click", async () => {
   );
   let rule = existing;
   if (!rule) {
-    rule = newRule({ pattern, priority: 5 });
+    rule = newRule({ pattern: pattern || NEW_RULE_PATTERN, priority: 5 });
     rules = [...rules, rule];
     expandedRules.add(rule.id);
+    // Draw the eye to the card that was just set up for this click; renders
+    // triggered by the save keep the mark until it times out.
+    markJustAdded(rule.id);
     await persistRules();
   } else {
+    markJustAdded(rule.id);
     setRuleExpanded(rule.id, true);
   }
   const card = $("rules-list").querySelector(
@@ -1534,8 +1596,15 @@ $("rule-add").addEventListener("click", async () => {
   );
   if (card) {
     card.classList.remove("is-filtered-out");
-    card.scrollIntoView({ block: "center", behavior: "smooth" });
-    card.querySelector(".rule-pattern")?.focus();
+    // The expanded card is tall: align its top so the pattern field stays on screen.
+    card.scrollIntoView({ block: "start", behavior: "smooth" });
+    card.classList.add("is-just-added");
+    const input = card.querySelector(".rule-pattern");
+    if (input) {
+      input.focus();
+      // A fresh "https://" stub: park the caret at the end, ready for the host.
+      if (!existing && !pattern) input.setSelectionRange(input.value.length, input.value.length);
+    }
   }
 });
 
