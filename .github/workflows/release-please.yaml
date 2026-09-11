@@ -5,7 +5,7 @@ run-name: "Release Please — ${{ github.event_name == 'workflow_dispatch' && 'd
 # Commits; merging it tags the version and (package) builds the Firefox + Chrome
 # zips and attaches them to the GitHub Release.
 #
-# timed-tabs is NOT containerized, so there is no image build, no Harbor login and
+# timed-tabs is NOT containerised, so there is no image build, no Harbor login and
 # no kubectl deploy. Jobs run on the self-hosted `timed-tabs` ARC scale set, like
 # quigley-web; Force Release stays on `ubuntu-latest` because it is git-only.
 #

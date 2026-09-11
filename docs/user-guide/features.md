@@ -250,7 +250,7 @@ about private windows.
 
 ## 🦊 Firefox
 
-Firefox 140 or later is the supported browser. Firefox for Android is not declared yet,
+Firefox 142 or later is the supported browser. Firefox for Android is not declared yet,
 and Chrome is planned but not yet supported; both are on the [road map](../road-map.md).
 A Chrome build is produced from the same source and attached to each release so it can
 be tried. The tab tint indicator is Firefox only because Chrome has no theme API for it.

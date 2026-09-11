@@ -5,7 +5,7 @@
 
 
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue)](src/manifest.json)
-[![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)](https://www.mozilla.org/firefox/)
+[![Firefox 142+](https://img.shields.io/badge/Firefox-142%2B-FF7139?logo=firefoxbrowser&logoColor=white)](https://www.mozilla.org/firefox/)
 [![Chrome: planned](https://img.shields.io/badge/Chrome-planned-9E9E9E?logo=googlechrome&logoColor=white)](docs/road-map.md)
 [![Data collected: none](https://img.shields.io/badge/data%20collected-none-success)](src/manifest.json)
 
@@ -16,7 +16,7 @@ That tab you opened on Tuesday and swore you'd read? It's red now.
 
 ## ✨ What you get
 
-- 🎨 **Four ways to show the time left.** The favicon, a coloured dot in the page
+- 🎨 **Five ways to show the time left.** The favicon, a coloured dot in the page
   title, the toolbar badge, or a tint over the Firefox theme. Pick any of them.
 - 📋 **Per-site rules.** Docs get an hour, news gets fifteen minutes, work repos
   never expire. Higher priority wins.
@@ -40,7 +40,7 @@ The full list, with screenshots, is in the user guide:
 Grab a zip from the newest pre-release under
 [Releases](https://github.com/politeauthority/timed-tabs/releases):
 
-- 🦊 **Firefox 140+** — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
+- 🦊 **Firefox 142+** — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
 
 Firefox is the only supported browser. Chrome is planned — see the
 [road map](docs/road-map.md). A Chrome zip is attached to each release so the build

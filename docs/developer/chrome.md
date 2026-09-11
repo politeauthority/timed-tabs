@@ -112,7 +112,7 @@ behind it first.
 ## Testing
 
 `npm run e2e:chrome` runs the same scenarios as the Firefox suite in a headless Chrome,
-and CI runs a Chrome leg beside the Firefox ones as an advisory check. The Firefox
+and CI runs Chrome legs beside the Firefox ones as an advisory check. The Firefox
 runner could not simply be pointed at Chrome: it reads the extension's console output
 from web-ext's stdout, and Chrome has no equivalent — its logs come over CDP or not at
 all. [ci/e2e.md](ci/e2e.md) covers the driver.
