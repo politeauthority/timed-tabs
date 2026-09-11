@@ -12,10 +12,10 @@ run-name: "CI — ${{ github.ref_name }}"
 
 on:
   pull_request:
-    # labeled/unlabeled so the `ci pause` label takes effect at once. Without
-    # them a check that went green before the label was added would stand, and
-    # the PR would still be mergeable while paused.
-    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    # No label events here on purpose. Pausing is enforced by the `Not paused`
+    # check, which is cheap enough to be woken by every label; waking this job
+    # instead would make arming auto-merge cost a full build.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   workflow_dispatch:
@@ -42,26 +42,6 @@ jobs:
       # `paths:` filter on the trigger would leave it pending for ever on a
       # docs-only PR and nothing would be mergeable. Skipping the work while
       # still answering is the part that is safe.
-      # `ci pause`: stop doing the work, without letting the PR merge. The job
-      # fails rather than skipping, because a required job that skips counts as
-      # passed -- pausing would then quietly remove the very gate it is meant
-      # to leave standing.
-      - name: CI is paused for this PR
-        if: contains(github.event.pull_request.labels.*.name, 'ci pause')
-        run: |
-          {
-            echo "### ⏸️ 🧪 CI is paused"
-            echo ""
-            echo "> ▶️ **Why this ran:** the \`ci pause\` label is on this pull request."
-            echo ""
-            echo "Nothing was linted, tested or built."
-            echo ""
-            echo "This check is red on purpose. It is a required check, and a paused"
-            echo "one that reported green would let the branch merge unverified."
-            echo "Remove the label and CI runs again."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
-
       - uses: ./.github/actions/changed-paths
         id: changed
 
@@ -92,7 +72,7 @@ jobs:
       - name: 📋 Summary
         # The paused step wrote its own summary; a "failed" block under it would
         # only muddy what is a deliberate red.
-        if: always() && !contains(github.event.pull_request.labels.*.name, 'ci pause')
+        if: always()
         run: |
           if [ "${{ steps.changed.outputs.code }}" != "true" ]; then
             {
