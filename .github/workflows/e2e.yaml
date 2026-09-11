@@ -12,10 +12,11 @@ run-name: "E2E — ${{ github.ref_name }}"
 # because the Firefox plumbing below is long enough to bury the rest of CI, and it
 # keeps workflow_dispatch so a Firefox-only run is still one click.
 #
-# Two versions of Firefox, in parallel: the current release and the one before it.
-# Both are resolved at run time from Mozilla's product-details feed rather than
-# pinned, so "previous" follows every release without anyone editing this file. Both
-# must pass.
+# Two versions of Firefox by default, in parallel: the current release and the one
+# before it. Both are resolved at run time from Mozilla's product-details feed
+# rather than pinned, so "previous" follows every release without anyone editing
+# this file. Both must pass. The `firefox` input replaces that list: `previous-N`
+# is N majors back, and full.yaml passes ten of them for the `ci run full` label.
 #
 # Each leg is its own status check: called from CI they report as
 # `E2E / Firefox latest` and `E2E / Firefox previous`, GitHub prefixing a called
@@ -50,6 +51,14 @@ on:
         type: string
         required: false
         default: ""
+      firefox:
+        # A JSON list, because a workflow input cannot be a real one. Each entry
+        # names a leg and becomes part of its check name: `latest`, `previous`,
+        # or `previous-N` for N majors behind the current release.
+        description: 'JSON list of Firefox legs to run, e.g. ["latest", "previous", "previous-2"].'
+        type: string
+        required: false
+        default: '["latest", "previous"]'
   workflow_dispatch:
     inputs:
       ref:
@@ -57,6 +66,11 @@ on:
         type: string
         required: false
         default: ""
+      firefox:
+        description: 'JSON list of Firefox legs to run: latest, previous, previous-N.'
+        type: string
+        required: false
+        default: '["latest", "previous"]'
 
 permissions:
   contents: read
@@ -97,7 +111,7 @@ jobs:
       # whether the other one broke too. Cancelling it throws that away.
       fail-fast: false
       matrix:
-        firefox: [latest, previous]
+        firefox: ${{ fromJSON(inputs.firefox) }}
     steps:
       # Full history: the changed-paths action diffs against the base commit.
       - uses: actions/checkout@v7
@@ -243,8 +257,12 @@ jobs:
               print(latest)
               sys.exit(0)
 
-          # One major back, and the last point release of it: 155.0.1 -> 154.0.1.
-          major = int(latest.split(".")[0]) - 1
+          # N majors back, and the last point release of that major: with 155.0.1
+          # current, `previous` is 154.0.1 and `previous-3` is 152.x.
+          m = re.fullmatch(r"previous(?:-([1-9]\d*))?", want)
+          if not m:
+              sys.exit(f"unknown Firefox leg {want!r}: use latest, previous or previous-N")
+          major = int(latest.split(".")[0]) - int(m.group(1) or 1)
           earlier = [v for v in versions if int(v.split(".")[0]) == major]
           if not earlier:
               sys.exit(f"no shipped release found for Firefox {major}")

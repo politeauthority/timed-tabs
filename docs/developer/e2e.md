@@ -142,9 +142,13 @@ Both legs resolve an exact version from that one feed rather than handing
 `setup-firefox` the string `latest`, which keeps `previous` defined relative to the
 version actually under test, and puts the number in the log and the job summary.
 
-To test a different pair, change the `firefox` matrix in the workflow and teach the
-resolve step the new label — and update branch protection in the same change, because
-the legs are the required checks. See below.
+The matrix comes from the workflow's `firefox` input, a JSON list of legs, and the
+resolve step also understands `previous-N`: N majors behind the current release, so
+`previous` is `previous-1`. The **CI run full** workflow calls it with ten legs,
+`latest` through `previous-9`, when a PR carries the `ci run full` label — see
+[ci/README.md](ci/README.md#the-full-run). To change the default pair, change the
+input's default and update branch protection in the same change, because those two
+legs are the required checks. See below.
 
 ## The status checks
 

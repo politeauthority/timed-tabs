@@ -57,6 +57,9 @@ part of the required context, so either one renamed breaks it. The prefix is not
 optional — a called workflow cannot report under a bare name — which is the price of
 calling one, and worth knowing before moving a required check into one.
 
+`CI run full` is the gate job in `full.yaml`; the ten `Full / Firefox …` legs it
+waits on are not required on their own, so that list can change freely.
+
 A matrix job's name carries its matrix values, which is where the `latest` and
 `previous` in those contexts come from. So changing what the matrix covers renames a
 protected context: adding a version, renaming a leg or dropping one all need the
@@ -85,6 +88,7 @@ of the trigger, as `CI` does, or let the job run every time, as `Not paused` doe
 |---|---|---|
 | `CI` | no | the label it cared about moved to `Not paused`, and `E2E`, which it calls, is a required check whose skip would overwrite a real pass |
 | `Not paused` | yes, all of them | required check; its red must never become a skip |
+| `CI run full` | yes, all of them | required check, same reason; its `plan` job keeps the ten Firefox legs from re-running on a commit that already passed |
 | `Auto-merge` | `automerge` only | not a required check, so an `if` is safe |
 
 `Auto-merge` listens both ways. Adding the label arms GitHub's auto-merge and
