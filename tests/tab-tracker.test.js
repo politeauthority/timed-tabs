@@ -117,3 +117,17 @@ describe("ignoreRules", () => {
     expect(values.has("7:timedTabs")).toBe(false);
   });
 });
+
+describe("popup folds", () => {
+  it("remembers a folded section per tab and starts open", async () => {
+    const tracker = createTabTracker();
+    await tracker.track(1, 0);
+    expect(tracker.get(1).folds).toEqual({});
+    await tracker.setFold(1, "rules", false);
+    await tracker.setFold(1, "settings", true);
+    expect(tracker.get(1).folds).toEqual({ rules: false, settings: true });
+    const again = createTabTracker();
+    await again.track(1, 5);
+    expect(again.get(1).folds).toEqual({ rules: false, settings: true });
+  });
+});

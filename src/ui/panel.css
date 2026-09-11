@@ -555,24 +555,122 @@ body:not([data-context="popup"]) .pages {
   padding: var(--sp-1) 0;
 }
 
+/* Compact rows: the label is a single line with the text shrinking first
+   (ellipsis, tooltip) and the "this tab" pill kept whole beside it. This
+   overrides the grid the full-size override rows use for their checkbox. */
+.tab-settings-list .field {
+  min-height: calc(var(--control-h) + 2px);
+}
+
 .tab-settings-list .field-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.tab-settings-list .field-label-text {
   min-width: 0;
   overflow: hidden;
-  white-space: nowrap;
   text-overflow: ellipsis;
 }
 
+.tab-settings-list .field-label .setting-source {
+  flex: none;
+  margin-left: 0;
+  /* A pill, not a button-sized block: it must not crowd the label out. */
+  min-height: 0;
+  height: auto;
+  padding: 1px 7px;
+  line-height: 1.4;
+  font-size: var(--fs-xs);
+}
+
+/* The "set on this tab" marker in the popup: a dot before the label. It is
+   still the button that hands the setting back; the tooltip says so. */
+.tab-settings-list .setting-source.is-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--green);
+  font-size: 0;
+  line-height: 0;
+}
+
+.tab-settings-list .setting-source.is-dot::after {
+  content: none;
+}
+
+.tab-settings-list .setting-source.is-dot:hover,
+.tab-settings-list .setting-source.is-dot:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* The Saved mark floats beside the value instead of taking a slot in the
+   column, so a control never shifts when its row is confirmed. */
+.tab-settings-list .field-control {
+  position: relative;
+}
+
+.tab-settings-list .field-control > .saved-mark {
+  position: absolute;
+  right: 100%;
+  margin-right: var(--sp-2);
+  white-space: nowrap;
+}
+
 /* The badge leads the control column, so a row reads label - source - value. */
+/* A fixed-width value column, right-aligned: a switch, a select and a number
+   field all sit on the same right edge, and taking a setting over or handing
+   it back changes nothing about where the control is. */
 .tab-settings-list .field-control {
   flex: none;
   gap: var(--sp-2);
+  min-width: 9.5em;
+  justify-content: flex-end;
+}
+
+.tab-settings-list .override-control {
+  transition: opacity 0.15s ease-out;
+}
+
+
+/* Fold a popup section away: the chevron and the title both toggle it. The
+   section head stays, everything under it goes. */
+.section-toggle {
+  flex: none;
+  width: 22px;
+  min-height: 0;
+  height: 22px;
+  padding: 0;
+  background: none;
+  color: var(--ink-2);
+}
+
+.section-head .settings-title[data-toggles] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab.is-collapsed > :not(.section-head) {
+  display: none;
+}
+
+.section-head .section-action {
+  margin-left: auto;
+  min-height: 0;
+  padding: 4px 8px;
+  font-size: var(--fs-sm);
 }
 
 /* Nothing in the value column may push the row wider than the popup. The
    label shrinks first: it has an ellipsis and a tooltip, and a clipped value
    is a lie where a clipped label is only terse. */
 .tab-settings-list select {
-  max-width: 11em;
+  max-width: 9.5em;
 }
 
 .tab-settings-list input[type="number"] {
@@ -604,9 +702,9 @@ button.setting-source {
   cursor: pointer;
 }
 
+/* The cross appears on hover without reserving room for itself at rest. */
 button.setting-source::after {
-  content: " \00d7";
-  opacity: 0;
+  content: "";
 }
 
 button.setting-source:hover,
@@ -617,7 +715,7 @@ button.setting-source:focus-visible {
 
 button.setting-source:hover::after,
 button.setting-source:focus-visible::after {
-  opacity: 1;
+  content: " \00d7";
 }
 
 .tab-rules-note {

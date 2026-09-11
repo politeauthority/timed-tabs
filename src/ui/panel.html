@@ -92,18 +92,18 @@
            and restart-on-focus, which the popup always answers. -->
       <section id="tab-settings" class="tab tab-settings-section" hidden>
         <div class="section-head">
-          <h2 class="settings-title">⚙️ Page settings</h2>
+          <button type="button" id="tab-settings-toggle" class="section-toggle chev is-open" aria-expanded="true" aria-controls="tab-settings-list" aria-label="Collapse page settings"></button>
+          <h2 class="settings-title" data-toggles="tab-settings">⚙️ Page settings</h2>
+          <button type="button" id="tab-settings-clear" class="quiet section-action" title="Hand every setting this tab took over back to the rules and your defaults" hidden>Reset this tab</button>
         </div>
         <div id="tab-settings-list" class="tab-settings-list"></div>
-        <p class="tab-rules-note">
-          <span>Everything else is at your defaults. Changes last until the tab closes.</span>
-          <button type="button" id="tab-settings-clear" class="quiet" hidden>Reset this tab</button>
-        </p>
+        <p class="tab-rules-note">Anything not listed is at your defaults. Changes here last until the tab closes.</p>
       </section>
 
       <section id="tab-rules" class="tab tab-rules-section" hidden>
         <div class="section-head">
-          <h2 class="settings-title">📋 Rules for this page <span id="tab-rules-count" class="count-badge" title="Rules that match this page">0</span></h2>
+          <button type="button" id="tab-rules-toggle" class="section-toggle chev is-open" aria-expanded="true" aria-controls="tab-rules-list" aria-label="Collapse rules for this page"></button>
+          <h2 class="settings-title" data-toggles="tab-rules">📋 Rules for this page <span id="tab-rules-count" class="count-badge" title="Rules that match this page">0</span></h2>
           <button type="button" id="tab-rules-open" class="icon-btn quiet" title="Make or edit rules for this page" aria-label="Make or edit rules for this page"><svg class="icon" aria-hidden="true"><use href="#i-edit" /></svg></button>
         </div>
         <div id="tab-rules-list" class="tab-rules-list"></div>

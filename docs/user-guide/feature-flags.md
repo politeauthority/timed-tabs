@@ -42,13 +42,18 @@ rules. It shows what is actually in force on the page in front of you — the li
 what happens when it expires, and anything a rule has changed — and lets this tab
 take any of them over.
 
-A setting you change here is set **on this tab only, until it closes**. Such a row is
-marked `this tab`; click that marker to hand the setting back to your rules and
-defaults, or use **Reset this tab** to hand back every one at once.
+A setting you change here is set **on this tab only, until it closes**. Such a row
+gets a green dot before its label; click the dot to hand the setting back to your
+rules and defaults, or use **Reset this tab** in the section's heading to hand back
+every one at once.
 
-The section lists only what something has changed on this page, plus the lifetime and
-restart-on-focus, which the popup always answers. Everything else is at your defaults
-and lives on the Settings page.
+The section lists what something has changed on this page, plus the lifetime and
+restart-on-focus, which the popup always answers. Once a row is on screen it stays
+for as long as the tab is open, so handing a setting back never makes the list jump.
+Everything else is at your defaults and lives on the Settings page.
+
+Both this section and **Rules for this page** fold away with the chevron beside
+their heading, and each tab remembers the folds until it closes.
 
 ### Site groups
 

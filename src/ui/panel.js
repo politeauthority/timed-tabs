@@ -495,6 +495,25 @@ async function refreshTab() {
   renderTab();
 }
 
+/** Fold or unfold a popup section, remembered on the tab until it closes. */
+function setSectionFold(section, open, persist = true) {
+  const el = $(`tab-${section}`);
+  const toggle = $(`tab-${section}-toggle`);
+  if (!el || !toggle) return;
+  el.classList.toggle("is-collapsed", !open);
+  toggle.classList.toggle("is-open", open);
+  toggle.setAttribute("aria-expanded", String(open));
+  const what = section === "settings" ? "page settings" : "rules for this page";
+  toggle.setAttribute("aria-label", `${open ? "Collapse" : "Expand"} ${what}`);
+  if (persist) tabAction("fold", { section, open });
+}
+
+for (const section of ["settings", "rules"]) {
+  const flip = () => setSectionFold(section, $(`tab-${section}`).classList.contains("is-collapsed"));
+  $(`tab-${section}-toggle`).addEventListener("click", flip);
+  document.querySelector(`.settings-title[data-toggles="tab-${section}"]`)?.addEventListener("click", flip);
+}
+
 function renderTab() {
   // What this tab actually does, rules and overrides included; the globals
   // only until the background has answered for it.
@@ -507,6 +526,10 @@ function renderTab() {
   $("act-never").checked = tabState.neverExpire;
   $("act-never-paused").checked = tabState.neverExpire;
   $("act-ignore").checked = Boolean(tabState.ignoreRules);
+  // The sections the user folded away on this tab stay folded.
+  for (const section of ["settings", "rules"]) {
+    setSectionFold(section, tabState.folds?.[section] !== false, false);
+  }
   // The rules section only appears when a rule matches this page, or rules are already ignored.
   $("tab-rules").hidden = !currentTab;
   renderTabRules();
@@ -662,6 +685,13 @@ function ruleSourceText(entry) {
   return `Set by ${name}${r?.priority !== undefined ? ` (priority ${r.priority})` : ""}.`;
 }
 
+/**
+ * Which settings the popup lists for this tab. The set only grows while the
+ * popup is open: a row that appeared because a rule or this tab set something
+ * stays put when that is handed back, so nothing jumps under the pointer.
+ */
+let pageSettingsKeys = null;
+
 function renderTabSettings() {
   const section = $("tab-settings");
   if (!tabState || !settings || !featureOn(settings, "mini-ui-page-settings")) {
@@ -689,45 +719,61 @@ function renderTabSettings() {
     },
   };
 
-  const defs = defsFor(RULE_FIELDS, THIS_TAB_SUBJECT).filter((def) =>
-    belongsInPageSettings(def.key, explained[def.key]),
-  );
+  const allDefs = defsFor(RULE_FIELDS, THIS_TAB_SUBJECT);
+  const wanted = allDefs.filter((def) => belongsInPageSettings(def.key, explained[def.key])).map((d) => d.key);
+  pageSettingsKeys ??= new Set();
+  for (const k of wanted) pageSettingsKeys.add(k);
+  const defs = allDefs.filter((def) => pageSettingsKeys.has(def.key));
+
   const list = $("tab-settings-list");
-  // The popup refreshes every few seconds; a rebuild while a control here has
-  // focus would throw away what is being typed.
-  if (list.contains(document.activeElement)) return;
-  list.replaceChildren(
-    ...defs.map((def) => {
-      const entry = explained[def.key];
-      // No onChanged: the commit goes through tabAction, which re-renders.
-      const row = renderOverride(def, store, () => {}, {
-        adopt: true,
-        compact: true,
-      });
-      // Which rule won is a tooltip, not a pill: it costs the label nothing.
-      if (entry.from === "rule") {
-        row.title = [row.title, ruleSourceText(entry)].filter(Boolean).join(" ");
-      }
-      if (entry.from === "tab") {
-        // neverExpire and resetOnActivate live in the tab's own state, not in
-        // the overrides map; undoing them goes through their own actions.
-        const legacy = !(def.key in (tabState.overrides ?? {}));
-        const undo = legacy
-          ? () => tabAction(def.key, def.key === "neverExpire" ? false : null)
-          : () => tabAction("override", { key: def.key, value: null });
-        const badge = thisTabBadge(undo);
-        // A stacked control (the indicator list) is a column of its own, so
-        // the badge goes with the label; beside the column it would read as
-        // belonging to whichever row it happened to line up with.
-        if (row.classList.contains("is-stacked")) {
-          row.querySelector(".field-label")?.append(" ", badge);
-        } else {
-          row.querySelector(".field-control")?.prepend(badge);
-        }
-      }
-      return row;
-    }),
-  );
+  const existing = new Map([...list.querySelectorAll(".override")].map((el) => [el.dataset.key, el]));
+  const sameRows = defs.length === existing.size && defs.every((d) => existing.has(d.key));
+
+  const decorate = (row, def) => {
+    const entry = explained[def.key];
+    // Which rule won is the row's tooltip; otherwise the help text is.
+    row.title = entry.from === "rule" ? ruleSourceText(entry) : (def.help ?? "");
+    // The "this tab" pill lives beside the label, so the value column keeps
+    // its place whether or not the tab has taken the setting over.
+    const label = row.querySelector(".field-label");
+    label?.querySelector(".setting-source")?.remove();
+    if (entry.from === "tab") {
+      // neverExpire and resetOnActivate live in the tab's own state, not in
+      // the overrides map; undoing them goes through their own actions.
+      const legacy = !(def.key in (tabState.overrides ?? {}));
+      const undo = legacy
+        ? () => tabAction(def.key, def.key === "neverExpire" ? false : null)
+        : () => tabAction("override", { key: def.key, value: null });
+      // In the popup the marker is a dot before the label, not a text pill:
+      // a 300px row has no room for both a label and "this tab".
+      const badge = thisTabBadge(undo);
+      badge.classList.add("is-dot");
+      badge.setAttribute("aria-label", "Set on this tab. Click to hand it back to the rules and your defaults.");
+      label?.prepend(badge);
+    }
+  };
+
+  if (sameRows) {
+    // Same rows as before: refresh each in place. No rebuild, no flicker, and
+    // a control being edited is left alone.
+    for (const def of defs) {
+      const row = existing.get(def.key);
+      const isOn = def.key in store.set;
+      const value = isOn ? store.set[def.key] : (inherited[def.key]?.value ?? (def.type === "toggle" ? false : undefined));
+      row.override?.refresh(isOn, value);
+      if (!row.contains(document.activeElement)) decorate(row, def);
+    }
+  } else {
+    if (list.contains(document.activeElement)) return;
+    list.replaceChildren(
+      ...defs.map((def) => {
+        // No onChanged: the commit goes through tabAction, which re-renders.
+        const row = renderOverride(def, store, () => {}, { adopt: true, compact: true });
+        decorate(row, def);
+        return row;
+      }),
+    );
+  }
 
   $("tab-settings-clear").hidden = Object.keys(overrides).length === 0;
 }
@@ -1361,6 +1407,7 @@ const RULE_FIELD_TEXT = {
   },
   onExpire: {
     label: "When a tab expires",
+    short: "On expiry",
     help: "What to do with {tab} once it runs out of time in the background.",
   },
   resetOnActivate: {
@@ -1369,6 +1416,7 @@ const RULE_FIELD_TEXT = {
   },
   pauseWhileActive: {
     label: "Count background time only",
+    short: "Background time only",
     help: "The clock stops while you are looking at {tab}.",
   },
   neverExpire: {
@@ -1377,18 +1425,22 @@ const RULE_FIELD_TEXT = {
   },
   indicators: {
     label: "Show remaining time with",
+    short: "Indicators",
     help: "Only these indicators are used for {tabs}, whatever the global choice.",
   },
   faviconStyle: {
     label: "Favicon colour style",
+    short: "Favicon style",
     help: "Where the colour goes on the icon of {tab}.",
   },
   hideWhileGreen: {
     label: "Leave fresh tabs alone",
+    short: "Quiet while fresh",
     help: "Show nothing on {tab} until part of its lifetime has passed.",
   },
   quietUntilPercent: {
     label: "Show indicators after",
+    short: "Show after",
     help: "The share of the lifetime of {tab} that must pass before anything is shown.",
   },
   flashBeforeExpiry: {
@@ -2067,7 +2119,10 @@ function settingRow(labelText, helpText, control, { checkbox } = {}) {
   const label = document.createElement("label");
   label.className = "field-label";
   if (checkbox) label.append(checkbox, " ");
-  label.append(labelText);
+  const text = document.createElement("span");
+  text.className = "field-label-text";
+  text.textContent = labelText;
+  label.append(text);
   if (helpText) {
     const help = document.createElement("span");
     help.className = "field-help";
@@ -2102,11 +2157,13 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
   const current = isOn ? store.set[def.key] : (store.base(def.key) ?? (def.type === "toggle" ? false : undefined));
 
   let read;
+  let setValue; // show a value without committing it; used to refresh a row in place
   let stacked = false;
   if (def.type === "toggle") {
     const sw = makeSwitch(Boolean(current), () => commit(true));
     control.append(sw.el);
     read = () => sw.input.checked;
+    setValue = (v) => (sw.input.checked = Boolean(v));
   } else if (def.type === "choice") {
     const select = document.createElement("select");
     for (const opt of def.options) select.add(new Option(opt.label, opt.value));
@@ -2114,6 +2171,7 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
     select.addEventListener("change", () => commit(true));
     control.append(select);
     read = () => select.value;
+    setValue = (v) => (select.value = v ?? def.options[0].value);
   } else if (def.type === "percent") {
     const num = document.createElement("input");
     num.type = "number";
@@ -2132,6 +2190,7 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
       num.value = String(clamped);
       return clamped;
     };
+    setValue = (v) => (num.value = String(v ?? 40));
   } else if (def.type === "indicators") {
     const chosen = new Set(Array.isArray(current) ? current : []);
     control.classList.add("override-indicators");
@@ -2150,6 +2209,10 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
       control.append(item);
     }
     read = () => [...control.querySelectorAll("input:checked")].map((i) => i.value);
+    setValue = (v) => {
+      const want = new Set(Array.isArray(v) ? v : []);
+      for (const i of control.querySelectorAll("input")) i.checked = want.has(i.value);
+    };
   } else {
     const { value: n, unit } = toUnit(current ?? 1800);
     const num = document.createElement("input");
@@ -2170,6 +2233,11 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
     control.append(num, units);
     read = () =>
       Math.max(def.min ?? 1, Math.round(Number(num.value) * Number(units.value)));
+    setValue = (v) => {
+      const u = toUnit(v ?? 1800);
+      num.value = String(u.value);
+      units.value = String(u.unit);
+    };
   }
 
   // `compact`: one line per setting, for the popup. The checkbox is built
@@ -2177,7 +2245,7 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
   // value is what takes the setting over -- and the help becomes the row's
   // tooltip rather than a sentence under every label.
   const wrap = opts.compact
-    ? settingRow(def.label, "", control)
+    ? settingRow(def.short ?? def.label, "", control) // the popup row is one line; long labels get a short form
     : settingRow(def.label, def.help, control, { checkbox: on });
   if (opts.compact && def.help) wrap.title = def.help;
   wrap.classList.add("override");
@@ -2203,6 +2271,18 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
     markSaved(live ?? wrap);
   };
   on.addEventListener("change", commit);
+
+  // For a list that refreshes: bring the row up to date without rebuilding
+  // it. Nothing is touched while the user is in one of its controls.
+  wrap.override = {
+    def,
+    refresh(nowOn, value) {
+      if (wrap.contains(document.activeElement)) return;
+      on.checked = nowOn;
+      wrap.classList.toggle("is-on", nowOn);
+      setValue(value);
+    },
+  };
   return wrap;
 }
 

@@ -372,6 +372,7 @@ async function tabState(tabId, tab) {
     ignoreRules: s.ignoreRules,
     ignoredRules: s.ignoredRules ?? [],
     overrides: { ...(s.overrides ?? {}) },
+    folds: { ...(s.folds ?? {}) },
     effective: Object.fromEntries(RULE_FIELDS.map((k) => [k, eff[k]])),
     rules: eff.allMatched.map((r) => ({
       id: r.id,
@@ -455,6 +456,9 @@ async function tabAction({ tabId, action, value }) {
       expired.delete(tabId);
       await serial(syncIndicators);
       await applyPauseSetting();
+      break;
+    case "fold":
+      if (["settings", "rules"].includes(value?.section)) await tracker.setFold(tabId, value.section, value.open);
       break;
     case "clearOverrides":
       await tracker.clearOverrides(tabId);
