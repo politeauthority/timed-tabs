@@ -16,16 +16,8 @@ def clock(seconds):
     return f"{seconds}s" if seconds < 60 else f"{seconds // 60}m {seconds % 60:02d}s"
 
 
-def main():
-    try:
-        with open(sys.argv[1], encoding="utf-8") as fh:
-            scenarios = json.load(fh)["scenarios"]
-    except (IndexError, OSError, ValueError, KeyError):
-        return 1
-    if not scenarios:
-        return 1
-
-    url = os.environ.get("ARTIFACT_URL") or ""
+def render(scenarios, url=""):
+    """The scenario table, plus what missed for each failed scenario, as Markdown."""
     passed = [s for s in scenarios if s["ok"]]
     failed = [s for s in scenarios if not s["ok"]]
 
@@ -71,7 +63,18 @@ def main():
     else:
         out.append("\n📦 Logs and screenshots are in the **e2e-artifacts** artifact on this run.")
 
-    print("\n".join(out))
+    return "\n".join(out)
+
+
+def main():
+    try:
+        with open(sys.argv[1], encoding="utf-8") as fh:
+            scenarios = json.load(fh)["scenarios"]
+    except (IndexError, OSError, ValueError, KeyError):
+        return 1
+    if not scenarios:
+        return 1
+    print(render(scenarios, os.environ.get("ARTIFACT_URL") or ""))
     return 0
 
 

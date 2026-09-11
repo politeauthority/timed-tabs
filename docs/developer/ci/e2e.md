@@ -144,8 +144,8 @@ version actually under test, and puts the number in the log and the job summary.
 
 The matrix comes from the workflow's `firefox` input, a JSON list of legs, and the
 resolve step also understands `previous-N`: N majors behind the current release, so
-`previous` is `previous-1`. The **CI run full** workflow calls it with ten legs,
-`latest` through `previous-9`, when a PR carries the `ci run full` label — see
+`previous` is `previous-1`. The **CI run full** workflow calls it with four legs,
+`latest` through `previous-3`, when a PR carries the `ci run full` label — see
 [README.md](README.md#the-full-run). To change the default pair, change the
 input's default and update branch protection in the same change, because those two
 legs are the required checks. See below.

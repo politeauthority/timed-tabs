@@ -21,7 +21,7 @@ explaining why it is shaped the way it is; this section is the map over the top.
 |---|---|---|
 | **CI** (`ci.yaml`) | every PR, every push to `main`, dispatch | Lints, unit-tests and builds both dist targets, then calls E2E. |
 | **E2E** (`e2e.yaml`) | called by CI; dispatch | The extension in a real headless Firefox, two versions in parallel. See [e2e.md](e2e.md). |
-| **CI run full** (`full.yaml`) | every PR, including every label change | Holds the merge — *pending*, not red — until the `ci run full` label is on and the E2E scenarios have passed on the last ten Firefox releases. See [The full run](#the-full-run). |
+| **CI run full** (`full.yaml`) | every PR, including every label change | Holds the merge — *pending*, not red — until the `ci run full` label is on and the E2E scenarios have passed on the last four Firefox releases. See [The full run](#the-full-run). |
 | **Not paused** (`pause.yaml`) | every PR, including every label change and review | Goes red while the `ci pause` label is on. Also dispatches Release Please when a review or the `release-approved` label lands on the release PR, so that workflow need not listen to PR events itself. |
 | **Auto-merge** (`automerge.yaml`) | the `automerge` label, both directions | Arms and disarms GitHub's auto-merge, and keeps the label and the state agreeing. |
 | **Release Please** (`release-please.yaml`) | push to `main`, review, label, dispatch | Maintains the release PR, and on merge tags, packages and publishes. |
@@ -94,27 +94,36 @@ so it is enforced by a required status, **CI run full**, that `full.yaml` posts 
 head commit. The label is a merge requirement, not a test, so a missing one is not a
 failure: the status sits at *pending*, the merge box says "Waiting" and stays locked,
 and nothing on the PR is red for a label nobody has had a reason to add yet. With the
-label on, the E2E scenarios run on the last ten Firefox releases — the current one and
-the nine majors before it, each resolved from Mozilla's feed the way `E2E` resolves its
-two — and the status goes green once all ten have passed. Take the label off and it
+label on, the E2E scenarios run on the last four Firefox releases — the current one and
+the three majors before it, each resolved from Mozilla's feed the way `E2E` resolves its
+two — and the status goes green once all four have passed. Take the label off and it
 goes back to pending. It is red only when the Firefoxes actually fail.
 
-The ten legs report as `Full / Firefox latest`, `Full / Firefox previous`,
-`Full / Firefox previous-2` … `previous-9`. None of them is required on its own, and
+The four legs report as `Full / Firefox latest`, `Full / Firefox previous`,
+`Full / Firefox previous-2` and `previous-3`. None of them is required on its own, and
 neither is the `Full run gate` job that posts the status; only the status is, so
 adding or dropping a leg does not touch branch protection.
+
+The gate's summary is the place to read the result: one table with every leg, the
+Firefox version it resolved to, how many scenarios passed, the scenario time and the
+job's wall time. A green leg says nothing more than its row. A failed leg gets its
+scenario table and what missed, under the main table and in its own job summary.
+Each leg uploads a small `e2e-leg-<leg>` artifact for this; the gate reads them from
+whichever run produced them, so a reused result still gets its table.
 
 Arming auto-merge adds the label, whether by the `automerge` label or the button on
 the PR, so a PR told to merge itself is never left waiting on a label nobody added.
 Auto-merge adds it with the `PAT` secret: a label added by `GITHUB_TOKEN` wakes no
 workflow, and the full run would only start on the next push.
 
-Ten Firefoxes are ten runner jobs, so the workflow is careful about when they run.
-A later event on a commit that already passed — a review, another label — reuses that
-result instead of running again: "passed" meaning an earlier run's `Full /` legs all
-concluded green, not merely that the run finished, since an unlabelled run finishes
-green having tested nothing. A new push cancels the legs still running for the commit
-it replaced. A pull request against a branch other than `main` passes the gate
+Four Firefoxes are four runner jobs, so the workflow is careful about how and when they
+run. Two legs at a time: an earlier ten at once starved one another on the runner node
+until three of them saw a single tick in a scenario's whole window and failed on
+timing alone. A later event on a commit that already passed — a review, another label —
+reuses that result instead of running again: "passed" meaning an earlier run's `Full /`
+legs all concluded green, not merely that the run finished, since an unlabelled run
+finishes green having tested nothing. A new push cancels the legs still running for the
+commit it replaced. A pull request against a branch other than `main` passes the gate
 without the label, and so does the release PR, whose branch never carries anything a
 scenario reads.
 

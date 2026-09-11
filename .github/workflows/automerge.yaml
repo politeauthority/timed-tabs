@@ -236,7 +236,7 @@ jobs:
           fi
           gh pr edit "$PR" --add-label "$FULL_LABEL"
           if [ "$HAVE_PAT" = "true" ]; then
-            echo "🏷️ Added \`${FULL_LABEL}\`: merging into main needs the ten-Firefox run, and it starts now." >> "$GITHUB_STEP_SUMMARY"
+            echo "🏷️ Added \`${FULL_LABEL}\`: merging into main needs the four-Firefox run, and it starts now." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "⚠️ Added \`${FULL_LABEL}\` with GITHUB_TOKEN, which wakes no workflow: the full run starts on the next push. Set the \`PAT\` secret to have it start now." >> "$GITHUB_STEP_SUMMARY"
           fi
