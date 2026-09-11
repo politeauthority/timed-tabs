@@ -37,12 +37,15 @@ permissions:
 # question about a commit nobody will merge any more, so killing it is free. On
 # main it is the only run that commit will ever get: branch protection does not
 # require branches to be up to date (`strict: false`), so the merge-ref result
-# from the PR does not cover what actually landed. Merge two PRs in quick
-# succession with cancel-in-progress on and the first commit goes to main having
-# been tested in no combination at all -- which is how six main runs were killed
-# in one morning.
+# from the PR does not cover what actually landed.
+#
+# So main runs share no group at all: each push gets a group of its own, keyed
+# on the run id. Sharing one with cancel-in-progress off was not enough --
+# GitHub keeps a single *pending* run per group and cancels the older pending
+# one when a third arrives, so four PRs merged in three minutes left two of
+# their commits never tested on main, one cancelled and one that never started.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -138,10 +141,11 @@ jobs:
       contents: read
       actions: read
     with:
-      # The Chrome leg, on the one branch proving it can run on this runner. A
-      # list like `firefox`, one entry here; full.yaml passes four on the same
-      # branch, and beta-release.yaml stays Firefox-only. The PR's head branch on a pull
-      # request, the pushed branch otherwise. Widening it to every branch is
-      # deleting this condition, in the same commit that adds `E2E / Chrome
-      # stable` to branch protection.
-      chrome: ${{ (github.head_ref == 'feat/chrome-e2e' || github.ref_name == 'feat/chrome-e2e') && '["stable"]' || '[]' }}
+      # The two Firefoxes are required checks; Chrome stable reports beside them
+      # and is advisory until branch protection says otherwise.
+      legs: '[{"browser": "firefox", "channel": "latest"}, {"browser": "firefox", "channel": "previous"}, {"browser": "chrome", "channel": "stable"}]'
+      # A PR to main carrying `ci run full` runs these same versions inside the
+      # full run, and the `CI run full` status holds the merge until they pass.
+      # So the legs skip here rather than run twice; a skipped required check
+      # reads as a pass, and the status is the thing actually holding the door.
+      skip-when-full: true

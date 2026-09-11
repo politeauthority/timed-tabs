@@ -2,7 +2,8 @@ name: CI run full
 run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
-# the E2E scenarios run on the last four Firefox releases instead of two.
+# the E2E scenarios run on the last four Firefox and Chrome releases instead of
+# CI's three legs.
 #
 # GitHub has no such thing as a required label, so the label is enforced by a
 # required status named `CI run full` that reads it. The gate job at the bottom
@@ -11,15 +12,15 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # failure, it is a merge requirement not yet met, so the gate reports it as
 # *pending*: the merge box says "Waiting" and stays locked, and nothing on the
 # PR is red for a label nobody has had a reason to add yet. The status goes
-# green once the label is on and the four Firefoxes have passed, back to pending
+# green once the label is on and every leg has passed, back to pending
 # the moment the label comes off, and to failure only when the Firefoxes fail.
 # Auto-merge adds the label when it arms (see automerge.yaml), so a PR marked to
 # merge itself gets the full run without anyone remembering.
 #
 # Three jobs:
 #   - plan     decides what this event needs, on a hosted runner in seconds
-#   - Full     the four legs, e2e.yaml called with a longer `firefox` list, so
-#              they report as `Full / Firefox latest` ... `Full / Firefox previous-3`
+#   - Full     the eight legs, e2e.yaml called with a longer `legs` list, so
+#              they report as `Full / Firefox latest` ... `Full / Chrome previous-3`
 #   - Full run gate   posts the `CI run full` status, which is the only thing
 #              branch protection reads. Its own check is not required and is
 #              named differently on purpose, so the two cannot be confused.
@@ -27,7 +28,7 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # It wakes on every label event, and it must: the gate is a required check, so
 # it can never filter itself down to its own label -- a skipped required check
 # is a pass, and on an unlabelled PR that would hand back the merge the label
-# is holding. What keeps that cheap is `plan`. Four Firefoxes only run when the
+# is holding. What keeps that cheap is `plan`. Eight browsers only run when the
 # head commit has not already passed them: any later event on the same commit
 # (another label, a review) finds the earlier green run and reuses it, and
 # events on an older commit are cancelled outright.
@@ -98,7 +99,7 @@ jobs:
             echo "$1: $2"
           }
 
-          # Older commits of this PR still running the four legs are answering a
+          # Older commits of this PR still running the eight legs are answering a
           # question nobody will merge any more. Older only: two pushes in
           # quick succession start two runs, and the first one's plan must not
           # cancel the newer one that is about to cancel it.
@@ -125,8 +126,8 @@ jobs:
           fi
 
           # The same commit already passed the full run: a label or review
-          # event since then changes nothing Firefox would notice.
-          # An earlier run counts only if its Firefox legs ran and every one
+          # event since then changes nothing a browser would notice.
+          # An earlier run counts only if its legs ran and every one
           # passed. The run's own conclusion is not enough: the gate exits 0
           # when the label is merely missing, so an unlabelled run concludes
           # "success" having tested nothing, and trusting that would let a
@@ -141,13 +142,13 @@ jobs:
           done
           if [ -n "$earlier" ]; then
             echo "run=${earlier}" >> "$GITHUB_OUTPUT"
-            decide reuse "run ${earlier} already passed the four Firefoxes on ${HEAD_SHA:0:7}"; exit 0
+            decide reuse "run ${earlier} already passed every leg on ${HEAD_SHA:0:7}"; exit 0
           fi
           echo "run=${RUN_ID}" >> "$GITHUB_OUTPUT"
-          decide run "the label is on and ${HEAD_SHA:0:7} has not been through the four Firefoxes yet"
+          decide run "the label is on and ${HEAD_SHA:0:7} has not been through the legs yet"
 
-  # Four legs: the current release and the three majors before it. Each reports
-  # as `Full / Firefox <leg>`; none of them is required on its own, the gate
+  # Eight legs: the current release and the three majors before it, in Firefox
+  # and in Chrome. Each reports as `Full / <Browser> <leg>`; none is required on its own, the gate
   # below is. e2e.yaml resolves each leg to an exact version at run time.
   firefox:
     name: Full
@@ -158,16 +159,23 @@ jobs:
       contents: read
       actions: read
     with:
-      firefox: '["latest", "previous", "previous-2", "previous-3"]'
-      # The same four majors back for Chrome, on the one branch proving Chrome
-      # on this runner; everywhere else an empty list, and the full run is the
-      # four Firefoxes it always was. None of the Chrome legs is required.
-      chrome: ${{ (github.event.pull_request.head.ref == 'feat/chrome-e2e') && '["stable", "previous", "previous-2", "previous-3"]' || '[]' }}
+      # The current release and the three majors before it, in both browsers.
+      # None of the legs is required on its own; the status the gate posts is.
+      legs: >-
+        [{"browser": "firefox", "channel": "latest"},
+         {"browser": "firefox", "channel": "previous"},
+         {"browser": "firefox", "channel": "previous-2"},
+         {"browser": "firefox", "channel": "previous-3"},
+         {"browser": "chrome", "channel": "stable"},
+         {"browser": "chrome", "channel": "previous"},
+         {"browser": "chrome", "channel": "previous-2"},
+         {"browser": "chrome", "channel": "previous-3"}]
       # Not all at once: ten at a time starved one another on the runner node
       # until three legs saw one tick in their whole window and failed on
-      # timing alone. Two at a time is two waves of about four minutes.
-      max-parallel: 2
-      # The gate below writes one table for all four; a green leg's own summary
+      # timing alone. Three at a time passed every leg; eight legs is three
+      # waves of about four minutes.
+      max-parallel: 3
+      # The gate below writes one table for all eight; a green leg's own summary
       # would only repeat its row. A failed leg still writes its own.
       leg-summary: on-failure
 
@@ -209,7 +217,7 @@ jobs:
           set -euo pipefail
           gh run view "$RUN" --json jobs > jobs.json || echo '{"jobs": []}' > jobs.json
           python3 scripts/e2e-full-summary.py legs jobs.json > table.md \
-            || echo "_The leg table could not be built; see the Firefox jobs on this run._" > table.md
+            || echo "_The leg table could not be built; see the browser jobs on this run._" > table.md
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -259,7 +267,7 @@ jobs:
               status pending "Add the 'ci run full' label to merge into main; arming auto-merge adds it for you"
               report 🏷️ "waiting for the label" \
                 "The merge is held, not failed: ${REASON}." "" \
-                "Merging into \`main\` needs the E2E scenarios to pass on the last four Firefox releases." \
+                "Merging into \`main\` needs the E2E scenarios to pass on the last four Firefox and Chrome releases." \
                 "Add the **\`ci run full\`** label to run them; arming auto-merge adds it for you." ;;
             reuse)
               status success "Passed on this commit already: ${REASON}"
@@ -267,13 +275,13 @@ jobs:
             run)
               case "$FIREFOX" in
                 success)
-                  status success "All four Firefox legs passed"
+                  status success "All eight legs passed, four Firefoxes and four Chromes"
                   report ✅ "passed" "$(cat table.md)" ;;
                 cancelled)
-                  status error "The Firefox legs were cancelled; re-run or push again"
-                  report ⏹️ "cancelled" "The Firefox legs were cancelled: a job timed out, or a newer commit took over." "" "$(cat table.md)"; exit 1 ;;
+                  status error "The legs were cancelled; re-run or push again"
+                  report ⏹️ "cancelled" "The legs were cancelled: a job timed out, or a newer commit took over." "" "$(cat table.md)"; exit 1 ;;
                 *)
-                  status failure "At least one of the four Firefox legs failed"
+                  status failure "At least one of the eight legs failed"
                   report ❌ "failed" "$(cat table.md)"; exit 1 ;;
               esac ;;
             *)

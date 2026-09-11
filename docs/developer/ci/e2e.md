@@ -158,29 +158,29 @@ on port 80 at all.
 
 ## Which browsers
 
-Two Firefox legs by default, in parallel, and both must pass. A Chrome leg joins them
-on one branch:
+Three legs from CI, in parallel; the two Firefoxes must pass:
 
 | Leg | What it is | Today | Runs on |
 |---|---|---|---|
-| `Firefox latest` | the current release | 155.0.1 | every branch, required |
-| `Firefox previous` | the last release of the major before it | 154.0.1 | every branch, required |
-| `Chrome stable` | the current stable | 153.x | `feat/chrome-e2e` only, advisory |
-| `Chrome previous-N` | N majors behind stable, latest build of that major | 152, 151, 150 | the full run on `feat/chrome-e2e` only |
+| `Firefox latest` | the current release | 155.0.1 | every PR and push, required |
+| `Firefox previous` | the last release of the major before it | 154.0.1 | every PR and push, required |
+| `Chrome stable` | the current stable | 153.x | every PR and push, advisory |
+| `Firefox previous-N`, `Chrome previous-N` | N majors back, latest release of that major | 153–152, 152–150 | the full run, on a PR labelled `ci run full` |
+
+On a PR to `main` that carries `ci run full`, CI's legs skip: the full run covers the
+same versions and the `CI run full` status holds the merge until it passes. The
+`skip-when-full` input is what `ci.yaml` sets for that; the full run leaves it off.
 
 All legs run the same scenarios in `tests/e2e/scenarios`. Nothing in them is
 browser-specific — they pin `indicators` explicitly rather than relying on a default,
 so the Firefox-only theme tint never enters — and that is the point: a scenario that
 passes in one browser and fails in another is a real difference in the extension.
 
-The `chrome` input is the same shape as `firefox`: a JSON list of legs, `stable` or
-`previous-N`. The *Resolve the Chrome version* step reads the Chrome for Testing
+A Chrome leg's channel is `stable` or `previous-N`. The *Resolve the Chrome version*
+step reads the Chrome for Testing
 [last-known-good feed](https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json)
 for the current stable, and `previous-N` becomes a bare major N behind it, which
-`setup-chrome` installs as the latest build of that major. The input is empty by
-default; `ci.yaml` passes `["stable"]` and `full.yaml` passes four legs, both only on
-`feat/chrome-e2e`, so the beta and every other branch stay Firefox-only without
-knowing Chrome exists.
+`setup-chrome` installs as the latest build of that major.
 
 Neither Firefox is pinned either. The `Resolve the Firefox version` step reads Mozilla's
 [product-details feed](https://product-details.mozilla.org/1.0/firefox.json), takes
@@ -193,14 +193,13 @@ Both legs resolve an exact version from that one feed rather than handing
 `setup-firefox` the string `latest`, which keeps `previous` defined relative to the
 version actually under test, and puts the number in the log and the job summary.
 
-The Firefox legs come from the workflow's `firefox` input, a JSON list, and the
-resolve step also understands `previous-N`: N majors behind the current release, so
-`previous` is `previous-1`. The **CI run full** workflow calls it with four legs,
-`latest` through `previous-3`, when a PR carries the `ci run full` label — see
-[README.md](README.md#the-full-run). The `legs` job at the top of the workflow
-turns that list, plus the `chrome` input, into the matrix; each Firefox entry keeps
-the name it always had, so no status-check context changes shape. To change the
-default pair, change the input's default and update branch protection in the same
+The legs come from the workflow's `legs` input, a JSON list of `{browser, channel}`
+objects that is the matrix directly; a leg is named `<Browser> <channel>`, and the
+Firefox resolve step understands `previous-N` as N majors behind the current release,
+so `previous` is `previous-1`. The default is the two Firefoxes; `ci.yaml` adds Chrome
+stable, and the **CI run full** workflow passes four legs of each browser when a PR
+carries the `ci run full` label — see [README.md](README.md#the-full-run). To change
+the default pair, change the input's default and update branch protection in the same
 change, because those two legs are the required checks. See below.
 
 ## The status checks
@@ -211,7 +210,7 @@ alongside **Lint, test & build**, **Not paused** and **CI run full**:
 - **E2E / Firefox latest**
 - **E2E / Firefox previous**
 
-`E2E / Chrome stable` reports too, on its branch, but is not required yet.
+`E2E / Chrome stable` reports too but is not required yet.
 
 Both halves of each name are load-bearing. GitHub prefixes a called workflow's jobs
 with the calling job's name, so the context is `jobs.e2e` in `ci.yaml` (named `E2E`)
