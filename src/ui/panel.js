@@ -1960,14 +1960,6 @@ async function openPageView(hash = "", extraParams = {}) {
 }
 
 $("open-page").addEventListener("click", () => openPageView("#tabs"));
-for (const b of document.querySelectorAll(".mini-nav [data-open]")) {
-  b.addEventListener("click", () => {
-    const what = b.dataset.open;
-    if (what === "rules-for-site")
-      openPageView("#rules", currentTab?.url ? { site: currentTab.url } : {});
-    else openPageView(`#${what}`);
-  });
-}
 $("diag-refresh").addEventListener("click", refreshDiag);
 $("diag-tick").addEventListener("click", async () => {
   await api.runtime.sendMessage({ type: "timed-tabs:tick" }).catch(() => {});

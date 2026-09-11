@@ -518,38 +518,18 @@ body:not([data-context="popup"]) .pages {
   box-shadow: 0 0 0 1px var(--line);
 }
 
-/* Mini UI footer: icon-and-label buttons plus the version. */
-.mini-nav {
+/* Mini UI footer: the version and a way to the source, nothing to navigate. */
+.mini-foot {
   display: none;
   align-items: center;
-  gap: 2px;
-  padding: var(--sp-2) var(--sp-2);
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2);
   border-top: 1px solid var(--line);
 }
 
-body[data-context="popup"] .mini-nav {
+body[data-context="popup"] .mini-foot {
   display: flex;
-}
-
-.mini-nav button {
-  flex: 1 1 0;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 0;
-  padding: 6px 4px;
-  background: none;
-  color: var(--ink-2);
-  font-size: var(--fs-xs);
-  /* Labels may run to two lines rather than push the footer past the popup edge. */
-  white-space: normal;
-  line-height: 1.2;
-  text-align: center;
-}
-
-.mini-nav button:hover {
-  background: var(--control);
-  color: var(--ink);
 }
 
 /* Pages: the page and preferences views show one page at a time. */
