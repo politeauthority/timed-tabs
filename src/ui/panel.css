@@ -811,7 +811,8 @@ body:not([data-context="popup"]) .settings-title {
 .section-help,
 .rules-help,
 .group-help,
-.overview-legend {
+.overview-legend,
+.overview-tools {
   margin: var(--sp-1) 0 var(--sp-3);
   font-size: var(--fs-sm);
   line-height: 1.5;
@@ -1154,20 +1155,14 @@ body:not([data-context="popup"]) .overview > summary {
   font-variant-numeric: tabular-nums;
 }
 
-.overview-legend {
+.overview-tools {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-1) var(--sp-4);
   margin: 0 0 var(--sp-2);
 }
 
-.legend-key {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-}
-
-/* Sits at the end of the legend row, pushed right when there is room. */
+/* Alone on its row now, and still pushed right by the auto margin. */
 .overview-sort {
   display: inline-flex;
   align-items: center;
