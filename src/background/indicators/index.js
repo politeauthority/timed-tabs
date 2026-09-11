@@ -13,8 +13,11 @@
  *     configure?(settings): void,      // optional: settings changed while running
  *     update(tabs): Promise<void>,     // tabs: [{ tabId, windowId, url, status, discarded,
  *                                      //          active, exempt, quiet, hidden, flashing,
- *                                      //          progress, remainingSeconds, faviconStyle }]
+ *                                      //          paused, progress, remainingSeconds,
+ *                                      //          faviconStyle }]
  *                                      // flashing: about to expire; blink if you can
+ *                                      // paused: the tab's clock is stopped, so progress
+ *                                      //         is frozen where it stands
  *                                      // quiet: show nothing for this tab (timer off, pinned,
  *                                      //        still green with hideWhileGreen, or this
  *                                      //        indicator is not used for the tab: hidden)

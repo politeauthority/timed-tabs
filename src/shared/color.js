@@ -41,6 +41,17 @@ export const VIVID_RAMP = Object.freeze([
 ]);
 
 /**
+ * Colours for marks that are not counting down, and so have no place on the
+ * ramp: a clock that is stopped, and a tab that will never expire. Both are
+ * deliberately off the green -> red axis, so "not running" cannot be misread
+ * as "plenty of time left".
+ */
+export const STATE_COLORS = Object.freeze({
+  paused: [0x70, 0x7d, 0x91], // slate
+  exempt: [0x4a, 0x9e, 0xda], // blue
+});
+
+/**
  * Firefox's built-in light/dark chrome colours (browser/themes/addons/{light,dark}).
  * A theme.update() replaces the whole window theme, so every key we do not
  * set would fall back to Firefox's light defaults. Keep these complete so

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRID, dialShapes, metrics, paintShapes } from "../src/shared/icon-art.js";
+import { GRID, dialShapes, faceMetrics, faceShapes, metrics, paintShapes } from "../src/shared/icon-art.js";
 import { decodePng, encodePng, rasterise } from "../scripts/icons.mjs";
 
 const arcs = (shapes) => shapes.filter((s) => s.kind === "arc");
@@ -74,6 +74,67 @@ describe("dialShapes", () => {
           }
         }
       }
+    }
+  });
+});
+
+const wedges = (shapes) => shapes.filter((s) => s.kind === "wedge");
+const cutOut = (shapes) => shapes.find((s) => s.kind === "erase")?.shapes ?? [];
+
+describe("faceShapes", () => {
+  it("empties the face as progress rises, keeping the rim and the track", () => {
+    let previous = Infinity;
+    for (const progress of [0, 0.2, 0.5, 0.8, 0.99]) {
+      const shapes = faceShapes({ progress });
+      const [track, remaining] = wedges(shapes);
+      expect(track.to - track.from).toBe(1);
+      expect(track.alpha).toBeLessThan(1);
+      expect(remaining.to).toBeLessThan(previous);
+      previous = remaining.to;
+      expect(arcs(shapes)).toHaveLength(1);
+    }
+  });
+
+  it("leaves no full-strength wedge once the face is empty", () => {
+    expect(wedges(faceShapes({ progress: 1 })).filter((w) => w.alpha === undefined)).toHaveLength(0);
+  });
+
+  it("cuts the hands out of the face rather than painting them over it", () => {
+    const shapes = faceShapes({ progress: 0.2 });
+    expect(cutOut(shapes)).toHaveLength(2);
+    expect(shapes.filter((s) => s.kind === "capsule")).toHaveLength(0);
+  });
+
+  it("swaps the hands for a pause bar on a stopped clock, at the same fill", () => {
+    const paused = faceShapes({ progress: 0.4, state: "paused" });
+    const running = faceShapes({ progress: 0.4 });
+    expect(wedges(paused)).toEqual(wedges(running));
+    const bars = cutOut(paused);
+    expect(bars).toHaveLength(2);
+    // Two uprights, mirrored about the centre: nothing like a clock hand.
+    expect(bars.every((b) => b.x1 === b.x2)).toBe(true);
+    expect(bars[0].x1 + bars[1].x1).toBeCloseTo(GRID);
+  });
+
+  it("draws a tab that never expires hollow, with nothing draining", () => {
+    const shapes = faceShapes({ state: "exempt" });
+    expect(wedges(shapes)).toHaveLength(0);
+    expect(shapes.filter((s) => s.kind === "capsule")).toHaveLength(2);
+  });
+
+  it("blinks and expires the same way the ring does", () => {
+    expect(faceShapes({ state: "flash" })).toEqual([expect.objectContaining({ kind: "disc" })]);
+    const expired = faceShapes({ state: "expired" });
+    expect(expired[0].kind).toBe("disc");
+    expect(expired[1].kind).toBe("erase");
+  });
+
+  it("holds the hands inside the face at every size, and the face inside the grid", () => {
+    for (const size of [16, 32, 48, 96, 128]) {
+      const m = faceMetrics(size);
+      expect(m.minute + m.hand / 2).toBeLessThan(m.face);
+      expect(m.face).toBeLessThan(m.rim - m.rimWidth / 2);
+      expect(m.rim + m.rimWidth / 2).toBeLessThanOrEqual(GRID / 2);
     }
   });
 });
