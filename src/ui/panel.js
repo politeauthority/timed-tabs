@@ -43,7 +43,7 @@ import {
   patternForUrl,
 } from "../shared/rules.js";
 import { exportText, parseBundle } from "../shared/backup.js";
-import { getDisplayVersion } from "../shared/version.js";
+import { compareVersions, getDisplayVersion } from "../shared/version.js";
 import { groupRecent } from "../shared/recent.js";
 import {
   formatDuration,
@@ -2598,8 +2598,17 @@ watchGroups((next) => {
 const backupText = $("backup-text");
 const backupStatus = $("backup-status");
 
-function showBackup() {
-  backupText.value = exportText(settings, rules, groups);
+/**
+ * Fill the box with everything as it stands, stamped with the build writing
+ * it. That stamp is also the restamp: a bundle loaded from an older Timed Tabs
+ * is shown again here as this one's, so copying it back out carries this
+ * version rather than the one it arrived with.
+ *
+ * Async only for the version, which is resolved once per page and cached.
+ */
+async function showBackup() {
+  const v = await getDisplayVersion().catch(() => null);
+  backupText.value = exportText(settings, rules, groups, v?.display ?? "");
   backupStatus.textContent = "";
 }
 
@@ -2620,7 +2629,7 @@ function backupNote(text, level = "info") {
 $("backup-refresh").addEventListener("click", showBackup);
 
 $("backup-copy").addEventListener("click", async () => {
-  showBackup();
+  await showBackup();
   try {
     await navigator.clipboard.writeText(backupText.value);
     backupNote("Copied.", "success");
@@ -2633,8 +2642,8 @@ $("backup-copy").addEventListener("click", async () => {
   }
 });
 
-$("backup-download").addEventListener("click", () => {
-  showBackup();
+$("backup-download").addEventListener("click", async () => {
+  await showBackup();
   const blob = new Blob([backupText.value], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -2691,9 +2700,10 @@ $("backup-reset").addEventListener("click", async () => {
 });
 
 async function applyBackup() {
+  const here = (await getDisplayVersion().catch(() => null))?.display ?? "";
   let parsed;
   try {
-    parsed = parseBundle(backupText.value);
+    parsed = parseBundle(backupText.value, here);
   } catch (err) {
     backupNote(err.message, "error");
     return;
@@ -2719,21 +2729,36 @@ async function applyBackup() {
   renderFlagged();
   if ($("overview").open) refreshOverview();
   const ruleCount = `${rules.length} rule${rules.length === 1 ? "" : "s"}`;
+  // Worth saying only when the bundle came from somewhere else. A file this
+  // build wrote itself, or one too old to carry a stamp, says nothing — and
+  // one from a later build is left to `parseBundle`, whose warning says both
+  // where it came from and why that matters.
+  const from =
+    parsed.version &&
+    parsed.version !== here &&
+    !(compareVersions(parsed.version, here) > 0)
+      ? ` Written by Timed Tabs ${parsed.version}.`
+      : "";
   backupNote(
     parsed.warnings.length
-      ? `Loaded with ${ruleCount}. ${parsed.warnings.join(" ")}`
-      : `Loaded settings and ${ruleCount}.`,
+      ? `Loaded with ${ruleCount}.${from} ${parsed.warnings.join(" ")}`
+      : `Loaded settings and ${ruleCount}.${from}`,
     parsed.warnings.length ? "warning" : "success",
   );
+  // Fills the box again from what is now in force, which is what restamps the
+  // bundle with this build.
   showBackupSoon();
 }
 
 let backupTimer;
 function showBackupSoon() {
   clearTimeout(backupTimer);
-  backupTimer = setTimeout(() => {
+  backupTimer = setTimeout(async () => {
+    // `showBackup` clears the line as it refills the box, so what was just
+    // said has to be put back after it — and awaited, or it is put back
+    // before the clearing rather than after it.
     const note = backupStatus.textContent;
-    showBackup();
+    await showBackup();
     backupStatus.textContent = note;
   }, 300);
 }

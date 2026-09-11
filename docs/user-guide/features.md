@@ -205,7 +205,10 @@ through the browser's extension storage; rules are kept locally.
   no closing and no colours, and undoes every mark already made. Back on, every tab
   starts its life afresh from that moment.
 - **Backup** exports every setting and every rule as one JSON document, to copy or
-  download, and loads one back. Loading replaces everything.
+  download, and loads one back. Loading replaces everything. The file records the
+  Timed Tabs that wrote it, and says so when you load one from a different version;
+  the copy shown after a load carries the version you loaded it into, not the one it
+  came from.
 - **Diagnostics** shows what the background is doing for each tab, which is useful
   when an indicator does not seem to paint.
 - **Feature flags**, under Advanced, switch on the parts that are not finished enough

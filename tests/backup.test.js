@@ -125,3 +125,78 @@ describe("validation on import", () => {
     expect(warnings.length).toBe(1);
   });
 });
+
+describe("the version stamp", () => {
+  it("records the build that wrote the file", () => {
+    const bundle = exportBundle(DEFAULTS, [], [], "0.8.0-beta.14");
+    expect(bundle.version).toBe("0.8.0-beta.14");
+    // Two different numbers: the shape of the file, and who wrote it.
+    expect(bundle.timedTabs).toBe(1);
+  });
+
+  it("leaves the key out rather than writing an empty one", () => {
+    for (const v of [undefined, "", "   ", 7, null]) {
+      expect("version" in exportBundle(DEFAULTS, [], [], v)).toBe(false);
+    }
+  });
+
+  it("hands the stamp back on import", () => {
+    const text = exportText(DEFAULTS, [], [], "0.7.1");
+    expect(parseBundle(text, "0.8.0").version).toBe("0.7.1");
+  });
+
+  it("reads a backup written before the stamp existed as unstamped", () => {
+    const { version, warnings } = parseBundle(
+      JSON.stringify({ timedTabs: 1, settings: {}, rules: [] }),
+      "0.8.0",
+    );
+    expect(version).toBe("");
+    expect(warnings).toEqual([]);
+  });
+
+  it("is a note, not a setting: it is never loaded into the settings", () => {
+    const { settings, warnings } = parseBundle(
+      JSON.stringify({ timedTabs: 1, version: "0.7.1", settings: {}, rules: [] }),
+      "0.7.1",
+    );
+    expect(settings).toEqual({});
+    expect(warnings).toEqual([]);
+  });
+
+  it("calls out a bundle from a later build, which is when settings go missing", () => {
+    const { warnings } = parseBundle(
+      JSON.stringify({ timedTabs: 1, version: "0.9.0", settings: {}, rules: [] }),
+      "0.8.0",
+    );
+    expect(warnings).toEqual(["Written by Timed Tabs 0.9.0, which is newer than this 0.8.0."]);
+  });
+
+  it("says nothing about an older or matching build", () => {
+    for (const [wrote, here] of [["0.7.1", "0.8.0"], ["0.8.0", "0.8.0"], ["0.8.0-beta.2", "0.8.0"]]) {
+      const { warnings } = parseBundle(
+        JSON.stringify({ timedTabs: 1, version: wrote, settings: {}, rules: [] }),
+        here,
+      );
+      expect(warnings).toEqual([]);
+    }
+  });
+
+  it("says nothing when either side is not a version it can read", () => {
+    // Told nothing about the build doing the loading, or given a mangled
+    // stamp, it has no comparison to make and must not invent one.
+    for (const [wrote, here] of [["0.9.0", ""], ["nightly", "0.8.0"], ["", "0.8.0"]]) {
+      const { warnings } = parseBundle(
+        JSON.stringify({ timedTabs: 1, version: wrote, settings: {}, rules: [] }),
+        here,
+      );
+      expect(warnings).toEqual([]);
+    }
+  });
+
+  it("restamps on the way out: what comes in is not what goes back out", () => {
+    const older = exportText(DEFAULTS, [], [], "0.7.1");
+    const parsed = parseBundle(older, "0.8.0");
+    const again = exportBundle({ ...DEFAULTS, ...parsed.settings }, parsed.rules, parsed.groups, "0.8.0");
+    expect(again.version).toBe("0.8.0");
+  });
+});
