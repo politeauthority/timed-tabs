@@ -25,18 +25,59 @@ run-name: "Auto-merge — #${{ github.event.pull_request.number }} ${{ github.ev
 
 on:
   pull_request:
-    types: [labeled, opened, reopened, synchronize, ready_for_review]
+    # auto_merge_enabled/disabled keep the label honest when auto-merge is
+    # armed some other way -- the button on the PR, or `gh pr merge --auto`.
+    types:
+      [labeled, opened, reopened, synchronize, ready_for_review,
+       auto_merge_enabled, auto_merge_disabled]
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
+  # Someone armed auto-merge without the label. Put the label on so the PR reads
+  # the way it behaves, and so `gh pr list --label automerge` finds it.
+  #
+  # This cannot loop: adding the label wakes `arm` below, which finds auto-merge
+  # already armed and stops. And it costs nothing now that the heavy CI job no
+  # longer wakes on label events -- only `Not paused` does, which takes seconds.
+  label:
+    name: Keep the label honest
+    if: github.event.action == 'auto_merge_enabled' || github.event.action == 'auto_merge_disabled'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Match the label to the state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          set -euo pipefail
+          if [ "$ACTION" = "auto_merge_enabled" ]; then
+            gh pr edit "$PR" --add-label automerge
+            note="Auto-merge was armed elsewhere, so the \`automerge\` label now says so."
+          else
+            gh pr edit "$PR" --remove-label automerge
+            note="Auto-merge was turned off, so the \`automerge\` label came off with it."
+          fi
+          {
+            echo "## 🏷️ Auto-merge"
+            echo ""
+            echo "> ▶️ **Why this ran:** \`${ACTION}\` on #${PR}."
+            echo ""
+            echo "$note"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   arm:
     name: Arm auto-merge
     # Only labelled PRs, and never a draft: arming one would merge it the moment
     # it is marked ready, before anyone has looked.
-    if: contains(github.event.pull_request.labels.*.name, 'automerge') && !github.event.pull_request.draft
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'automerge')
+      && !github.event.pull_request.draft
+      && github.event.action != 'auto_merge_disabled' 
     runs-on: ubuntu-latest
     steps:
       - name: Enable auto-merge

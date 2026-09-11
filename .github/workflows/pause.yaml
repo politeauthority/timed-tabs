@@ -1,0 +1,57 @@
+name: Not paused
+run-name: "Not paused — #${{ github.event.pull_request.number }}"
+
+# ⏸️ The `ci pause` label, enforced on its own.
+#
+# This is deliberately a separate check from CI. Pausing has to take effect the
+# moment the label goes on, which means listening to `labeled`; if the heavy CI
+# job did that, every label change -- including the `automerge` one -- would
+# start a fresh build and the PR would wait a full cycle for it. This job runs
+# on a hosted runner in seconds, so it can afford to be woken by any label.
+#
+# It fails while the label is on, and that is the point: a required job that is
+# *skipped* counts as passed, so a paused check reporting green would quietly
+# remove the gate the label exists to hold. Red with an explanation is honest --
+# CI has not verified this, and it must not merge.
+#
+# ⚠️ PREREQ: `Not paused` has to be a required check on main, or a red one
+# blocks nothing. Add it only once this file is on main: a required check whose
+# workflow is missing never reports, and that blocks every PR for ever.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  paused:
+    name: Not paused
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the label
+        env:
+          PAUSED: ${{ contains(github.event.pull_request.labels.*.name, 'ci pause') }}
+        run: |
+          set -euo pipefail
+          if [ "$PAUSED" != "true" ]; then
+            {
+              echo "### ▶️ Not paused"
+              echo ""
+              echo "No \`ci pause\` label, so the checks run as usual."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### ⏸️ CI is paused for this pull request"
+            echo ""
+            echo "> ▶️ **Why this ran:** the \`ci pause\` label is on this pull request."
+            echo ""
+            echo "Lint, the tests and the build were not run against this commit."
+            echo ""
+            echo "This check is red on purpose. It is required, and a paused check that"
+            echo "reported green would let the branch merge unverified. Remove the label"
+            echo "and everything runs again."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
