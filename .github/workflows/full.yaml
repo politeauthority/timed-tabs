@@ -4,8 +4,10 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
 # the E2E scenarios run on nightly, stable and the two stables before it, in
 # Firefox and in Chrome, instead of CI's three legs. Each browser is its own
-# segment of the table with its own verdict, and nightly is advisory in both: a
-# daily build breaking is worth seeing and not worth holding a merge for.
+# segment of the table with its own verdict. Nightly is advisory in both -- a
+# daily build breaking is worth seeing and not worth holding a merge for -- and
+# so is every Chrome leg while Chrome is being proven on this runner: the
+# status is set by the Firefox stable legs alone.
 #
 # GitHub has no such thing as a required label, so the label is enforced by a
 # required status named `CI run full` that reads it. The gate job at the bottom
@@ -22,7 +24,7 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # Three jobs:
 #   - plan     decides what this event needs, on a hosted runner in seconds
 #   - Full     the eight legs, e2e.yaml called with a longer `legs` list, so
-#              they report as `Full / Firefox nightly` ... `Full / Chrome previous-2`
+#              they report as `Full / Firefox nightly` ... `Full / Chrome stable-2`
 #   - Full run gate   posts the `CI run full` status, which is the only thing
 #              branch protection reads. Its own check is not required and is
 #              named differently on purpose, so the two cannot be confused.
@@ -164,8 +166,8 @@ jobs:
       # The standard set, in both browsers: the daily build, the current stable
       # and the two stables before it. None of the legs is required on its own;
       # the status the gate posts is, and it ignores nightly.
-      firefox: '["nightly", "stable", "previous", "previous-2"]'
-      chrome: '["nightly", "stable", "previous", "previous-2"]'
+      firefox: '["nightly", "stable", "stable-1", "stable-2"]'
+      chrome: '["nightly", "stable", "stable-1", "stable-2"]'
       # Not all at once: ten at a time starved one another on the runner node
       # until three legs saw one tick in their whole window and failed on
       # timing alone. Two per browser, so four at a time across the two jobs,
@@ -215,11 +217,18 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RUN: ${{ needs.plan.outputs.run }}
         run: |
-          set -uo pipefail
+          # +e explicitly: GitHub runs this under `bash -e`, and the script's
+          # exit 3 (a leg that counts failed) must reach the case below, not
+          # abort the step -- which left the status unposted and the PR
+          # pending rather than red the first time a leg failed.
+          set -u +e -o pipefail
           gh run view "$RUN" --json jobs > jobs.json || echo '{"jobs": []}' > jobs.json
           # stdout is the table; stderr is one line per browser, "Firefox: passed"
           # or "Chrome: stable failed", which becomes the status description.
-          python3 scripts/e2e-full-summary.py legs jobs.json > table.md 2> verdict.txt
+          # What counts towards the status: nightly never does, and no Chrome
+          # leg does while Chrome is advisory. Keep in step with e2e.yaml's
+          # `chrome-advisory` default.
+          python3 scripts/e2e-full-summary.py --advisory nightly,chrome legs jobs.json > table.md 2> verdict.txt
           case $? in
             0) verdict=pass ;;
             3) verdict=fail ;;

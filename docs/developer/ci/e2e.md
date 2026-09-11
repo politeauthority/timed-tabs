@@ -165,13 +165,15 @@ browser's own feed:
 |---|---|---|---|---|
 | `nightly` | Firefox Nightly (`latest-nightly`) | Chrome Canary | — | advisory |
 | `stable` | the current release, 155.0.1 today | the current stable, 153.x | required (Firefox), advisory (Chrome) | counts |
-| `previous` | the last release of the major before it, 154.0.1 | one major behind stable, 152 | required (Firefox) | counts |
-| `previous-2` | two majors back, 153.x | two majors back, 151 | — | counts |
+| `stable-1` | the last release of the major before it, 154.0.1 | one major behind stable, 152 | required (Firefox) | counts |
+| `stable-2` | two majors back, 153.x | two majors back, 151 | — | counts |
 
-CI runs Firefox stable and previous, which are the required checks, and Chrome stable
+CI runs Firefox stable and stable-1, which are the required checks, and Chrome stable
 beside them. The full run, on a PR labelled `ci run full`, runs all four channels in
-both browsers; nightly is shown and flagged but never holds the merge, since a daily
-build breaking is worth knowing and not worth blocking on.
+both browsers. Nightly is shown and flagged but never holds the merge, since a daily
+build breaking is worth knowing and not worth blocking on — and while Chrome is being
+proven on the runner, the same goes for every Chrome leg (`chrome-advisory`, on by
+default). An advisory leg that fails is a warning on its job rather than a red.
 
 On a PR to `main` that carries `ci run full`, CI's legs skip: the full run covers the
 same versions and the `CI run full` status holds the merge until it passes. The
@@ -184,28 +186,28 @@ passes in one browser and fails in another is a real difference in the extension
 
 For Chrome, the *Resolve the Chrome version* step reads the Chrome for Testing
 [last-known-good feed](https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json)
-for the current stable; `previous-N` becomes a bare major N behind it, which
+for the current stable; `stable-N` becomes a bare major N behind it, which
 `setup-chrome` installs as the latest build of that major, and `nightly` is handed to
 `setup-chrome` as the `canary` channel.
 
 No Firefox is pinned either. The `Resolve the Firefox version` step reads Mozilla's
 [product-details feed](https://product-details.mozilla.org/1.0/firefox.json), takes
 the shipped desktop releases from it (`major` and `stability`; betas, ESRs and
-devedition are filtered out), and picks the newest — or, for `previous`, the last
-point release one major back. So `previous` follows every Firefox release on its own,
+devedition are filtered out), and picks the newest — or, for `stable-N`, the last
+point release N majors back. So `stable-1` follows every Firefox release on its own,
 and the pair is always genuinely adjacent. `nightly` is handed to `setup-firefox` as
 `latest-nightly`; whichever build that fetches, the *Which browser* step reads the
 version off the binary, and that is what the table and the summary show for every leg.
 
 Both legs resolve an exact version from that one feed rather than handing
-`setup-firefox` the string `latest`, which keeps `previous` defined relative to the
+`setup-firefox` the string `latest`, which keeps `stable-1` defined relative to the
 version actually under test, and puts the number in the log and the job summary.
 
 The legs come from two inputs, `firefox` and `chrome`, each a JSON list of channels
 that is that browser's matrix directly; the workflow has one job per browser, near
-copies of each other, and a leg is named `<Browser> <channel>`. `previous-N` is N
-majors behind stable, so `previous` is `previous-1`. The defaults are Firefox stable
-and previous plus Chrome stable, which is what CI and the beta gate run, and the
+copies of each other, and a leg is named `<Browser> <channel>`. `stable-N` is N
+majors behind stable. The defaults are Firefox stable
+and stable-1 plus Chrome stable, which is what CI and the beta gate run, and the
 **CI run full** workflow passes all four channels of each
 browser when a PR carries the `ci run full` label — see
 [README.md](README.md#the-full-run). To change
@@ -218,14 +220,14 @@ Each leg reports its own check, and both Firefox ones are required on `main`,
 alongside **Lint, test & build**, **Not paused** and **CI run full**:
 
 - **E2E / Firefox stable**
-- **E2E / Firefox previous**
+- **E2E / Firefox stable-1**
 
 `E2E / Chrome stable` reports too but is not required yet.
 
 Both halves of each name are load-bearing. GitHub prefixes a called workflow's jobs
 with the calling job's name, so the context is `jobs.e2e` in `ci.yaml` (named `E2E`)
 plus the leg's own name — and a matrix job's name carries its matrix values, which is
-what puts `stable` and `previous` in there.
+what puts `stable` and `stable-1` in there.
 
 That last part is the sharp edge: **changing the matrix renames a protected context.**
 Add a third version, rename a leg, drop one — each of those silently stops a required
