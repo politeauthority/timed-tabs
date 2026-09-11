@@ -47,6 +47,12 @@ out of time:
 With **Tell me when a tab is closed** on, a desktop notification names each tab that
 was closed. Several tabs closed on the same tick share one notification. Clicking it
 reopens the tab when there was one, and opens the Tabs page when there were more.
+Switching the setting on sends a test notification at once. If the switch stays on but
+nothing appears, the browser accepted it and your operating system is holding it back:
+on macOS check System Settings, Notifications, Firefox, and any Focus mode; on Windows,
+Settings, Notifications. The Diagnostics section of the Settings page shows whether the
+setting is on and the permission granted.
+
 This needs the browser's notification permission, which is asked for when the setting
 is switched on.
 
