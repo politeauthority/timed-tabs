@@ -5,7 +5,7 @@
 import { api, withTimeout } from "../shared/browser.js";
 import { watchGroups, watchRules, watchSettings } from "../shared/settings.js";
 import { featureOn } from "../shared/flags.js";
-import { RULE_FIELDS, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
+import { RULE_FIELDS, applicableRules, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
 import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
@@ -36,6 +36,19 @@ let groups = [];
 // featureOn, not flagOn: site groups also needs the beta-features switch, and
 // the raw switch would have let it run with that master switch off.
 const activeGroups = () => (featureOn(settings, "site-groups") ? groups : []);
+
+/**
+ * Settings, rules and groups changes, and anything that starts or stops
+ * indicators, run one at a time. Two overlapping runs used to race on
+ * `active`: one could start an indicator twice, or leave a running one
+ * untracked so nothing ever stopped it.
+ */
+let chain = Promise.resolve();
+function serial(fn) {
+  const next = chain.then(fn, fn);
+  chain = next.catch((e) => console.warn("[timed-tabs]", String(e)));
+  return next;
+}
 let active = [];
 const expired = new Set();
 const diag = { ticks: 0, lastTick: null, lastError: null, lastSnapshot: [] };
@@ -58,7 +71,10 @@ async function loadRecent() {
   }
   return recent;
 }
-async function recordExpired(tab, action) {
+function recordExpired(tab, action) {
+  return serial(() => recordExpiredNow(tab, action));
+}
+async function recordExpiredNow(tab, action) {
   const list = await loadRecent();
   list.unshift({
     id: `${tab.id}-${Date.now()}`,
@@ -131,7 +147,7 @@ if (IS_DEV_BUILD) {
 }
 // @dev-only-end
 
-watchSettings(async (next) => {
+watchSettings((next) => serial(async () => {
   const previous = settings;
   settings = next;
   await ready;
@@ -149,12 +165,11 @@ watchSettings(async (next) => {
   await syncIndicators();
 
   if (previous?.pauseWhileActive !== settings.pauseWhileActive) await applyPauseSetting();
-  void previous;
 
   await api.alarms.clear(TICK_ALARM);
   api.alarms.create(TICK_ALARM, { periodInMinutes: Math.max(1, settings.tickSeconds) / 60 });
   await tick();
-});
+}));
 
 /**
  * Put the browser back how we found it: stop every indicator, which is what
@@ -172,34 +187,41 @@ async function standDown() {
 async function restartAllClocks() {
   const now = Date.now();
   const tabs = await api.tabs.query({});
-  await Promise.all(tabs.map((t) => tracker.reset(t.id, now)));
+  // A fresh clock for every tab, and a running one for every tab not on
+  // screen: reset keeps a paused tab paused, and a tab that was active when
+  // the switch went off would otherwise stay paused for good.
+  await Promise.all(tabs.map(async (t) => {
+    await tracker.reset(t.id, now);
+    if (!t.active) await tracker.resume(t.id, now);
+  }));
+  await applyPauseSetting();
   expired.clear();
 }
 
-watchRules(async (next) => {
+watchRules((next) => serial(async () => {
   rules = next;
   if (!managing()) return;
   await ready;
   await syncIndicators();
   await applyPauseSetting();
   await tick();
-});
+}));
 
 // A group edit can change which tabs a rule matches, exactly like a rule edit.
-watchGroups(async (next) => {
+watchGroups((next) => serial(async () => {
   groups = next;
   if (!settings) return;
   await ready;
   await applyPauseSetting();
   await tick();
-});
+}));
 
 /**
  * Start every indicator any tab could need (globals and every enabled rule)
  * and stop the rest. Which of them paint a given tab is decided per tab in tick().
  */
 async function syncIndicators() {
-  const wanted = findIndicators(wantedIndicatorIds(settings, rules, tracker.allOverrides()));
+  const wanted = findIndicators(wantedIndicatorIds(settings, rules, tracker.allOverrides(), activeGroups()));
   await Promise.all(active.filter((i) => !wanted.includes(i)).map((i) => i.stop()));
   await Promise.all(wanted.filter((i) => !active.includes(i)).map((i) => i.start({ api, tracker, settings })));
   for (const i of wanted) if (active.includes(i)) i.configure?.(settings);
@@ -210,10 +232,13 @@ async function syncIndicators() {
 function settingsFor(tab, tabState) {
   const url = tab.url ?? "";
   const ignoredIds = new Set(tabState?.ignoredRules ?? []);
-  const active = tabState?.ignoreRules ? [] : rules.filter((r) => !ignoredIds.has(r.id));
-  const eff = effectiveSettings(settings, active, url, activeGroups());
-  // Everything that would match if nothing were ignored, for the UI.
-  eff.allMatched = effectiveSettings(settings, rules, url, activeGroups()).matched;
+  const groupsInForce = activeGroups();
+  // Match every rule once; the UI wants all of them, the settings only the
+  // ones this tab has not switched off.
+  const allMatched = applicableRules(rules, url, groupsInForce);
+  const active = tabState?.ignoreRules ? [] : allMatched.filter((r) => !ignoredIds.has(r.id));
+  const eff = effectiveSettings(settings, active, url, groupsInForce);
+  eff.allMatched = allMatched;
   eff.ignoredIds = ignoredIds;
   if (tabState?.resetOnActivate !== null && tabState?.resetOnActivate !== undefined) {
     eff.resetOnActivate = tabState.resetOnActivate;
@@ -254,7 +279,10 @@ api.tabs.onActivated.addListener(async ({ tabId, previousTabId }) => {
   if (!managing()) return;
   const tab = await api.tabs.get(tabId).catch(() => ({ id: tabId }));
   const eff = settingsFor(tab, await tracker.track(tabId));
-  if (eff.resetOnActivate) await tracker.reset(tabId);
+  if (eff.resetOnActivate) {
+    await tracker.reset(tabId);
+    expired.delete(tabId); // a new life can expire again
+  }
   if (eff.pauseWhileActive) await tracker.pause(tabId);
   if (previousTabId !== undefined) await tracker.resume(previousTabId);
   tick();
@@ -263,25 +291,21 @@ api.tabs.onActivated.addListener(async ({ tabId, previousTabId }) => {
 // Rules match on URL, so a navigation can change a tab's effective settings:
 // re-evaluate at once, let the new page expire on its own terms, and bring
 // the active tab's pause state in line with the rules that now apply.
-api.tabs.onUpdated.addListener(
-  async (tabId, change, tab) => {
-    if (!change.url || !managing()) return;
+// One listener without a filter: the `properties` filter is Firefox-only and
+// Chrome rejects it, which would abort this whole module.
+api.tabs.onUpdated.addListener(async (tabId, change, tab) => {
+  if (!managing()) return;
+  if (change.url) {
     expired.delete(tabId);
     if (tab?.active) {
       const eff = settingsFor(tab, await tracker.track(tabId));
       await (eff.pauseWhileActive ? tracker.pause : tracker.resume)(tabId);
     }
     tick();
-  },
-  { properties: ["url"] },
-);
-
-api.tabs.onUpdated.addListener(
-  (_tabId, change) => {
-    if (change.status === "complete" && managing()) tick();
-  },
-  { properties: ["status"] },
-);
+  } else if (change.status === "complete") {
+    tick();
+  }
+});
 
 api.runtime.onMessage.addListener((msg) => {
   switch (msg?.type) {
@@ -306,7 +330,8 @@ api.runtime.onMessage.addListener((msg) => {
     case "timed-tabs:recent-remove": {
       // One entry by id, or every entry in a grouped row by its ids.
       const ids = new Set(Array.isArray(msg.ids) ? msg.ids : [msg.id]);
-      return loadRecent().then(async (list) => {
+      return serial(async () => {
+        const list = await loadRecent();
         recent = list.filter((r) => !ids.has(r.id));
         await api.storage.local.set({ [RECENT_KEY]: recent });
         return "ok";
@@ -428,7 +453,7 @@ async function tabAction({ tabId, action, value }) {
       if (!RULE_FIELDS.includes(value?.key)) break;
       await tracker.setOverride(tabId, value.key, value.value);
       expired.delete(tabId);
-      await syncIndicators();
+      await serial(syncIndicators);
       await applyPauseSetting();
       break;
     case "clearOverrides":
@@ -477,8 +502,15 @@ function devLogLook(tab, eff, quiet) {
 }
 
 let ticking = false;
+let tickAgain = false;
 async function tick() {
-  if (!managing() || ticking) return;
+  if (!managing()) return;
+  // A tick that lands mid-tick (a navigation during a slow indicator update)
+  // runs once the current one finishes rather than being dropped.
+  if (ticking) {
+    tickAgain = true;
+    return;
+  }
   ticking = true;
   try {
     const now = Date.now();
@@ -538,12 +570,17 @@ async function tick() {
     console.warn("[timed-tabs] tick failed", String(e));
   } finally {
     ticking = false;
+    if (tickAgain) {
+      tickAgain = false;
+      void tick();
+    }
   }
 }
 
+const expiring = new Set();
 async function expire(tab, onExpire) {
-  if (expired.has(tab.id)) return;
-  expired.add(tab.id);
+  if (expired.has(tab.id) || expiring.has(tab.id)) return;
+  expiring.add(tab.id);
   if (IS_DEV_BUILD) console.log(`[timed-tabs] expired ${tab.id} ${tab.url} action=${onExpire}`);
   try {
     if (onExpire === "close") {
@@ -566,9 +603,13 @@ async function expire(tab, onExpire) {
       // Refresh the page and start the clock again, so it keeps refreshing every lifetime.
       await api.tabs.reload(tab.id);
       await tracker.reset(tab.id);
-      expired.delete(tab.id);
     }
+    // Done, and not to be done again until the clock restarts. A reload has
+    // just restarted it; the others are marked so the tab is left alone.
+    if (onExpire !== "reload") expired.add(tab.id);
   } catch {
-    // Tab may already be gone or not discardable; ignore.
+    // Tab may already be gone or not discardable: try again next tick.
+  } finally {
+    expiring.delete(tab.id);
   }
 }

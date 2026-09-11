@@ -39,6 +39,9 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
   function configure(settings) {
     enabled = Boolean(settings?.notifyOnExpire);
     if (!enabled) discardPending();
+    // The permission is optional and may have been granted since load, in
+    // which case the namespace appeared after start() ran.
+    if (enabled) start();
   }
 
   /** Record a tab we just closed. Cheap and synchronous; the send is batched. */
@@ -84,14 +87,18 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
     targets.delete(id);
   }
 
+  let listening = false;
   function start() {
-    api.notifications?.onClicked?.addListener(onClicked);
-    api.notifications?.onClosed?.addListener(onClosed);
+    if (listening || !api.notifications?.onClicked) return;
+    api.notifications.onClicked.addListener(onClicked);
+    api.notifications.onClosed?.addListener(onClosed);
+    listening = true;
   }
 
   function stop() {
     api.notifications?.onClicked?.removeListener?.(onClicked);
     api.notifications?.onClosed?.removeListener?.(onClosed);
+    listening = false;
     discardPending();
   }
 

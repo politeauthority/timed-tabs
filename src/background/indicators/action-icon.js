@@ -92,7 +92,9 @@ export async function stop() {
   const a = action();
   const resting = iconFor(iconKey({ quiet: true }));
   await Promise.all(
-    [...painted.keys()].map(async (tabId) => {
+    // Every tab, not just the ones this instance remembers painting: on Chrome
+    // the service worker restarts and forgets, but the icons stay.
+    [...new Set([...painted.keys(), ...(await api.tabs.query({}).catch(() => [])).map((t) => t.id)])].map(async (tabId) => {
       // Firefox drops a per-tab icon when handed null. A browser that will
       // not gets the resting mark instead, which is the packaged icon redrawn.
       try {

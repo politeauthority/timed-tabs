@@ -31,6 +31,7 @@
     if (msg.type === "timed-tabs:reset") {
       setBlink(false);
       restore();
+      return Promise.resolve("favicon:reset");
     }
     // The background asks before closing an expired tab, so its "recently
     // expired" entry can show the site's icon rather than our painted one.
@@ -38,7 +39,9 @@
       captureOriginal();
       return Promise.resolve(originalHref ?? "");
     }
-    return Promise.resolve("ok");
+    // Not ours: say nothing, so the script the message was for can be
+    // injected if it is missing (see background/indicators/inject.js).
+    return undefined;
   });
 
   // About to expire: alternate the painted icon with the site's plain one.

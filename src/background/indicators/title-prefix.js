@@ -25,13 +25,11 @@ export async function start() {
 
 export async function update(tabs) {
   await Promise.all(
-    tabs.map((t) =>
-      injector.send(t, {
-        type: "timed-tabs:title",
-        prefix: t.exempt || t.quiet ? "" : emojiFor(t.progress),
-        flash: Boolean(t.flashing),
-      }),
-    ),
+    tabs.map((t) => {
+      const prefix = t.exempt || t.quiet ? "" : emojiFor(t.progress);
+      // An empty prefix only undoes: no point injecting a script to do nothing.
+      return injector.send(t, { type: "timed-tabs:title", prefix, flash: Boolean(t.flashing) }, { undo: !prefix });
+    }),
   );
 }
 
