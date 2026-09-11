@@ -2728,6 +2728,11 @@ watchSettings((next) => {
   settings = next;
   applyManagementState();
   renderFields();
+  // `?group=` picks the Settings group to arrive on -- what the flags note's
+  // "Change" uses to send the popup somewhere specific. After renderFields,
+  // which otherwise restores the last group looked at.
+  const group = params.get("group");
+  if (!isPopup && GROUPS.some((g) => g.id === group)) showGroup(group);
   renderSortControl();
   renderFlagged();
 });
@@ -3183,17 +3188,28 @@ async function openPageView(hash = "", extraParams = {}) {
 
 $("open-page").addEventListener("click", () => openPageView("#tabs"));
 
+/** The Settings group the flags row lives in, asked rather than assumed. */
+const FLAGS_GROUP = FIELDS.find((f) => f.key === "featureFlags")?.group;
+
 /**
  * "Change" on the flags note goes to the switches it is talking about. From
  * the popup that means opening the page, since the flags live on the Settings
- * page and the popup has no copy of them; from a page view it is a hop and a
- * scroll, because the row is below the fold of a long Settings page.
+ * page and the popup has no copy of them; from a page view it is a hop, a
+ * group and a scroll.
+ *
+ * The group is the part that is easy to miss. Settings shows one group at a
+ * time and the flags are in Advanced, so on any other group the row is inside
+ * a hidden section -- and `scrollIntoView` on one of those does nothing at
+ * all, which lands you on Settings with no idea what you were sent to look at.
  */
 $("flags-note-manage").addEventListener("click", () => {
-  if (isPopup) return openPageView("#settings");
+  // The popup has no page to scroll, so it asks the page it opens to arrive
+  // on the right group, the way `site` asks the Rules page to arrive filtered.
+  if (isPopup) return openPageView("#settings", FLAGS_GROUP ? { group: FLAGS_GROUP } : {});
   location.hash = "#settings";
   // After the hash has been routed and the section is displayed.
   requestAnimationFrame(() => {
+    if (FLAGS_GROUP) showGroup(FLAGS_GROUP);
     $("fields")
       .querySelector('.field[data-key="featureFlags"]')
       ?.scrollIntoView({ block: "center", behavior: "smooth" });

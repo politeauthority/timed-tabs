@@ -26,7 +26,7 @@ set you had.
 
 ## 🚩 Knowing one is on
 
-While any beta feature is on, a line at the top of the popup and of every page names
+While any beta feature is on, a line at the foot of the popup and of every page names
 which ones — `2 beta features on: Site groups, Settings toasts` — with **Change** to
 go straight back to the switches. It is there so that a screen which no longer matches
 this guide explains itself, rather than leaving you to wonder which switch did it.
