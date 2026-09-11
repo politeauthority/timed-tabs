@@ -31,6 +31,7 @@ import {
   snoozeSeconds,
   toUnit,
 } from "../shared/time.js";
+import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
 import { indicators } from "../background/indicators/index.js";
 
 // The same file serves three contexts: the toolbar popup (default), the
@@ -654,7 +655,8 @@ async function refreshOverview() {
   }
   const frag = document.createDocumentFragment();
   groups.forEach((g, i) => {
-    const rows = g.tabs.map(renderTabRow);
+    // Order within each window; the windows themselves keep their own order.
+    const rows = sortTabs(g.tabs, settings.tabSort).map(renderTabRow);
     if (groups.length === 1) {
       frag.append(...rows);
       return;
@@ -879,6 +881,22 @@ function quickToggle(iconName, pressed, inherited, label, cls) {
   b.title = label;
   return b;
 }
+
+function renderSortControl() {
+  const select = $("overview-sort");
+  if (select.options.length !== TAB_SORTS.length) {
+    select.replaceChildren(
+      ...TAB_SORTS.map((o) => new Option(o.label, o.id)),
+    );
+  }
+  select.value = settings.tabSort;
+}
+
+// `save` persists the choice and redraws the list, so the order survives a
+// reload and follows the profile.
+$("overview-sort").addEventListener("change", (e) =>
+  save({ tabSort: e.target.value }),
+);
 
 $("overview").addEventListener("toggle", (e) => {
   clearInterval(overviewTimer);
@@ -1800,6 +1818,7 @@ getDisplayVersion().then((v) => {
     route();
   }
   renderFields();
+  renderSortControl();
   refreshPermissionWarning();
   syncPermissionFields();
   if (isPopup) {
