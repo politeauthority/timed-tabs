@@ -22,7 +22,7 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # Three jobs:
 #   - plan     decides what this event needs, on a hosted runner in seconds
 #   - Full     the eight legs, e2e.yaml called with a longer `legs` list, so
-#              they report as `Full / Firefox nightly` ... `Full / Chrome previous-2`
+#              they report as `Full / Firefox nightly` ... `Full / Chrome stable-2`
 #   - Full run gate   posts the `CI run full` status, which is the only thing
 #              branch protection reads. Its own check is not required and is
 #              named differently on purpose, so the two cannot be confused.
@@ -164,8 +164,8 @@ jobs:
       # The standard set, in both browsers: the daily build, the current stable
       # and the two stables before it. None of the legs is required on its own;
       # the status the gate posts is, and it ignores nightly.
-      firefox: '["nightly", "stable", "previous", "previous-2"]'
-      chrome: '["nightly", "stable", "previous", "previous-2"]'
+      firefox: '["nightly", "stable", "stable-1", "stable-2"]'
+      chrome: '["nightly", "stable", "stable-1", "stable-2"]'
       # Not all at once: ten at a time starved one another on the runner node
       # until three legs saw one tick in their whole window and failed on
       # timing alone. Two per browser, so four at a time across the two jobs,
