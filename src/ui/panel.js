@@ -586,8 +586,9 @@ function renderTabRules() {
 // ---- Page settings ---------------------------------------------------------
 
 /**
- * Settings that are details of another one. They say nothing on their own, so
- * they wait behind "Show more" however they are set.
+ * Settings that are details of another one. They say nothing without the
+ * setting they qualify, so a rule touching one is not reason enough to list it
+ * here; the rule card below prints what it sets.
  */
 const DEPENDENT_SETTINGS = new Set([
   "flashLeadSeconds",
@@ -595,26 +596,29 @@ const DEPENDENT_SETTINGS = new Set([
   "faviconStyle",
 ]);
 
-/** Whether a setting is doing something, and so belongs in the short list. */
 /**
- * Always in the short list, whatever they are set to. How long this tab has
- * and whether looking at it starts that over are the two questions the popup
- * exists to answer, so neither should need "Show more" to reach.
+ * Always listed, whatever they are set to. How long this tab has and whether
+ * looking at it starts that over are the two questions the popup exists to
+ * answer.
  */
 const ALWAYS_SHOWN = new Set(["tabLifetimeSeconds", "resetOnActivate"]);
 
-function isSettingActive(key, value) {
+/**
+ * Which of the eleven per-tab settings the popup lists.
+ *
+ * It used to render all of them and hide whatever sat at its default behind
+ * "Show more", so the section opened with more concealed than shown -- and the
+ * test for "doing something" was the value's truthiness, which buried any
+ * setting a rule had switched *off*: a rule setting `flashBeforeExpiry: false`
+ * read as untouched. The list is now what something actually changed on this
+ * page, plus the two questions above. Everything else is a default, and
+ * defaults belong on the settings page.
+ */
+function belongsInPageSettings(key, entry) {
   if (ALWAYS_SHOWN.has(key)) return true;
   if (DEPENDENT_SETTINGS.has(key)) return false;
-  if (key === "onExpire") return value !== "none";
-  if (key === "indicators") {
-    const a = [...(value ?? [])].sort().join();
-    return a !== [...DEFAULTS.indicators].sort().join();
-  }
-  return Boolean(value);
+  return entry?.from !== "global";
 }
-
-let tabSettingsExpanded = false;
 
 /** The tab's own layer: explicit overrides, plus the two older per-tab switches. */
 function tabOverrides() {
@@ -630,31 +634,29 @@ function tabOverrides() {
   return out;
 }
 
-/** "global", the rule that won, or this tab -- shown next to each value. */
-function sourceBadge(entry, onClear) {
-  // A tab override is the only source the user can take back from here, so
-  // that badge is a button and the others stay plain text.
-  const clearable = entry.from === "tab" && typeof onClear === "function";
-  const el = document.createElement(clearable ? "button" : "span");
-  if (clearable) {
-    el.type = "button";
-    el.addEventListener("click", onClear);
-  }
-  el.className = `setting-source is-${entry.from}`;
-  if (entry.from === "rule") {
-    const r = entry.rule;
-    el.textContent = r?.description || r?.pattern || "rule";
-    el.title = `From the rule ${r?.pattern ?? ""}${r?.priority !== undefined ? ` (priority ${r.priority})` : ""}`;
-  } else if (entry.from === "tab") {
-    el.textContent = "this tab";
-    el.title = clearable
-      ? "Set on this tab, until it closes. Click to hand it back to the rules and your defaults."
-      : "Set on this tab, until it closes";
-  } else {
-    el.textContent = "default";
-    el.title = "Your global setting, with no rule changing it here";
-  }
+/**
+ * The one marker a row still carries: this tab has taken the setting over.
+ *
+ * A rule is no longer badged. Naming it here cost the label its width -- the
+ * row read "Lifetim" beside a pill spelling out the rule -- and said a third
+ * time what the rule card below already prints in full. The rule's name rides
+ * in the row's tooltip instead, where it takes no space.
+ */
+function thisTabBadge(onClear) {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "setting-source is-tab";
+  el.textContent = "this tab";
+  el.title = "Set on this tab, until it closes. Click to hand it back to the rules and your defaults.";
+  el.addEventListener("click", onClear);
   return el;
+}
+
+/** How a rule that changed a value names itself, for the row's tooltip. */
+function ruleSourceText(entry) {
+  const r = entry.rule;
+  const name = r?.description || r?.pattern || "a rule";
+  return `Set by ${name}${r?.priority !== undefined ? ` (priority ${r.priority})` : ""}.`;
 }
 
 function renderTabSettings() {
@@ -684,7 +686,9 @@ function renderTabSettings() {
     },
   };
 
-  const defs = defsFor(RULE_FIELDS, THIS_TAB_SUBJECT);
+  const defs = defsFor(RULE_FIELDS, THIS_TAB_SUBJECT).filter((def) =>
+    belongsInPageSettings(def.key, explained[def.key]),
+  );
   const list = $("tab-settings-list");
   list.replaceChildren(
     ...defs.map((def) => {
@@ -693,40 +697,27 @@ function renderTabSettings() {
         adopt: true,
         compact: true,
       });
-      // In the control column, not the label: the label is a two-column grid
-      // and a third child there wraps onto a line of its own.
-      const clear = () => tabAction("override", { key: def.key, value: null });
-      // Only badge a value something has changed. "default" on most rows is
-      // noise that costs the label its width, and the note below says what no
-      // badge means.
-      const badge = entry.from === "global" ? null : sourceBadge(entry, clear);
-      // A stacked control (the indicator list) is a column of its own, so the
-      // badge goes with the label; beside the column it reads as belonging to
-      // whichever row it happens to line up with.
-      if (badge && row.classList.contains("is-stacked")) {
-        row.querySelector(".field-label")?.append(" ", badge);
-      } else if (badge) {
-        row.querySelector(".field-control")?.prepend(badge);
+      // Which rule won is a tooltip, not a pill: it costs the label nothing.
+      if (entry.from === "rule") {
+        row.title = [row.title, ruleSourceText(entry)].filter(Boolean).join(" ");
       }
-      row.hidden = !tabSettingsExpanded && !isSettingActive(def.key, entry.value);
+      if (entry.from === "tab") {
+        const badge = thisTabBadge(() => tabAction("override", { key: def.key, value: null }));
+        // A stacked control (the indicator list) is a column of its own, so
+        // the badge goes with the label; beside the column it would read as
+        // belonging to whichever row it happened to line up with.
+        if (row.classList.contains("is-stacked")) {
+          row.querySelector(".field-label")?.append(" ", badge);
+        } else {
+          row.querySelector(".field-control")?.prepend(badge);
+        }
+      }
       return row;
     }),
   );
 
-  const hiddenCount = defs.filter(
-    (d) => !isSettingActive(d.key, explained[d.key].value),
-  ).length;
-  const more = $("tab-settings-more");
-  more.hidden = hiddenCount === 0;
-  more.textContent = tabSettingsExpanded ? "Show less" : `Show more (${hiddenCount})`;
-  more.setAttribute("aria-expanded", String(tabSettingsExpanded));
   $("tab-settings-clear").hidden = Object.keys(tabState.overrides ?? {}).length === 0;
 }
-
-$("tab-settings-more").addEventListener("click", () => {
-  tabSettingsExpanded = !tabSettingsExpanded;
-  renderTabSettings();
-});
 
 $("tab-settings-clear").addEventListener("click", async () => {
   await tabAction("clearOverrides");
