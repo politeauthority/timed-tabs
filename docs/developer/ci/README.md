@@ -19,6 +19,7 @@ explaining why it is shaped the way it is; this section is the map over the top.
 |---|---|---|
 | **CI** (`ci.yaml`) | every PR, every push to `main`, dispatch | Lints, unit-tests and builds both dist targets, then calls E2E. |
 | **E2E** (`e2e.yaml`) | called by CI; dispatch | The extension in a real headless Firefox, two versions in parallel. See [e2e.md](../e2e.md). |
+| **CI run full** (`full.yaml`) | every PR, including every label change | Red until the `ci run full` label is on and the E2E scenarios have passed on the last ten Firefox releases. See [The full run](#the-full-run). |
 | **Not paused** (`pause.yaml`) | every PR, including every label change and review | Goes red while the `ci pause` label is on. Also dispatches Release Please when a review or the `release-approved` label lands on the release PR, so that workflow need not listen to PR events itself. |
 | **Auto-merge** (`automerge.yaml`) | the `automerge` label, both directions | Arms and disarms GitHub's auto-merge, and keeps the label and the state agreeing. |
 | **Release Please** (`release-please.yaml`) | push to `main`, review, label, dispatch | Maintains the release PR, and on merge tags, packages and publishes. |
@@ -27,13 +28,14 @@ explaining why it is shaped the way it is; this section is the map over the top.
 
 ## What must be green
 
-Four contexts are required on `main`:
+Five contexts are required on `main`:
 
 ```
 Lint, test & build
 Not paused
 E2E / Firefox latest
 E2E / Firefox previous
+CI run full
 ```
 
 `Not paused` was missing from that list for a while, and the gap is worth
@@ -58,7 +60,8 @@ gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/requir
  "checks": [{"context": "Lint, test & build", "app_id": 15368},
             {"context": "Not paused", "app_id": 15368},
             {"context": "E2E / Firefox latest", "app_id": 15368},
-            {"context": "E2E / Firefox previous", "app_id": 15368}]}
+            {"context": "E2E / Firefox previous", "app_id": 15368},
+            {"context": "CI run full", "app_id": 15368}]}
 JSON
 ```
 
@@ -79,6 +82,32 @@ saying nothing. Lint, the unit tests and the build still run there, which is wha
 keeps `web-ext lint` on the bumped manifest version before the tag is cut, and the
 `package` job re-runs lint and the tests against the tag itself before anything is
 attached to a release.
+
+## The full run
+
+Merging into `main` needs the **`ci run full`** label. GitHub has no required labels,
+so it is enforced the way `ci pause` is: **CI run full** (`full.yaml`) is a required
+check that reads the label. Without it the check is red and says so; with it, the
+E2E scenarios run on the last ten Firefox releases — the current one and the nine
+majors before it, each resolved from Mozilla's feed the way `E2E` resolves its two —
+and the check goes green once all ten have passed. Take the label off and it goes red
+again.
+
+The ten legs report as `Full / Firefox latest`, `Full / Firefox previous`,
+`Full / Firefox previous-2` … `previous-9`. None of them is required on its own; only
+the gate is, so adding or dropping a leg does not touch branch protection.
+
+Arming auto-merge adds the label, whether by the `automerge` label or the button on
+the PR, so a PR told to merge itself is never left waiting on a label nobody added.
+Auto-merge adds it with the `PAT` secret: a label added by `GITHUB_TOKEN` wakes no
+workflow, and the full run would only start on the next push.
+
+Ten Firefoxes are ten runner jobs, so the workflow is careful about when they run.
+A later event on a commit that already passed — a review, another label — reuses that
+result instead of running again, and a new push cancels the legs still running for the
+commit it replaced. A pull request against a branch other than `main` passes the gate
+without the label, and so does the release PR, whose branch never carries anything a
+scenario reads.
 
 ## Pausing a pull request
 

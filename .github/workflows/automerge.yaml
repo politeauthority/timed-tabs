@@ -19,6 +19,12 @@ run-name: "Auto-merge — PR #${{ github.event.pull_request.number }}"
 # allow auto-merge. Without a required check GitHub refuses to arm auto-merge,
 # because nothing is blocking the PR.
 #
+# 🏷️ Arming also puts the `ci run full` label on, because that label is itself
+# required to merge into main (full.yaml): a PR told to merge itself would
+# otherwise sit at a red check waiting for a label nobody was going to add. The
+# label goes on with the PAT secret rather than GITHUB_TOKEN, since a label
+# added by GITHUB_TOKEN wakes no workflow and the full run would never start.
+#
 # 🔒 The release PR is deliberately left out of all this: it is admin-gated
 # behind the STABLE_RELEASES variable (see docs/developer/ci/releasing.md). It has
 # no `automerge` label, so this workflow never touches it. Do not add one.
@@ -47,6 +53,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+
+env:
+  FULL_LABEL: ci run full
 
 jobs:
   # One job, three concerns, each a step that only runs for its own event:
@@ -176,7 +185,7 @@ jobs:
 
           if gh pr merge "$PR" --auto --squash 2>err.txt; then
             {
-              echo "✅ Armed. GitHub will squash-merge this PR as soon as **Lint, test & build** passes,"
+              echo "✅ Armed. GitHub will squash-merge this PR as soon as every required check passes,"
               echo "and delete the branch afterwards. Remove the \`automerge\` label to cancel."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -196,3 +205,38 @@ jobs:
             echo "blocking a PR there is nothing for auto-merge to wait on."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
+
+      # Whichever way auto-merge came on -- the step above, or the button on
+      # the PR -- the full run has to be asked for, or the merge waits on a red
+      # `CI run full` for ever. Checked against the live state rather than the
+      # event, so it is idempotent and safe to run after either path.
+      - name: Ask for the full run
+        if: github.event.action != 'unlabeled' && github.event.action != 'auto_merge_disabled'
+        env:
+          # PAT so the `labeled` event actually fires full.yaml. Falls back to
+          # GITHUB_TOKEN, which adds the label but wakes nothing -- the summary
+          # says so, and the next push starts the run instead.
+          GH_TOKEN: ${{ secrets.PAT || github.token }}
+          HAVE_PAT: ${{ secrets.PAT != '' }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          state=$(gh pr view "$PR" --json state,autoMergeRequest,labels --jq \
+            ".state + \" \" + ((.autoMergeRequest != null) | tostring) + \" \" + (([.labels[].name] | index(\"${FULL_LABEL}\") != null) | tostring)")
+          read -r open armed labelled <<< "$state"
+          [ "$open" = "OPEN" ] || exit 0
+          if [ "$armed" != "true" ]; then
+            echo "Auto-merge is not armed, so the \`${FULL_LABEL}\` label is left alone." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$labelled" = "true" ]; then
+            echo "🏷️ \`${FULL_LABEL}\` is already on, so the full run is already asked for." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh pr edit "$PR" --add-label "$FULL_LABEL"
+          if [ "$HAVE_PAT" = "true" ]; then
+            echo "🏷️ Added \`${FULL_LABEL}\`: merging into main needs the ten-Firefox run, and it starts now." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ Added \`${FULL_LABEL}\` with GITHUB_TOKEN, which wakes no workflow: the full run starts on the next push. Set the \`PAT\` secret to have it start now." >> "$GITHUB_STEP_SUMMARY"
+          fi
