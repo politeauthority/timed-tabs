@@ -1370,3 +1370,30 @@ button.danger.is-armed {
 .tab-rule > .saved-mark {
   grid-column: 2;
 }
+
+/* ---- Version ---------------------------------------------------------------- */
+
+.version {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+
+body[data-context="page"] .version {
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.version-mini {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+  padding: 0 4px;
+}
+
+/* The mini UI shows the version in its footer only. */
+body[data-context="popup"] .topbar .version {
+  display: none;
+}

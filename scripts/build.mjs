@@ -4,7 +4,13 @@
 // The "dev" target is a plain copy of src/ plus an optional dev.json taken
 // from DEV_JSON (a path) so test profiles can be seeded without ever putting
 // that file in src/, which the user's own profile loads directly.
+//
+// Every target gets a build.json ({ version, tag, commit, builtAt }). The UI
+// appends `tag` to the manifest version, so BUILD_TAG=rc1 shows as 0.4.4-rc1
+// while the manifest keeps the digits-only version Firefox requires. The dev
+// target is tagged "dev" unless BUILD_TAG says otherwise.
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { execSync } from "node:child_process";
 import path from "node:path";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
@@ -27,12 +33,40 @@ for (const target of targets) {
     await cp(process.env.DEV_JSON, path.join(out, "dev.json"));
   }
 
-  const manifest = JSON.parse(await readFile(path.join(SRC, "manifest.json"), "utf8"));
+  const manifest = JSON.parse(
+    await readFile(path.join(SRC, "manifest.json"), "utf8"),
+  );
   await writeFile(
     path.join(out, "manifest.json"),
     JSON.stringify(adaptManifest(manifest, target), null, 2) + "\n",
   );
+  await writeFile(
+    path.join(out, "build.json"),
+    JSON.stringify(
+      {
+        version: manifest.version,
+        tag: process.env.BUILD_TAG ?? (target === "dev" ? "dev" : ""),
+        commit: gitShortSha(),
+        builtAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ) + "\n",
+  );
   console.log(`built ${target} -> ${path.relative(ROOT, out)}`);
+}
+
+function gitShortSha() {
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      cwd: ROOT,
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "";
+  }
 }
 
 function adaptManifest(base, target) {

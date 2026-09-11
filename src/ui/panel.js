@@ -24,6 +24,7 @@ import {
   patternForUrl,
 } from "../shared/rules.js";
 import { exportText, parseBundle } from "../shared/backup.js";
+import { getDisplayVersion } from "../shared/version.js";
 import { formatDuration, formatRemaining, toUnit } from "../shared/time.js";
 import { indicators } from "../background/indicators/index.js";
 
@@ -1494,7 +1495,9 @@ async function refreshDiag() {
     summary.textContent = `Background not reachable: ${d?.error ?? "no reply"}`;
     return;
   }
+  const v = await getDisplayVersion();
   summary.textContent = [
+    `version: ${v.display}${v.commit ? ` (${v.commit})` : ""}`,
     `ticks: ${d.ticks}`,
     `last tick: ${d.lastTick ? new Date(d.lastTick).toLocaleTimeString() : "never"}`,
     `last error: ${d.lastError ?? "none"}`,
@@ -1582,6 +1585,20 @@ $("diagnostics").addEventListener("toggle", (e) => {
 });
 api.permissions.onAdded?.addListener(refreshPermissionWarning);
 api.permissions.onRemoved?.addListener(refreshPermissionWarning);
+
+// Version, shown in the page header and the mini UI footer.
+getDisplayVersion().then((v) => {
+  const text = `v${v.display}`;
+  const tip = v.commit
+    ? `Version ${v.display} (${v.commit})`
+    : `Version ${v.display}`;
+  for (const id of ["version", "version-mini"]) {
+    const el = $(id);
+    if (!el) continue;
+    el.textContent = text;
+    el.title = tip;
+  }
+});
 
 (async () => {
   applyBrowserTheme();
