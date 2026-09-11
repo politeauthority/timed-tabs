@@ -15,6 +15,7 @@ import {
   getSettings,
   saveRules,
   saveSettings,
+  watchSettings,
   watchGroups,
   watchRules,
 } from "../shared/settings.js";
@@ -51,7 +52,7 @@ import {
   toUnit,
 } from "../shared/time.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
-import { FLAGS, flagOn } from "../shared/flags.js";
+import { FLAGS, featureOn, flagOn, flagRequires } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
 
 // The same file serves three contexts: the toolbar popup (default), the
@@ -340,16 +341,32 @@ function renderField(field) {
     control.remove();
     const list = document.createElement("div");
     list.className = "field-group-rows";
+    const switches = new Map();
+    // A flag that requires another is greyed out until that one is on; its
+    // own value is kept, so turning the parent back on restores it.
+    const syncDependents = () => {
+      for (const [id, entry] of switches) {
+        const parent = flagRequires(id);
+        const blocked = Boolean(parent) && !flagOn(settings, parent);
+        entry.input.disabled = blocked;
+        entry.row.classList.toggle("is-blocked", blocked);
+        entry.row.title = blocked ? `Needs “${FLAGS.find((f) => f.id === parent)?.label ?? parent}” on as well` : "";
+      }
+    };
     for (const flag of FLAGS) {
       const sw = makeSwitch(value?.[flag.id] === true, async (checked) => {
         await save({ featureFlags: { ...settings.featureFlags, [flag.id]: checked } });
+        syncDependents();
         markSaved(sub);
       });
       sw.input.id = `f-flag-${flag.id}`;
       const sub = settingRow(flag.label, flag.help, sw.el);
       sub.querySelector(".field-label").htmlFor = sw.input.id;
+      if (flag.requires) sub.classList.add("flag-dependent");
+      switches.set(flag.id, { input: sw.input, row: sub });
       list.append(sub);
     }
+    syncDependents();
     row.append(list);
   }
   return row;
@@ -382,10 +399,7 @@ async function save(partial) {
   settings = { ...settings, ...partial };
   if ("tabManagement" in partial) applyManagementState();
   // A flag can show or hide whole sections; the rules page depends on site-groups.
-  if ("featureFlags" in partial && !isPopup) {
-    renderGroups();
-    renderRules();
-  }
+  if ("featureFlags" in partial) renderFlagged();
   updateFieldVisibility();
   for (const key of Object.keys(partial)) {
     const row = $("fields").querySelector(
@@ -582,7 +596,7 @@ function sourceBadge(entry) {
 
 function renderTabSettings() {
   const section = $("tab-settings");
-  if (!tabState || !settings || !flagOn(settings, "beta-features")) {
+  if (!tabState || !settings || !featureOn(settings, "mini-ui-page-settings")) {
     section.hidden = true;
     return;
   }
@@ -2045,6 +2059,30 @@ watchRules((next) => {
   if (!isPopup) renderRules();
   if (isPopup) refreshTab();
 });
+
+/**
+ * Settings saved by another instance (the full page while the popup is open,
+ * or the reverse) arrive here. Anything a flag shows or hides follows at
+ * once. A change this instance made itself is already applied, so it is
+ * skipped rather than re-rendered under the user's cursor.
+ */
+watchSettings((next) => {
+  if (JSON.stringify(next) === JSON.stringify(settings)) return;
+  settings = next;
+  applyManagementState();
+  renderFields();
+  renderSortControl();
+  renderFlagged();
+});
+
+/** Every part of the UI a feature flag can show or hide. */
+function renderFlagged() {
+  if (!isPopup) {
+    renderGroups();
+    renderRules();
+  }
+  if (isPopup) renderTab();
+}
 
 watchGroups((next) => {
   if (groupsSaving) return;

@@ -9,6 +9,10 @@
  * time settings are saved, and nothing throws. Backups written before the flag
  * existed, or after it was retired, load without complaint.
  *
+ * A flag may `require` another: it only counts as on while that one is on
+ * too, which lets "Beta features" act as a master switch. Read a feature
+ * through `featureOn`, which follows the chain; `flagOn` is the raw switch.
+ *
  * Pure, so none of this needs a browser to test.
  */
 
@@ -17,8 +21,15 @@ export const FLAGS = [
   {
     id: "beta-features",
     label: "Beta features",
-    help: "Turn on parts of Timed Tabs that are still settling down. Right now: the Page settings section in the popup, which lists every setting in force on the page and lets this tab take any of them over.",
+    help: "The master switch for parts of Timed Tabs that are still settling down. Each beta feature below also has its own switch, and needs both to be on.",
     default: false,
+  },
+  {
+    id: "mini-ui-page-settings",
+    label: "Page settings in the popup",
+    help: "A Page settings section in the popup that lists every setting in force on the page and lets this tab take any of them over.",
+    default: false,
+    requires: "beta-features",
   },
   {
     id: "site-groups",
@@ -47,7 +58,24 @@ export function mergeFlags(stored) {
   return out;
 }
 
-/** True when a flag is on. An id this build does not know is off, not an error. */
+/** True when a flag's own switch is on. An id this build does not know is off, not an error. */
 export function flagOn(settings, id) {
   return settings?.featureFlags?.[id] === true;
+}
+
+/** The flag another flag requires, or null. */
+export function flagRequires(id) {
+  return FLAGS.find((f) => f.id === id)?.requires ?? null;
+}
+
+/**
+ * True when a feature is in force: its flag is on, and so is every flag it
+ * requires, all the way up. This is the read the UI and background use.
+ */
+export function featureOn(settings, id, seen = new Set()) {
+  if (!flagOn(settings, id) || seen.has(id)) return false;
+  const parent = flagRequires(id);
+  if (!parent) return true;
+  seen.add(id);
+  return featureOn(settings, parent, seen);
 }
