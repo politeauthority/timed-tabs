@@ -63,7 +63,11 @@ export async function stop() {
   blinkTimer = null;
   blinkOn = true;
   const a = action();
-  await Promise.all([...touched].map((tabId) => a.setBadgeText({ tabId, text: "" }).catch(() => {})));
+  // Every tab, not just the ones this instance remembers painting: on Chrome
+  // the service worker restarts and forgets, but the badges stay.
+  const tabs = await api.tabs.query({}).catch(() => []);
+  const ids = new Set([...touched, ...tabs.map((t) => t.id)]);
+  await Promise.all([...ids].map((tabId) => a.setBadgeText({ tabId, text: "" }).catch(() => {})));
   touched.clear();
 }
 

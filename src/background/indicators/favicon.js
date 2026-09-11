@@ -61,7 +61,7 @@ export async function update(tabs) {
             style: t.faviconStyle ?? style,
             flash: Boolean(t.flashing),
           };
-      const r = await injector.send(t, msg);
+      const r = await injector.send(t, msg, { undo: t.quiet });
       if (r.skipped) {
         if (r.skipped !== "unreachable") lastOutcome.set(t.tabId, `skipped: ${r.skipped}`);
       } else if (r.failed) lastOutcome.set(t.tabId, `failed: ${r.failed}`);

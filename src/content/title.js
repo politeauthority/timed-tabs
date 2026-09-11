@@ -13,7 +13,6 @@
 
   let prefix = "";
   let basePrefix = "";
-  let applying = false;
   let observer = null;
   let blinkTimer = null;
 
@@ -59,9 +58,7 @@
   function apply() {
     const want = prefix ? `${prefix} ${stripped()}` : stripped();
     if (document.title === want) return;
-    applying = true;
     document.title = want;
-    applying = false;
   }
 
   function watch() {
@@ -69,7 +66,7 @@
     const titleEl = document.querySelector("title") ?? document.head;
     if (!titleEl) return;
     observer = new MutationObserver(() => {
-      if (!applying) apply();
+      apply();
     });
     observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
   }

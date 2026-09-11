@@ -10,6 +10,7 @@ import {
   patternForUrl,
   wantedIndicatorIds,
 } from "../src/shared/rules.js";
+import * as rulesModule from "../src/shared/rules.js";
 
 const r = (p, extra = {}) => newRule({ pattern: p, priority: 5, ...extra });
 
@@ -215,5 +216,45 @@ describe("explainSettings", () => {
   it("replaces the indicator list outright rather than merging it", () => {
     const r = rule("vis", 5, { indicators: ["badge"] });
     expect(explainSettings(globals, [r]).indicators.value).toEqual(["badge"]);
+  });
+});
+
+describe("wildcardMatch", () => {
+  const { wildcardMatch } = rulesModule;
+  it("matches like a shell glob, star for any run", () => {
+    expect(wildcardMatch("github.com/*", "github.com/foo/bar")).toBe(true);
+    expect(wildcardMatch("*.github.com/*", "gist.github.com/x")).toBe(true);
+    expect(wildcardMatch("github.com/*", "gist.github.com/x")).toBe(false);
+    expect(wildcardMatch("a*b*c", "abc")).toBe(true);
+    expect(wildcardMatch("a*b*c", "axxbyyc")).toBe(true);
+    expect(wildcardMatch("a*b*c", "axxbyy")).toBe(false);
+    expect(wildcardMatch("", "")).toBe(true);
+    expect(wildcardMatch("*", "")).toBe(true);
+    expect(wildcardMatch("**", "anything")).toBe(true);
+    expect(wildcardMatch("exact", "exact")).toBe(true);
+    expect(wildcardMatch("exact", "exactly")).toBe(false);
+  });
+  it("treats regex characters literally", () => {
+    expect(wildcardMatch("example.com/a+b?c=*", "example.com/a+b?c=1")).toBe(true);
+    expect(wildcardMatch("example.com/a+b?c=*", "example.com/aab?c=1")).toBe(false);
+  });
+  it("stays fast on the pattern that stalled the regex", () => {
+    const t = Date.now();
+    expect(wildcardMatch("*a*a*a*a*a*a*a*a*a*a*a*b", "a".repeat(2000))).toBe(false);
+    expect(Date.now() - t).toBeLessThan(200);
+  });
+});
+
+describe("wantedIndicatorIds with overrides and inert groups", () => {
+  const { wantedIndicatorIds } = rulesModule;
+  const base = { indicators: ["favicon"] };
+  it("unions per-tab overrides", () => {
+    expect(wantedIndicatorIds(base, [], [{ indicators: ["badge"] }, {}]).sort()).toEqual(["badge", "favicon"]);
+  });
+  it("skips a group rule whose group is not in force", () => {
+    const rules = [r("@news", { set: { indicators: ["title-prefix"] } })];
+    expect(wantedIndicatorIds(base, rules, [], [])).toEqual(["favicon"]);
+    const news = { id: "g", name: "news", patterns: ["a.com/*"] };
+    expect(wantedIndicatorIds(base, rules, [], [news]).sort()).toEqual(["favicon", "title-prefix"]);
   });
 });

@@ -131,18 +131,36 @@ function matchesPattern(rawPattern, match, url) {
   if (!pattern) return false;
   const target = subject(pattern, url).toLowerCase();
   if (match === "prefix") return target.startsWith(pattern);
-  return wildcardToRegExp(pattern).test(target);
+  return wildcardMatch(pattern, target);
 }
 
-const regexpCache = new Map();
-export function wildcardToRegExp(pattern) {
-  let re = regexpCache.get(pattern);
-  if (!re) {
-    const escaped = pattern.split("*").map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
-    re = new RegExp(`^${escaped}$`, "s");
-    regexpCache.set(pattern, re);
+/**
+ * Does `text` fit `pattern`, where "*" matches any run of characters? A
+ * two-pointer walk that backtracks to the most recent star only, so it is
+ * linear in practice. The regex this replaced ("^a.*a.*a…$") backtracked
+ * exponentially: one such rule stalled the background for good.
+ */
+export function wildcardMatch(pattern, text) {
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let mark = 0;
+  while (t < text.length) {
+    if (p < pattern.length && pattern[p] === "*") {
+      star = p++;
+      mark = t;
+    } else if (p < pattern.length && pattern[p] === text[t]) {
+      p++;
+      t++;
+    } else if (star >= 0) {
+      p = star + 1;
+      t = ++mark;
+    } else {
+      return false;
+    }
   }
-  return re;
+  while (p < pattern.length && pattern[p] === "*") p++;
+  return p === pattern.length;
 }
 
 /** Enabled rules that match, lowest priority first (later wins on ties). */
@@ -155,15 +173,20 @@ export function applicableRules(rules, url, groups = []) {
 }
 
 /**
- * Indicator ids any tab could need: the global list plus every enabled rule's.
- * Indicators are started from this union so a rule can turn one on for a
- * single site.
+ * Indicator ids any tab could need: the global list, every enabled rule's,
+ * and every per-tab override's. Indicators are started from this union so a
+ * rule or a single tab can turn one on.
  */
-export function wantedIndicatorIds(settings, rules) {
+export function wantedIndicatorIds(settings, rules, tabOverrides = [], groups = []) {
   const ids = new Set(settings?.indicators ?? []);
   for (const rule of rules ?? []) {
-    if (rule.priority > 0) for (const id of rule.set?.indicators ?? []) ids.add(id);
+    if (!(rule.priority > 0)) continue;
+    // A group rule whose group is not in force can never match, so it
+    // should not start an indicator either.
+    if (isGroupRef(rule.pattern) && !groupForRule(rule, groups)) continue;
+    for (const id of rule.set?.indicators ?? []) ids.add(id);
   }
+  for (const o of tabOverrides ?? []) for (const id of o?.indicators ?? []) ids.add(id);
   return [...ids];
 }
 
