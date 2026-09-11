@@ -103,7 +103,7 @@ jobs:
           NEW=$(awk '/^Install:/{line=$0} END{print line}' /var/log/apt/history.log | sed -E 's/^Install: //; s/ \([^)]*\)//g' | tr ',' '\n' | sed -E 's/^ *//; s/:[a-z0-9]+$//' | grep -E '^[a-z0-9.+-]+$' | sort -u)
           echo "$NEW" | tr '\n' ' '; echo
           # shellcheck disable=SC2086
-          dpkg -L $NEW | sort -u | while read -r f; do [ -f "$f" ] || [ -L "$f" ] && echo "$f"; done > ~/firefox-libs.list
+          dpkg -L $NEW | sort -u | while read -r f; do if [ -f "$f" ] || [ -L "$f" ]; then echo "$f"; fi; done > ~/firefox-libs.list
           sudo tar -C / -cpf ~/firefox-libs.tar --no-recursion -T <(sed 's#^/##' ~/firefox-libs.list)
           echo "packed $(wc -l < ~/firefox-libs.list) files for the cache"
 
