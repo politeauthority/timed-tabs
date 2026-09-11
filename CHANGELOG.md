@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/politeauthority/timed-tabs/compare/v0.4.0...v0.5.0) (2026-09-11)
+
+
+### Features
+
+* unified visual language for the panel ([007de47](https://github.com/politeauthority/timed-tabs/commit/007de4748075b501b5381a503a35cdb7729f6ad3))
+
 ## [0.4.0](https://github.com/politeauthority/timed-tabs/compare/v0.3.0...v0.4.0) (2026-09-11)
 
 
