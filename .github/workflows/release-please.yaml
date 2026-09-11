@@ -6,7 +6,8 @@ run-name: "Release Please — ${{ github.event_name == 'pull_request_review' && 
 # zips and attaches them to the GitHub Release.
 #
 # timed-tabs is NOT containerized, so there is no image build, no Harbor login and
-# no kubectl deploy. The whole pipeline runs on GitHub-hosted `ubuntu-latest`.
+# no kubectl deploy. Jobs run on the self-hosted `timed-tabs` ARC scale set, like
+# quigley-web; Force Release stays on `ubuntu-latest` because it is git-only.
 #
 # 🔒 ADMIN GATE. Unlike quigley-web, the release PR is NOT merged automatically the
 # moment it appears. Nothing is tagged, released or packaged until someone with
@@ -52,7 +53,7 @@ jobs:
     # A review submission never changes what should be released — it only unblocks
     # the merge — so release-please itself sits out those runs.
     if: github.event_name != 'pull_request_review'
-    runs-on: ubuntu-latest
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name: ${{ steps.rp.outputs.tag_name }}
@@ -93,7 +94,7 @@ jobs:
     name: Stable releases paused
     needs: release-please
     if: always() && vars.STABLE_RELEASES != 'true' && needs.release-please.outputs.release_created != 'true'
-    runs-on: ubuntu-latest
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
       - name: 📋 Summary
         run: |
@@ -113,7 +114,7 @@ jobs:
     # PR. Skipped on the post-merge run (a release was just cut — nothing to merge),
     # and skipped entirely while stable releases are paused (see the header).
     if: always() && vars.STABLE_RELEASES == 'true' && needs.release-please.result != 'failure' && needs.release-please.outputs.release_created != 'true'
-    runs-on: ubuntu-latest
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
       - name: Merge the release PR if an admin has approved it
         env:
@@ -195,7 +196,7 @@ jobs:
     # pushes its image and deploys; timed-tabs has nothing to deploy, so it builds
     # the two browser zips and attaches them to the GitHub Release instead.
     if: needs.release-please.outputs.release_created == 'true'
-    runs-on: ubuntu-latest
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     permissions:
       contents: write        # gh release upload
     steps:

@@ -30,7 +30,7 @@ concurrency:
 jobs:
   beta:
     name: Tag, build and publish a beta
-    runs-on: ubuntu-latest
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
       - uses: actions/checkout@v7
         with:
