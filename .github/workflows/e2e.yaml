@@ -31,17 +31,17 @@ run-name: "E2E — ${{ github.ref_name }}"
 # Branch protection has to be updated in the same change. Dispatched rather than
 # called, the legs report under their bare names.
 #
-# A PR labelled "ci pause" skips the job. The job is a required status check, and
-# GitHub counts a skipped required check as passed, so the label lets a PR merge
-# without waiting for Firefox while still leaving the check in place for every other
-# PR. CI does not wake on label events, so applying "ci pause" does not retroactively
-# skip a run that already happened; it does not need to, because the `Not paused`
-# check goes red the moment the label lands and no paused PR can merge anyway. The
+# Three things make a leg skip its work: a PR labelled "ci pause", the release PR
+# (release-please's branch only ever carries a CHANGELOG entry and the version,
+# which no scenario reads), and CI's legs on a PR to main that carries "ci run
+# full", which the full run covers. In every case the leg still runs and reports
+# green, by name, with the reason in its summary -- it is a required status check,
+# and a check that never reports blocks the PR for ever, while one skipped at the
+# job level is not even expanded into its matrix and so never reports under the
+# names branch protection is waiting for. See the `skip` step. CI does not wake on
+# label events, so a label applied after a run does not rewrite it; the `Not
+# paused` and `CI run full` checks are what hold the merge in the meantime, and the
 # next push picks the label up.
-#
-# The release PR skips it too, for a different reason: release-please's branch only
-# ever carries a CHANGELOG entry and the version, which no scenario reads. See the
-# job's own comment.
 on:
   workflow_call:
     inputs:
@@ -138,29 +138,14 @@ jobs:
   scenarios:
     name: ${{ matrix.browser == 'chrome' && 'Chrome' || 'Firefox' }} ${{ matrix.channel }}
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
-    # Two ways a PR skips Firefox. Both skip the job rather than the caller, so
-    # the check still reports: a required check that never reports blocks the PR
-    # for ever, while a skipped one counts as passed.
-    #
-    # The release PR is the second. release-please only ever rewrites CHANGELOG.md
-    # and the four files carrying the version, and no scenario can read any of
-    # them, so no browser has anything to say about it -- they just spent four
-    # minutes each saying it, on every push to main. Lint, the unit tests and
-    # the build still run there, which is what keeps `web-ext lint` looking at the
-    # bumped manifest version before the tag is cut; and the `package` job in
-    # release-please.yaml re-runs lint and the tests against the tag itself before
-    # anything is attached to a release.
-    if: >-
-      github.event_name != 'pull_request'
-      || (
-        !contains(github.event.pull_request.labels.*.name, 'ci pause')
-        && !startsWith(github.event.pull_request.head.ref, 'release-please--')
-        && !(
-          inputs.skip-when-full
-          && github.event.pull_request.base.ref == 'main'
-          && contains(github.event.pull_request.labels.*.name, 'ci run full')
-        )
-      )
+    # No `if` on the job. Three things skip a leg -- the `ci pause` label, the
+    # release PR, and CI's legs when the full run covers them -- and every one
+    # of them is decided by the `skip` step inside the job, never here. A matrix
+    # job skipped at the job level is not expanded: it reports once, under the
+    # literal text of its `name` expression, and the contexts branch protection
+    # is waiting for (`E2E / Firefox latest`, …) never arrive, so the PR is
+    # stuck. Skipping the steps instead leaves each leg reporting, by name, as
+    # a pass -- which is what a skip is meant to be.
     timeout-minutes: 20
     strategy:
       # Not fail-fast: when one version breaks, the first thing worth knowing is
@@ -173,8 +158,31 @@ jobs:
         # artifacts, where a space would be awkward.
         include: ${{ fromJSON(inputs.legs) }}
     steps:
+      # Whether this leg has anything to do, decided before anything is even
+      # checked out. A PR labelled `ci pause` is paused; the release PR only
+      # carries the CHANGELOG and the version, which no scenario reads (lint and
+      # the unit tests still run on it, which is what keeps `web-ext lint` on
+      # the bumped manifest before the tag is cut); and CI's legs on a PR to
+      # main carrying `ci run full` are covered by the full run, whose status
+      # holds the merge until they pass. Each answer is a pass with a reason.
+      - id: skip
+        env:
+          PAUSED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci pause') }}
+          RELEASE: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'release-please--') }}
+          FULL: ${{ github.event_name == 'pull_request' && inputs.skip-when-full && github.event.pull_request.base.ref == 'main' && contains(github.event.pull_request.labels.*.name, 'ci run full') }}
+        run: |
+          reason=""
+          if [ "$PAUSED" = "true" ]; then reason="the \`ci pause\` label is on this pull request."
+          elif [ "$RELEASE" = "true" ]; then reason="the release PR only carries the CHANGELOG and the version, which no scenario reads."
+          elif [ "$FULL" = "true" ]; then reason="the \`ci run full\` label is on, so the full run tests this version and more; the \`CI run full\` status holds the merge until it passes."
+          fi
+          echo "skip=$([ -n "$reason" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+          [ -z "$reason" ] || echo "skipping: ${reason}"
+
       # Full history: the changed-paths action diffs against the base commit.
       - uses: actions/checkout@v7
+        if: steps.skip.outputs.skip != 'true'
         with:
           # actions/checkout treats an empty ref as "unset", so the default keeps
           # the behaviour this job had before the input existed.
@@ -185,7 +193,22 @@ jobs:
       # check, but on a docs-only change it skips the work. Firefox is not
       # going to notice a README.
       - uses: ./.github/actions/changed-paths
+        if: steps.skip.outputs.skip != 'true'
         id: changed
+
+      # The one verdict every step below reads: run, or skip with this reason.
+      - id: go
+        env:
+          SKIP: ${{ steps.skip.outputs.skip }}
+          SKIP_REASON: ${{ steps.skip.outputs.reason }}
+          CODE: ${{ steps.changed.outputs.code }}
+          CODE_REASON: ${{ steps.changed.outputs.reason }}
+        run: |
+          if [ "$SKIP" = "true" ]; then run=false; reason="$SKIP_REASON"
+          elif [ "$CODE" = "true" ]; then run=true; reason="$CODE_REASON"
+          else run=false; reason="$CODE_REASON"; fi
+          echo "run=${run}" >> "$GITHUB_OUTPUT"
+          echo "reason=${reason}" >> "$GITHUB_OUTPUT"
 
       # The runner node is short of CPU, not bandwidth: unpacking Node took two
       # minutes and apt nine on a busy day. So the caches below hold the
@@ -193,7 +216,7 @@ jobs:
       # and setup-node then finds it without downloading or extracting; the
       # Firefox libraries come back as installed files, skipping dpkg entirely.
       - uses: ./.github/actions/node-toolcache
-        if: steps.changed.outputs.code == 'true'
+        if: steps.go.outputs.run == 'true'
         id: node
         timeout-minutes: 4
         with:
@@ -201,7 +224,7 @@ jobs:
           # they would share a key and race to save it on a cold cache.
           key-suffix: "-${{ matrix.browser }}-${{ matrix.channel }}"
       - name: npm ci
-        if: steps.changed.outputs.code == 'true'
+        if: steps.go.outputs.run == 'true'
         id: npm
         timeout-minutes: 4
         run: npm ci --prefer-offline --no-audit --no-fund
@@ -213,14 +236,14 @@ jobs:
       # apt and dpkg (nine minutes on a starved CPU). Bump FIREFOX_LIBS_KEY after
       # changing the package list. Ubuntu 24.04: ALSA is libasound2t64.
       - id: os
-        if: steps.changed.outputs.code == 'true'
+        if: steps.go.outputs.run == 'true'
         # The library tarball is untarred over /, so its key must carry the OS
         # release it was built on.
         run: |
           . /etc/os-release
           echo "id=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
       - name: Restore the Firefox libraries
-        if: steps.changed.outputs.code == 'true'
+        if: steps.go.outputs.run == 'true'
         id: libs
         uses: actions/cache/restore@v5
         with:
@@ -233,7 +256,7 @@ jobs:
           restore-keys: |
             firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}-
       - name: Firefox libraries
-        if: steps.changed.outputs.code == 'true'
+        if: steps.go.outputs.run == 'true'
         id: firefox-libs
         timeout-minutes: 6
         env:
@@ -286,7 +309,7 @@ jobs:
       # and puts the number in the log and the summary instead of leaving it to
       # be guessed from a run date.
       - name: Resolve the Firefox version
-        if: steps.changed.outputs.code == 'true' && matrix.browser == 'firefox'
+        if: steps.go.outputs.run == 'true' && matrix.browser == 'firefox'
         id: ffver
         timeout-minutes: 2
         env:
@@ -340,7 +363,7 @@ jobs:
       # setup-firefox downloads a ~90 MB tarball every run; that took 14s and is
       # the smallest cost here, so it is left alone.
       - uses: browser-actions/setup-firefox@v1
-        if: steps.changed.outputs.code == 'true' && matrix.browser == 'firefox'
+        if: steps.go.outputs.run == 'true' && matrix.browser == 'firefox'
         id: firefox
         timeout-minutes: 3
         with:
@@ -352,7 +375,7 @@ jobs:
       # follows every release. setup-chrome takes a bare major and installs the
       # latest build of it, which is what a version number here means.
       - name: Resolve the Chrome version
-        if: steps.changed.outputs.code == 'true' && matrix.browser == 'chrome'
+        if: steps.go.outputs.run == 'true' && matrix.browser == 'chrome'
         id: chver
         timeout-minutes: 2
         env:
@@ -380,14 +403,14 @@ jobs:
           echo "${WANT} -> Chrome ${version}"
 
       - uses: browser-actions/setup-chrome@v1
-        if: steps.changed.outputs.code == 'true' && matrix.browser == 'chrome'
+        if: steps.go.outputs.run == 'true' && matrix.browser == 'chrome'
         id: chrome
         timeout-minutes: 3
         with:
           chrome-version: ${{ steps.chver.outputs.version }}
 
       - name: Which browser
-        if: steps.changed.outputs.code == 'true'
+        if: steps.go.outputs.run == 'true'
         id: browser
         env:
           BIN: ${{ matrix.browser == 'chrome' && steps.chrome.outputs.chrome-path || steps.firefox.outputs.firefox-path }}
@@ -399,7 +422,7 @@ jobs:
           echo "${version}"
 
       - name: Run the scenarios
-        if: steps.changed.outputs.code == 'true'
+        if: steps.go.outputs.run == 'true'
         id: scenarios
         timeout-minutes: 8
         env:
@@ -421,8 +444,8 @@ jobs:
           # The resolved number for Firefox; what the binary said for Chrome.
           VERSION: ${{ steps.ffver.outputs.version || steps.browser.outputs.version }}
           OUTCOME: ${{ steps.scenarios.outcome }}
-          CODE: ${{ steps.changed.outputs.code }}
-          REASON: ${{ steps.changed.outputs.reason }}
+          CODE: ${{ steps.go.outputs.run }}
+          REASON: ${{ steps.go.outputs.reason }}
         run: |
           mkdir -p e2e-artifacts
           python3 - <<'PY'
@@ -457,7 +480,7 @@ jobs:
         # scenarios never ran: there is no e2e-artifacts/ on a docs-only change,
         # and starting the upload only to find nothing costs a few seconds of
         # what is otherwise a twenty-second job.
-        if: always() && steps.changed.outputs.code == 'true'
+        if: always() && steps.go.outputs.run == 'true'
         with:
           # One name per leg. Two uploads under the same name in one run is an
           # error, and when a version fails you want its artifacts on their own.
@@ -477,7 +500,7 @@ jobs:
           ARTIFACT_URL: ${{ steps.artifacts.outputs.artifact-url }}
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref_name }}
-          REASON: ${{ steps.changed.outputs.reason }}
+          REASON: ${{ steps.go.outputs.reason }}
           WHO: ${{ matrix.browser == 'chrome' && 'Chrome' || 'Firefox' }} ${{ matrix.channel }}
           EMOJI: ${{ matrix.browser == 'chrome' && '🌐' || '🦊' }}
           # Empty when nothing resolved, which the heading allows for.
@@ -486,7 +509,7 @@ jobs:
           who="${WHO}${VERSION:+ (${VERSION})}"
           case "${{ job.status }}" in
             success)
-              if [ "${{ steps.changed.outputs.code }}" = "true" ]; then head="### ✅ ${EMOJI} ${who} passed"
+              if [ "${{ steps.go.outputs.run }}" = "true" ]; then head="### ✅ ${EMOJI} ${who} passed"
               else head="### ⏭️ ${EMOJI} ${who} skipped: ${REASON}"; fi ;;
             cancelled) head="### ⏹️ ${EMOJI} ${who} cancelled (the job timed out, or a newer run took over)" ;;
             *) head="### ❌ ${EMOJI} ${who} failed" ;;
@@ -498,7 +521,7 @@ jobs:
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "${{ steps.changed.outputs.code }}" = "true" ]; then
+          if [ "${{ steps.go.outputs.run }}" = "true" ]; then
             python3 scripts/e2e-summary.py e2e-artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
               echo "_No scenario results were written; see the job log._" >> "$GITHUB_STEP_SUMMARY"
           fi
