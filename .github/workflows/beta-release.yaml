@@ -43,12 +43,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # Before the first stable release there is no tag: every commit on main
+          # counts, and the manifest alias starts from 0.0.0.
           LAST=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude 'v*-beta*' 2>/dev/null || true)
-          if [ -z "$LAST" ]; then
-            echo "::error::No stable tag found; cut a stable release first."; exit 1
+          if [ -n "$LAST" ]; then
+            STABLE="${LAST#v}"
+            RANGE="${LAST}..HEAD"
+          else
+            STABLE="0.0.0"
+            RANGE="HEAD"
+            echo "::notice::No stable tag yet; counting every commit on main."
           fi
-          STABLE="${LAST#v}"
-          N=$(git rev-list --count "${LAST}..HEAD")
+          N=$(git rev-list --count "$RANGE")
           if [ "$N" -eq 0 ]; then
             echo "::error::main is exactly ${LAST}; nothing to beta."; exit 1
           fi
@@ -64,6 +70,8 @@ jobs:
           fi
           {
             echo "stable=${STABLE}"
+            echo "range=${RANGE}"
+            echo "since=${LAST:-the first commit}"
             echo "next=${NEXT}"
             echo "n=${N}"
             echo "tag=${TAG}"
@@ -97,17 +105,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.ver.outputs.tag }}
-          LAST: v${{ steps.ver.outputs.stable }}
+          SINCE: ${{ steps.ver.outputs.since }}
+          RANGE: ${{ steps.ver.outputs.range }}
           MANIFEST: ${{ steps.ver.outputs.manifest }}
         run: |
           set -euo pipefail
           NOTES=$(mktemp)
           {
-            echo "Beta build of the work on \`main\` since ${LAST}. Installs as version \`${MANIFEST}\`; the UI shows \`${TAG#v}\` with a BETA badge."
+            echo "Beta build of the work on \`main\` since ${SINCE}. Installs as version \`${MANIFEST}\`; the UI shows \`${TAG#v}\` with a BETA badge."
             echo ""
-            echo "## Changes since ${LAST}"
+            echo "## Changes since ${SINCE}"
             echo ""
-            git log --no-merges --pretty='- %s (%h)' "${LAST}..HEAD"
+            git log --no-merges --pretty='- %s (%h)' "${RANGE}"
           } > "$NOTES"
           # `gh release create` makes the tag on the given commit; no PAT needed
           # because nothing downstream has to be re-triggered by the push.

@@ -28,7 +28,9 @@ of `<last stable>.<N>` instead, where N is the number of commits on `main` since
 last stable tag. The beta named `0.8.0-beta.14` installs as `0.7.0.14`. That sorts
 after `0.7.0` and before `0.8.0`, so a beta install updates to the next stable once
 builds are signed and served with an update URL. Stable manifest versions stay
-three-part.
+three-part. Before the first stable release there is no tag, so N counts every commit
+on `main` and the alias starts from `0.0.0`: the first betas install as `0.0.0.N` and
+are named `0.0.1-beta.N`.
 
 `scripts/build.mjs` writes `build.json` next to the manifest in every build:
 
@@ -43,8 +45,10 @@ from `src/` has no `build.json` and shows the manifest version alone.
 ## How a stable release happens
 
 1. Commits land on `main` through PRs. They must be Conventional Commits, because
-   release-please derives the bump from them: `feat:` is a minor, `fix:` a patch,
-   `chore:` and `docs:` do not release at all.
+   release-please derives the bump from them. Below 1.0.0 both `feat:` and `fix:` bump
+   the patch and a breaking change bumps the minor, so the versions climb slowly
+   while the project is in development; `chore:` and `docs:` do not release at all.
+   The first release is 0.0.1.
 2. `.github/workflows/release-please.yaml` keeps a release PR open with the next
    version and the changelog.
 3. Nothing is released until someone with admin permission approves that PR on its
