@@ -103,6 +103,16 @@ on:
         type: string
         required: false
         default: always
+      chrome-advisory:
+        # While Chrome is being proven on this runner, no Chrome leg fails the
+        # run: it reports, it is read, and it is not what a merge waits on.
+        # Nightly is advisory in both browsers regardless. Both are enforced
+        # with continue-on-error on the leg, so the caller's job stays green
+        # and the check is a warning rather than a failure.
+        description: Chrome legs never fail the run.
+        type: boolean
+        required: false
+        default: true
       skip-when-full:
         # For CI. A PR to main carrying `ci run full` gets these same versions
         # again inside the full run, and the `CI run full` status holds the
@@ -140,6 +150,11 @@ on:
         type: string
         required: false
         default: always
+      chrome-advisory:
+        description: Chrome legs never fail the run.
+        type: boolean
+        required: false
+        default: true
       skip-when-full:
         # Never true on a dispatch, which is not a pull request; declared so
         # that every `inputs.*` the job reads exists for this trigger too.
@@ -177,6 +192,8 @@ jobs:
     # arrive, so the PR is stuck. Skipping the steps instead leaves each leg
     # reporting, by name, as a pass -- which is what a skip is meant to be.
     if: inputs.firefox != '[]'
+    # Nightly is a daily build: worth watching, never worth failing a run for.
+    continue-on-error: ${{ matrix.channel == 'nightly' }}
     timeout-minutes: 20
     strategy:
       # Not fail-fast: when one version breaks, the first thing worth knowing is
@@ -482,6 +499,8 @@ jobs:
     # arrive, so the PR is stuck. Skipping the steps instead leaves each leg
     # reporting, by name, as a pass -- which is what a skip is meant to be.
     if: inputs.chrome != '[]'
+    # Nightly always; every Chrome leg while `chrome-advisory` is on.
+    continue-on-error: ${{ matrix.channel == 'nightly' || inputs.chrome-advisory }}
     timeout-minutes: 20
     strategy:
       # Not fail-fast: when one version breaks, the first thing worth knowing is
