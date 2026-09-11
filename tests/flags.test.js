@@ -20,6 +20,15 @@ describe("FLAGS", () => {
     expect(new Set(FLAGS.map((f) => f.id)).size).toBe(FLAGS.length);
   });
 
+  it("holds every beta feature behind the master switch", () => {
+    // Anything that is not the master switch itself must hang off it, or it
+    // would be reachable with "Beta features" turned off.
+    for (const f of FLAGS) {
+      if (f.id === "beta-features") continue;
+      expect(f.requires).toBe("beta-features");
+    }
+  });
+
   it("only requires flags that exist", () => {
     const ids = new Set(FLAGS.map((f) => f.id));
     for (const f of FLAGS) if (f.requires) expect(ids.has(f.requires)).toBe(true);
@@ -37,9 +46,17 @@ describe("featureOn", () => {
     expect(featureOn(on(), "mini-ui-page-settings")).toBe(false);
   });
   it("is plain flagOn for a flag with no parent", () => {
-    expect(featureOn(on("site-groups"), "site-groups")).toBe(true);
+    // beta-features is the only flag without one; it is the master switch.
     expect(featureOn(on("beta-features"), "beta-features")).toBe(true);
     expect(featureOn(on(), "beta-features")).toBe(false);
+  });
+
+  it("holds site groups behind beta features as well as its own switch", () => {
+    expect(featureOn(on("beta-features", "site-groups"), "site-groups")).toBe(true);
+    // Its own switch alone is not enough: this is the case that used to slip through.
+    expect(featureOn(on("site-groups"), "site-groups")).toBe(false);
+    expect(featureOn(on("beta-features"), "site-groups")).toBe(false);
+    expect(featureOn(on(), "site-groups")).toBe(false);
   });
   it("is off for an unknown id and never loops", () => {
     // An id this build does not declare has no parent, so its raw switch decides.
