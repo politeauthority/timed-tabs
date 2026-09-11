@@ -30,13 +30,6 @@ beta. Grab a zip from the newest pre-release under
 - 🦊 **Firefox 140+** — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
 - 🌐 **Chrome** — unzip `timed-tabs-chrome-*.zip`, then `chrome://extensions` → Developer mode → Load unpacked
 
-### 🚧 Betas
-
-Betas are snapshots of `main`, published as
-[pre-releases](https://github.com/politeauthority/timed-tabs/releases). A beta shows
-a yellow BETA badge beside the title, and `about:addons` lists it as "Timed Tabs
-Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
-
 ## ✨ What you get
 
 - 🎨 **Four ways to show the time left.** The favicon, a coloured dot in the page
@@ -52,6 +45,13 @@ Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
 
 The full list, with screenshots, is in the user guide:
 [docs/user-guide/features.md](docs/user-guide/features.md).
+
+### 🚧 Betas
+
+Betas are snapshots of `main`, published as
+[pre-releases](https://github.com/politeauthority/timed-tabs/releases). A beta shows
+a yellow BETA badge beside the title, and `about:addons` lists it as "Timed Tabs
+Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
 
 ## 📚 Documentation
 
