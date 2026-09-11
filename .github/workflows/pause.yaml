@@ -32,12 +32,20 @@ run-name: "Not paused — PR #${{ github.event.pull_request.number }}"
 # `gh api` call in docs/developer/ci/README.md -- add to that list and to the
 # branch in the same change.
 
+# It is also where the release gate gets woken. Release Please used to listen to
+# label and review events itself, which put five skipped jobs on every pull
+# request each time; now this job, already awake for every label, dispatches it
+# only when the event is one that could clear the gate.
+
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted]
 
 permissions:
   contents: read
+  actions: write        # to dispatch Release Please when the gate is cleared
 
 jobs:
   paused:
@@ -69,3 +77,24 @@ jobs:
             echo "and everything runs again."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
+
+      - name: Wake the release gate
+        # Only for the release PR, and only for the two things that clear its gate.
+        if: >-
+          startsWith(github.event.pull_request.head.ref, 'release-please--')
+          && (
+            (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'release-approved')
+            || (github.event_name == 'pull_request_review' && github.event.review.state == 'approved')
+          )
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          WHY: ${{ github.event_name == 'pull_request_review' && 'an approving review' || 'the release-approved label' }}
+        run: |
+          set -euo pipefail
+          gh workflow run release-please.yaml --ref main
+          {
+            echo "### 🔓 Release gate"
+            echo ""
+            echo "${WHY} landed on the release PR, so **Release Please** was dispatched to check the gate."
+          } >> "$GITHUB_STEP_SUMMARY"

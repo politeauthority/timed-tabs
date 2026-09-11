@@ -95,8 +95,9 @@ even when its `tag` is empty, so a real release is never mistaken for a source l
 2. `.github/workflows/release-please.yaml` keeps a release PR open with the next
    version and the changelog.
 3. Nothing is released until someone with admin permission clears that PR, either
-   by approving it or by applying the `release-approved` label. The workflow then
-   merges it, tags `vX.Y.Z`, creates the GitHub Release and attaches the zips.
+   by approving it or by applying the `release-approved` label. The **Not paused**
+   workflow sees that event and dispatches Release Please, which then merges the
+   PR, tags `vX.Y.Z`, creates the GitHub Release and attaches the zips.
    See [The admin gate](#-the-admin-gate).
 4. release-please writes the version to `.release-please-manifest.json`,
    `package.json`, `package-lock.json` and `src/manifest.json`. Never bump a version

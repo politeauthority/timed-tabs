@@ -1,9 +1,5 @@
 name: Release Please
-run-name: >-
-  Release Please —
-  ${{ (github.event_name == 'pull_request_review' && format('PR #{0} review', github.event.pull_request.number))
-  || (github.event_name == 'pull_request' && format('PR #{0} labelled {1}', github.event.pull_request.number, github.event.label.name))
-  || github.ref_name }}
+run-name: "Release Please — ${{ github.event_name == 'workflow_dispatch' && 'dispatched' || github.ref_name }}"
 
 # Mirrors quigley-web: release-please maintains a release PR from Conventional
 # Commits; merging it tags the version and (package) builds the Firefox + Chrome
@@ -47,10 +43,10 @@ run-name: >-
 on:
   push:
     branches: ["main"]
-  pull_request_review:
-    types: [submitted]
-  pull_request:
-    types: [labeled]      # the `release-approved` label is the other way through the gate
+  # The two things that clear the gate -- an approving review on the release PR,
+  # or the `release-approved` label -- arrive as a dispatch from pause.yaml, the
+  # one small workflow that listens to every PR event. Listening here directly
+  # put five skipped jobs on every pull request for every label and review.
   workflow_dispatch:
 
 permissions:
@@ -127,19 +123,15 @@ jobs:
   gated-merge:
     name: Admin-gated merge
     needs: release-please
-    # Runs on pushes to main AND on the two things that can clear the gate — a review
-    # submission, or the `release-approved` label — so the release goes out whichever
-    # happens last: the approval, or a later commit on an already-approved PR. Skipped
-    # on the post-merge run (a release was just cut — nothing to merge), and skipped
-    # entirely while stable releases are paused (see the header).
-    #
-    # A label event fires for every label on every PR, so runs for any other label are
-    # dropped here rather than doing a pointless lookup.
+    # Runs on pushes to main AND on the dispatch pause.yaml sends when a review or
+    # the `release-approved` label lands on the release PR, so the release goes out
+    # whichever happens last: the approval, or a later commit on an already-approved
+    # PR. Skipped on the post-merge run (a release was just cut — nothing to merge),
+    # and skipped entirely while stable releases are paused (see the header).
     if: >-
       always() && vars.STABLE_RELEASES == 'true'
       && needs.release-please.result != 'failure'
       && needs.release-please.outputs.release_created != 'true'
-      && (github.event_name != 'pull_request' || github.event.label.name == 'release-approved')
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
       # No checkout in this job otherwise; fetch only what the action needs.
