@@ -175,9 +175,16 @@ function renderField(field) {
   const value = settings[field.key];
 
   if (field.type === "toggle") {
-    const sw = makeSwitch(Boolean(value), (checked) =>
-      save({ [field.key]: checked }),
-    );
+    const sw = makeSwitch(Boolean(value), async (checked) => {
+      // A setting that needs an optional permission cannot be switched on
+      // without it. `requestPermission` must be reached from this handler
+      // with nothing awaited before it, or the browser sees no user gesture.
+      if (checked && field.requires && !(await requestPermission(field.requires))) {
+        sw.input.checked = false;
+        return;
+      }
+      await save({ [field.key]: checked });
+    });
     sw.input.id = `f-${field.key}`;
     label.htmlFor = sw.input.id;
     control.append(sw.el);
@@ -1571,6 +1578,32 @@ $("act-never-paused").addEventListener("change", (e) =>
 $("act-ignore").addEventListener("change", (e) =>
   tabAction("ignoreRules", e.target.checked, e.target.closest("label")),
 );
+/** True once the optional permissions a setting needs are granted. */
+async function requestPermission(requires) {
+  try {
+    return await api.permissions.request(requires);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A permission can be taken away in about:addons long after the setting was
+ * switched on, which would leave the panel promising something that can no
+ * longer happen. Switch those settings back off when their permission goes.
+ */
+async function syncPermissionFields() {
+  const gated = FIELDS.filter((f) => f.requires && settings[f.key]);
+  const lost = [];
+  for (const field of gated) {
+    const held = await api.permissions.contains(field.requires).catch(() => true);
+    if (!held) lost.push(field.key);
+  }
+  if (!lost.length) return;
+  await save(Object.fromEntries(lost.map((key) => [key, false])));
+  renderFields();
+}
+
 $("grant-permission").addEventListener("click", async () => {
   await api.permissions.request(WEB_ORIGINS).catch(() => false);
   refreshPermissionWarning();
@@ -1609,7 +1642,10 @@ $("diagnostics").addEventListener("toggle", (e) => {
   if (e.target.open) refreshDiag();
 });
 api.permissions.onAdded?.addListener(refreshPermissionWarning);
-api.permissions.onRemoved?.addListener(refreshPermissionWarning);
+api.permissions.onRemoved?.addListener(() => {
+  refreshPermissionWarning();
+  syncPermissionFields();
+});
 
 // Version, shown in the page header and the mini UI footer.
 getDisplayVersion().then((v) => {
@@ -1640,6 +1676,7 @@ getDisplayVersion().then((v) => {
   }
   renderFields();
   refreshPermissionWarning();
+  syncPermissionFields();
   if (isPopup) {
     await refreshTab();
     setInterval(updateReadout, 1000);

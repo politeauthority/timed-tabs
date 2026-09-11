@@ -8,6 +8,9 @@
     "48": "icons/icon.svg",
     "96": "icons/icon.svg"
   },
+  "optional_permissions": [
+    "notifications"
+  ],
   "permissions": [
     "tabs",
     "storage",
