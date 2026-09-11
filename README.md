@@ -1,11 +1,14 @@
 # Timed Tabs
 [![Beta](https://img.shields.io/badge/status-beta-F5A623)](https://github.com/politeauthority/timed-tabs/releases)
 [![CI](https://github.com/politeauthority/timed-tabs/actions/workflows/ci.yaml/badge.svg)](https://github.com/politeauthority/timed-tabs/actions/workflows/ci.yaml)
+[![Licence: GPL v3](https://img.shields.io/badge/licence-GPLv3-blue)](LICENSE)
+
+
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue)](src/manifest.json)
 [![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)](https://www.mozilla.org/firefox/)
 [![Chrome](https://img.shields.io/badge/Chrome-supported-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![Data collected: none](https://img.shields.io/badge/data%20collected-none-success)](src/manifest.json)
-[![Licence: GPL v3](https://img.shields.io/badge/licence-GPLv3-blue)](LICENSE)
+
 
 > [!WARNING]
 > 🚧 **Timed Tabs is in beta.** Every release is a snapshot of `main`, published as a
