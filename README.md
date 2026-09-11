@@ -46,7 +46,8 @@ The full tour, with screenshots, is in [docs/features.md](docs/features.md).
 - ⏸️ **The clock can pause** while you're looking at a tab, and restart from the top
   when you come back to it.
 - 🔒 **Nothing leaves the browser.** The manifest declares no data collection, and
-  there is no server to talk to.
+  there is no server to talk to. [What is kept on your
+  machine](docs/user-guide/privacy.md), and how to control it.
 
 ![The rules view, with per-site patterns and the lifetime each one sets](assets/screenshots/rules.png)
 
