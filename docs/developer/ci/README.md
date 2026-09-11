@@ -108,7 +108,11 @@ two — and the status goes green once all four have passed. Take the label off 
 goes back to pending. It is red only when the Firefoxes actually fail.
 
 The four legs report as `Full / Firefox latest`, `Full / Firefox previous`,
-`Full / Firefox previous-2` and `previous-3`. None of them is required on its own, and
+`Full / Firefox previous-2` and `previous-3`. On the `feat/chrome-e2e` branch four
+Chrome legs run beside them — `Full / Chrome stable` through `Chrome previous-3`, the
+same majors-back idea read from the Chrome for Testing feed — while Chrome is being
+proven on the runner; every other branch's full run is Firefox-only. None of them is
+required on its own, and
 neither is the `Full run gate` job that posts the status; only the status is, so
 adding or dropping a leg does not touch branch protection.
 

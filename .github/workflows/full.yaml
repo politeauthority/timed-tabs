@@ -159,6 +159,10 @@ jobs:
       actions: read
     with:
       firefox: '["latest", "previous", "previous-2", "previous-3"]'
+      # The same four majors back for Chrome, on the one branch proving Chrome
+      # on this runner; everywhere else an empty list, and the full run is the
+      # four Firefoxes it always was. None of the Chrome legs is required.
+      chrome: ${{ (github.event.pull_request.head.ref == 'feat/chrome-e2e') && '["stable", "previous", "previous-2", "previous-3"]' || '[]' }}
       # Not all at once: ten at a time starved one another on the runner node
       # until three legs saw one tick in their whole window and failed on
       # timing alone. Two at a time is two waves of about four minutes.

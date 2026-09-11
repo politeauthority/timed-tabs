@@ -165,19 +165,22 @@ on one branch:
 |---|---|---|---|
 | `Firefox latest` | the current release | 155.0.1 | every branch, required |
 | `Firefox previous` | the last release of the major before it | 154.0.1 | every branch, required |
-| `Chrome stable` | whatever `setup-chrome` calls stable | 152.x | `feat/chrome-e2e` only, advisory |
+| `Chrome stable` | the current stable | 153.x | `feat/chrome-e2e` only, advisory |
+| `Chrome previous-N` | N majors behind stable, latest build of that major | 152, 151, 150 | the full run on `feat/chrome-e2e` only |
 
 All legs run the same scenarios in `tests/e2e/scenarios`. Nothing in them is
 browser-specific — they pin `indicators` explicitly rather than relying on a default,
 so the Firefox-only theme tint never enters — and that is the point: a scenario that
 passes in one browser and fails in another is a real difference in the extension.
 
-Chrome is not pinned to a pair the way Firefox is. There is one stable channel and no
-"previous" to hold a line against, so the leg tracks whatever stable is that day and
-reports the version it got in the log and the summary. It is switched on by the
-workflow's `chrome` input, which only `ci.yaml` passes, and only on that branch; the
-full run and the beta call the same workflow and stay Firefox-only without knowing
-Chrome exists.
+The `chrome` input is the same shape as `firefox`: a JSON list of legs, `stable` or
+`previous-N`. The *Resolve the Chrome version* step reads the Chrome for Testing
+[last-known-good feed](https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json)
+for the current stable, and `previous-N` becomes a bare major N behind it, which
+`setup-chrome` installs as the latest build of that major. The input is empty by
+default; `ci.yaml` passes `["stable"]` and `full.yaml` passes four legs, both only on
+`feat/chrome-e2e`, so the beta and every other branch stay Firefox-only without
+knowing Chrome exists.
 
 Neither Firefox is pinned either. The `Resolve the Firefox version` step reads Mozilla's
 [product-details feed](https://product-details.mozilla.org/1.0/firefox.json), takes
