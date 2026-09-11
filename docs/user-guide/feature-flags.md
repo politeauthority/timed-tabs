@@ -13,16 +13,17 @@ Settings, Feature flags.
 
 Every beta feature needs **two** switches on: **Beta features**, which is the master
 switch, and the feature's own switch below it. On its own, neither does anything.
+The individual switches only appear once the master switch is on.
 
 1. Open **Full page** from the popup header, then **Settings**.
 2. Pick the **Flags** pill.
-3. Turn on **Beta features**.
+3. Turn on **Beta features**. The list of beta features appears beneath it.
 4. Turn on the feature you want.
 
 The master switch exists so you can put every beta back in its box with one click
 without losing track of which ones you had chosen. Turning **Beta features** off
-leaves the individual switches as they were; turning it back on restores exactly the
-set you had.
+hides the individual switches but leaves them as they were; turning it back on
+shows exactly the set you had.
 
 ## 🚩 Knowing one is on
 
