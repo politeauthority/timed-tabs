@@ -32,7 +32,7 @@ of closed tabs are all in local storage and never sync.
 
 ### The list of closed tabs
 
-This is the only thing Timed Tabs stores that describes your browsing. When it closes
+This is the only thing Timed Tabs stores that names a page you visited. When it closes
 a tab, it records that page's **address, title and icon**, the time it was closed, and
 what was done to it, so you can get the tab back from **Recently expired** on the Tabs
 page.
@@ -44,6 +44,23 @@ Expiry. You can delete a single row, or empty the list, at any time.
 
 There is no switch to stop the list being kept at all. Setting the retention to its
 lowest value is the closest thing; if you want a real off switch, open an issue.
+
+### The tally
+
+**Statistics** on the Tabs page counts what Timed Tabs has done: tabs closed, unloaded
+and reloaded, snoozes and the time they bought, timer restarts, and the most tabs you
+have had open at once. It also keeps a per-day count of expiries for the last 30 days,
+which is what the small chart draws.
+
+All of it is **numbers and dates**. No address, no title, no icon, nothing per-tab —
+so unlike the list above there is nothing in it to identify a page, and a tab from a
+private window is counted without leaving any trace that it existed, exactly as a
+notification counts one it may not name.
+
+It is worth being straight about the one thing it does reveal: a per-day count says
+which days you were busy, even though it cannot say what you were doing. It stays in
+local storage, never syncs, and is not included in a backup. **Clear statistics**, at
+the foot of the section, empties it.
 
 ### Private windows
 

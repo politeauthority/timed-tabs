@@ -45,12 +45,7 @@ import {
 import { exportText, parseBundle } from "../shared/backup.js";
 import { compareVersions, getDisplayVersion } from "../shared/version.js";
 import { groupRecent } from "../shared/recent.js";
-import {
-  formatDuration,
-  formatRemaining,
-  snoozeSeconds,
-  toUnit,
-} from "../shared/time.js";
+import { formatDuration, formatRemaining, formatSpan, snoozeSeconds, toUnit } from "../shared/time.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
 import { FLAGS, featureOn, flagOn, flagRequires } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
@@ -1420,6 +1415,183 @@ function timeAgo(ts) {
   return `${Math.floor(s / 86400)} d ago`;
 }
 
+// ---- Statistics ------------------------------------------------------------
+
+/**
+ * The tally, as tiles and a small chart.
+ *
+ * Deliberately the plainest rendering in the panel: `summarise` has already
+ * decided what every number means, so there is nothing to work out here beyond
+ * where to put it. The legend above it earns its place — this is the one list
+ * on the page that keeps nothing about any particular tab, and next to
+ * "Recently expired", which keeps rather a lot, that is worth saying.
+ */
+async function refreshStats() {
+  const s = await api.runtime.sendMessage({ type: "timed-tabs:stats" }).catch(() => null);
+  const body = $("stats-body");
+  const headline = $("stats-headline");
+  if (!s) {
+    headline.textContent = "";
+    body.replaceChildren(statsEmpty("Statistics are not available right now."));
+    return;
+  }
+  headline.textContent = s.expired ? s.expired.toLocaleString() : "";
+  if (s.empty) {
+    body.replaceChildren(statsEmpty("Nothing to count yet. Once a tab runs out of time, this fills in."));
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  // The headline and the chart are both about expiries, so both wait until
+  // there has been one. Snoozing a tab on your first day should not be met
+  // with a bold zero and fourteen empty columns.
+  if (s.expired > 0) frag.append(statsHeadline(s), statsChart(s));
+  frag.append(statsTiles(s));
+  body.replaceChildren(frag);
+}
+
+function statsEmpty(text) {
+  const p = document.createElement("p");
+  p.className = "overview-empty";
+  p.textContent = text;
+  return p;
+}
+
+/** The one number this whole section is about, and what it is made of. */
+function statsHeadline(s) {
+  const wrap = document.createElement("div");
+  wrap.className = "stats-headline";
+
+  const big = document.createElement("p");
+  big.className = "stats-big";
+  const n = document.createElement("span");
+  n.className = "stats-big-number";
+  n.textContent = s.expired.toLocaleString();
+  const label = document.createElement("span");
+  label.className = "stats-big-label";
+  label.textContent = s.expired === 1 ? "tab seen off" : "tabs seen off";
+  big.append(n, label);
+
+  const parts = [
+    [s.closed, "closed"],
+    [s.discarded, "unloaded"],
+    [s.reloaded, "reloaded"],
+  ].filter(([count]) => count > 0);
+  wrap.append(big);
+  // Only worth a line when it says something the headline did not: one kind of
+  // expiry on its own is already the number above.
+  if (parts.length > 1) {
+    const sub = document.createElement("p");
+    sub.className = "stats-sub";
+    sub.textContent = parts.map(([count, word]) => `${count.toLocaleString()} ${word}`).join(" · ");
+    wrap.append(sub);
+  }
+  return wrap;
+}
+
+/**
+ * Expiries per day, oldest on the left. `summarise` returns every day in the
+ * window including the empty ones, so the gaps in the chart are real gaps.
+ *
+ * Drawn rather than charted: a run of `<div>`s with a height each, which needs
+ * no library and takes the theme's colours for nothing.
+ */
+function statsChart(s) {
+  const wrap = document.createElement("figure");
+  wrap.className = "stats-chart";
+
+  const peak = Math.max(1, ...s.days.map((d) => d.count));
+  const bars = document.createElement("div");
+  bars.className = "stats-bars";
+  for (const day of s.days) {
+    const bar = document.createElement("div");
+    bar.className = "stats-bar";
+    // A day with nothing in it keeps a sliver, so the run of days stays legible
+    // as a run of days rather than becoming a gap in the middle of the chart.
+    bar.style.setProperty("--h", day.count ? `${Math.max(8, (day.count / peak) * 100)}%` : "2px");
+    if (!day.count) bar.classList.add("is-empty");
+    bar.title = `${formatDay(day.date)}: ${day.count} ${day.count === 1 ? "tab" : "tabs"}`;
+    bars.append(bar);
+  }
+
+  const caption = document.createElement("figcaption");
+  caption.className = "stats-caption";
+  caption.textContent = `Last ${s.days.length} days · busiest ${
+    s.busiest ? `${formatDay(s.busiest.date)} with ${s.busiest.count}` : "day yet to come"
+  }`;
+
+  wrap.append(bars, caption);
+  return wrap;
+}
+
+/** The rest of it, one tile each; a tile with nothing to say is left out. */
+function statsTiles(s) {
+  const tiles = [
+    s.snoozes && {
+      value: s.snoozes.toLocaleString(),
+      label: s.snoozes === 1 ? "snooze" : "snoozes",
+      note: s.snoozeSeconds ? `${formatSpan(s.snoozeSeconds)} bought` : "",
+    },
+    s.resets && {
+      value: s.resets.toLocaleString(),
+      label: s.resets === 1 ? "timer restarted" : "timers restarted",
+    },
+    s.peakTabs && {
+      value: s.peakTabs.toLocaleString(),
+      label: "tabs at once, at most",
+      note: s.peakAt ? formatDay(dayKeyOf(s.peakAt)) : "",
+    },
+    s.expired && {
+      value: s.perDay >= 10 ? Math.round(s.perDay).toLocaleString() : s.perDay.toFixed(1),
+      label: "a day, on average",
+      note: `over ${s.daysTracked} ${s.daysTracked === 1 ? "day" : "days"}`,
+    },
+  ].filter(Boolean);
+
+  const grid = document.createElement("div");
+  grid.className = "stats-tiles";
+  for (const t of tiles) {
+    const tile = document.createElement("div");
+    tile.className = "stats-tile";
+    const value = document.createElement("span");
+    value.className = "stats-tile-value";
+    value.textContent = t.value;
+    const label = document.createElement("span");
+    label.className = "stats-tile-label";
+    label.textContent = t.label;
+    tile.append(value, label);
+    if (t.note) {
+      const note = document.createElement("span");
+      note.className = "stats-tile-note";
+      note.textContent = t.note;
+      tile.append(note);
+    }
+    grid.append(tile);
+  }
+  return grid;
+}
+
+/** "11 Sep" from a "YYYY-MM-DD" key, in the reader's own locale. */
+function formatDay(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/** The local day an epoch stamp fell on, so a date reads the way the chart does. */
+function dayKeyOf(ms) {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+$("stats").addEventListener("toggle", (e) => {
+  if (e.target.open) refreshStats();
+});
+$("stats-clear").addEventListener("click", async () => {
+  await api.runtime.sendMessage({ type: "timed-tabs:stats-clear" }).catch(() => {});
+  refreshStats();
+});
+
 let recentTimer = null;
 $("recent").addEventListener("toggle", (e) => {
   if (e.target.open) refreshRecent();
@@ -1444,9 +1616,12 @@ function onPageShown(page) {
       overviewTimer = setInterval(refreshOverview, 5000);
     }
     if ($("recent").open) refreshRecent();
-    // Recent list keeps itself fresh while the page is open.
+    if ($("stats").open) refreshStats();
+    // Recent list keeps itself fresh while the page is open; the tally rides
+    // along on the same beat, since it moves for the same reasons.
     recentTimer = setInterval(() => {
       if ($("recent").open) refreshRecent();
+      if ($("stats").open) refreshStats();
     }, 15000);
   } else if (page === "rules") {
     renderRules();
@@ -3041,6 +3216,7 @@ getDisplayVersion().then((v) => {
     showBackup();
     rememberFold($("overview"), "overview", true);
     rememberFold($("recent"), "recent", false);
+    rememberFold($("stats"), "stats", false);
     route();
   }
   renderFields();

@@ -11,6 +11,7 @@ import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
 import { createNotifier } from "./notify.js";
 import { recordFor } from "../shared/recent.js";
+import { emptyStats, record as recordStat, summarise } from "../shared/stats.js";
 import { findIndicators } from "./indicators/index.js";
 import { lastOutcome as faviconOutcome } from "./indicators/favicon.js";
 
@@ -90,6 +91,40 @@ async function recordExpiredNow(tab, action) {
   if (IS_DEV_BUILD) console.log(`[timed-tabs] recorded ${tab.url} icon=${list[0].favIconUrl ? "yes" : "no"}`);
 }
 
+/**
+ * The tally. Counts only — see shared/stats.js for why that matters — kept in
+ * storage.local beside the recently-expired list, and loaded the same lazy way
+ * so a restarted service worker picks it up again without a startup read.
+ *
+ * Not in storage.sync on purpose. It is written whenever a tab expires, and
+ * Chrome rations sync writes by the minute; a busy profile would spend that
+ * allowance on a number nobody is waiting to see on another machine.
+ */
+const STATS_KEY = "stats";
+let stats = null;
+async function loadStats() {
+  if (!stats) {
+    const { [STATS_KEY]: stored } = await api.storage.local.get(STATS_KEY);
+    stats = stored ?? emptyStats();
+  }
+  return stats;
+}
+
+/**
+ * Count one event, and write only if it changed anything. `record` hands back
+ * the object it was given when nothing moved, which is what keeps a tick that
+ * reports the open-tab count from touching the disk on every pass.
+ */
+function bumpStats(event) {
+  return serial(async () => {
+    const before = await loadStats();
+    const after = recordStat(before, event);
+    if (after === before) return;
+    stats = after;
+    await api.storage.local.set({ [STATS_KEY]: after });
+  });
+}
+
 const ready = tracker.seed();
 
 /**
@@ -122,6 +157,14 @@ if (IS_DEV_BUILD) {
       if (dev.settings) await api.storage.sync.set(dev.settings);
       if (dev.rules) await api.storage.local.set({ rules: dev.rules });
       if (dev.groups) await api.storage.local.set({ siteGroups: dev.groups });
+      // A tally to start from, so a scenario can check what the panel makes of
+      // one without having to live through a fortnight first. The in-memory
+      // copy is set too: the first tick may already have loaded and cached an
+      // empty one, and a write alone would be overwritten by the next bump.
+      if (dev.stats) {
+        stats = dev.stats;
+        await api.storage.local.set({ [STATS_KEY]: stats });
+      }
       for (const urls of dev.openWindows ?? []) await api.windows.create({ url: urls }).catch(() => {});
       await Promise.all((dev.openUrls ?? []).map((u) => api.tabs.create({ url: api.runtime.getURL(u) })));
       // "navigate": [{ "at": ms, "from": url, "to": url }] sends the tab that is
@@ -355,6 +398,11 @@ api.runtime.onMessage.addListener((msg) => {
         return "ok";
       });
     }
+    case "timed-tabs:stats":
+      return loadStats().then((s) => summarise(s));
+    case "timed-tabs:stats-clear":
+      stats = emptyStats();
+      return api.storage.local.set({ [STATS_KEY]: stats }).then(() => "ok");
     case "timed-tabs:recent-clear":
       recent = [];
       return api.storage.local.set({ [RECENT_KEY]: [] }).then(() => "ok");
@@ -445,6 +493,7 @@ async function tabAction({ tabId, action, value }) {
   switch (action) {
     case "reset":
       await tracker.reset(tabId);
+      bumpStats({ type: "reset" });
       expired.delete(tabId);
       break;
     case "snooze": {
@@ -452,10 +501,9 @@ async function tabAction({ tabId, action, value }) {
       // lifetime -- the one its rules give it, not the global default.
       const tab = await api.tabs.get(tabId).catch(() => ({ id: tabId }));
       const eff = settingsFor(tab, await tracker.track(tabId));
-      await tracker.snooze(
-        tabId,
-        Number(value) || snoozeSeconds(eff.tabLifetimeSeconds, settings.snoozePercent),
-      );
+      const seconds = Number(value) || snoozeSeconds(eff.tabLifetimeSeconds, settings.snoozePercent);
+      await tracker.snooze(tabId, seconds);
+      bumpStats({ type: "snoozed", seconds });
       expired.delete(tabId);
       break;
     }
@@ -544,6 +592,9 @@ async function tick() {
     diag.ticks += 1;
     diag.lastTick = now;
     const tabs = await api.tabs.query({});
+    // The tick already has every tab; the record costs a comparison, and a
+    // write only on the rare pass that beats it.
+    bumpStats({ type: "tabs", open: tabs.length });
     const snapshot = [];
     for (const tab of tabs) {
       const s = await tracker.track(tab.id, now);
@@ -631,6 +682,10 @@ async function expire(tab, onExpire) {
       await api.tabs.reload(tab.id);
       await tracker.reset(tab.id);
     }
+    // Counted here rather than above, so the tally only ever holds things that
+    // really happened: a tab that could not be closed is retried next tick and
+    // must not be counted twice, nor once for an attempt that failed.
+    bumpStats({ type: "expired", action: onExpire });
     // Done, and not to be done again until the clock restarts. A reload has
     // just restarted it; the others are marked so the tab is left alone.
     if (onExpire !== "reload") expired.add(tab.id);

@@ -115,6 +115,15 @@ keeps the site's icon and can be reopened. A page that keeps expiring shows once
 with a count and the time it was last closed. Rows can be removed one at a time, or
 the whole list cleared.
 
+**Statistics** is the tally: how many tabs have been seen off and how (closed,
+unloaded, reloaded), how many snoozes you have granted and how much time they bought,
+how many timers you have restarted, and the most tabs you have ever had open at once.
+A small chart shows the last fortnight a day at a time, and names your busiest day.
+
+It is counts and dates only — no addresses, no titles, nothing about any particular
+tab — which makes it the one list on that page holding nothing about where you have
+been. **Clear statistics** empties it. See [privacy.md](privacy.md#-statistics).
+
 ## 📋 Rules
 
 ![The Rules page, with one rule expanded to show its pattern, match mode, priority and overrides](../../assets/screenshots/rules.png)

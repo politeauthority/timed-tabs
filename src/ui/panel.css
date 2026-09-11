@@ -2409,3 +2409,112 @@ body[data-context="popup"] .topbar .version {
     animation-timing-function: steps(12, end);
   }
 }
+
+/* ---- Statistics ---------------------------------------------------------- */
+
+.stats-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-2) 0 var(--sp-1);
+}
+
+.stats-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-big {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.stats-big-number {
+  font-size: var(--fs-display);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-big-label {
+  color: var(--ink-2);
+}
+
+.stats-sub {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+}
+
+.stats-chart {
+  margin: 0;
+}
+
+/*
+ * A day per bar, oldest on the left. Heights are set inline as a percentage of
+ * the busiest day in the window, so the chart re-scales itself rather than
+ * needing a fixed ceiling nobody could pick.
+ */
+.stats-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 56px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-bar {
+  flex: 1;
+  min-width: 4px;
+  height: var(--h, 2px);
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+}
+
+/* A day with nothing in it keeps a sliver rather than a gap. */
+.stats-bar.is-empty {
+  background: var(--line-strong);
+}
+
+.stats-caption {
+  margin: var(--sp-1) 0 0;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-2);
+}
+
+.stats-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--raised);
+}
+
+.stats-tile-value {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-tile-label {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.stats-tile-note {
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
