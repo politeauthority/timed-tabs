@@ -143,7 +143,8 @@ jobs:
     with:
       # The two Firefoxes are required checks; Chrome stable reports beside them
       # and is advisory until branch protection says otherwise.
-      legs: '[{"browser": "firefox", "channel": "stable"}, {"browser": "firefox", "channel": "previous"}, {"browser": "chrome", "channel": "stable"}]'
+      firefox: '["stable", "previous"]'
+      chrome: '["stable"]'
       # A PR to main carrying `ci run full` runs these same versions inside the
       # full run, and the `CI run full` status holds the merge until they pass.
       # So the legs skip here rather than run twice; a skipped required check

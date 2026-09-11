@@ -201,12 +201,14 @@ Both legs resolve an exact version from that one feed rather than handing
 `setup-firefox` the string `latest`, which keeps `previous` defined relative to the
 version actually under test, and puts the number in the log and the job summary.
 
-The legs come from the workflow's `legs` input, a JSON list of `{browser, channel}`
-objects that is the matrix directly; a leg is named `<Browser> <channel>`, and
-`previous-N` is N majors behind stable, so `previous` is `previous-1`. The default is
-Firefox stable and previous; `ci.yaml` adds Chrome stable, and the **CI run full**
-workflow passes all four channels of each browser when a PR carries the `ci run full`
-label — see [README.md](README.md#the-full-run). To change
+The legs come from two inputs, `firefox` and `chrome`, each a JSON list of channels
+that is that browser's matrix directly; the workflow has one job per browser, near
+copies of each other, and a leg is named `<Browser> <channel>`. `previous-N` is N
+majors behind stable, so `previous` is `previous-1`. Firefox defaults to stable and
+previous and Chrome to nothing; `ci.yaml` adds Chrome stable, the beta gate stays
+Firefox-only, and the **CI run full** workflow passes all four channels of each
+browser when a PR carries the `ci run full` label — see
+[README.md](README.md#the-full-run). To change
 the default pair, change the input's default and update branch protection in the same
 change, because those two legs are the required checks. See below.
 

@@ -3,7 +3,8 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
 # the E2E scenarios run on nightly, stable and the two stables before it, in
-# Firefox and in Chrome, instead of CI's three legs. Nightly is advisory: a
+# Firefox and in Chrome, instead of CI's three legs. Each browser is its own
+# segment of the table with its own verdict, and nightly is advisory in both: a
 # daily build breaking is worth seeing and not worth holding a merge for.
 #
 # GitHub has no such thing as a required label, so the label is enforced by a
@@ -163,20 +164,13 @@ jobs:
       # The standard set, in both browsers: the daily build, the current stable
       # and the two stables before it. None of the legs is required on its own;
       # the status the gate posts is, and it ignores nightly.
-      legs: >-
-        [{"browser": "firefox", "channel": "nightly"},
-         {"browser": "firefox", "channel": "stable"},
-         {"browser": "firefox", "channel": "previous"},
-         {"browser": "firefox", "channel": "previous-2"},
-         {"browser": "chrome", "channel": "nightly"},
-         {"browser": "chrome", "channel": "stable"},
-         {"browser": "chrome", "channel": "previous"},
-         {"browser": "chrome", "channel": "previous-2"}]
+      firefox: '["nightly", "stable", "previous", "previous-2"]'
+      chrome: '["nightly", "stable", "previous", "previous-2"]'
       # Not all at once: ten at a time starved one another on the runner node
       # until three legs saw one tick in their whole window and failed on
-      # timing alone. Three at a time passed every leg; eight legs is three
-      # waves of about four minutes.
-      max-parallel: 3
+      # timing alone. Two per browser, so four at a time across the two jobs,
+      # is two waves of about four minutes.
+      max-parallel: 2
       # The gate below writes one table for all eight; a green leg's own summary
       # would only repeat its row. A failed leg still writes its own.
       leg-summary: on-failure
@@ -223,14 +217,17 @@ jobs:
         run: |
           set -uo pipefail
           gh run view "$RUN" --json jobs > jobs.json || echo '{"jobs": []}' > jobs.json
-          python3 scripts/e2e-full-summary.py legs jobs.json > table.md
+          # stdout is the table; stderr is one line per browser, "Firefox: passed"
+          # or "Chrome: stable failed", which becomes the status description.
+          python3 scripts/e2e-full-summary.py legs jobs.json > table.md 2> verdict.txt
           case $? in
             0) verdict=pass ;;
             3) verdict=fail ;;
-            *) verdict=error; echo "_The leg table could not be built; see the browser jobs on this run._" > table.md ;;
+            *) verdict=error; echo "_The leg table could not be built; see the browser jobs on this run._" > table.md; cat verdict.txt ;;
           esac
           echo "verdict=${verdict}" >> "$GITHUB_OUTPUT"
-          echo "verdict: ${verdict}"
+          echo "segments=$(paste -sd ';' verdict.txt | sed 's/;/; /g')" >> "$GITHUB_OUTPUT"
+          echo "verdict: ${verdict} ($(paste -sd ';' verdict.txt))"
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -241,6 +238,7 @@ jobs:
           PLAN: ${{ needs.plan.result }}
           FIREFOX: ${{ needs.firefox.result }}
           VERDICT: ${{ steps.table.outputs.verdict }}
+          SEGMENTS: ${{ steps.table.outputs.segments }}
           ACTION: ${{ github.event.action }}
           PR: ${{ github.event.pull_request.number }}
         run: |
@@ -295,10 +293,10 @@ jobs:
               fi
               case "$VERDICT" in
                 pass)
-                  status success "Stable and the two before it passed in Firefox and Chrome"
+                  status success "${SEGMENTS:-Every leg that counts passed}"
                   report ✅ "passed" "$(cat table.md)" ;;
                 fail)
-                  status failure "A stable or previous leg failed; nightly does not count"
+                  status failure "${SEGMENTS:-A leg that counts failed; nightly does not count}"
                   report ❌ "failed" "$(cat table.md)"; exit 1 ;;
                 *)
                   status error "The leg records could not be read; see the run"

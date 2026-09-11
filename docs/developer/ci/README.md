@@ -108,18 +108,20 @@ and nothing on the PR is red for a label nobody has had a reason to add yet. Wit
 label on, the E2E scenarios run on the standard set in both browsers — `nightly`,
 `stable`, `previous` and `previous-2`, each resolved from the browser's own feed the way
 `E2E` resolves its legs — and the status goes green once stable and the two before it
-have passed in both. Nightly is Firefox Nightly and Chrome Canary, the daily builds:
-they run and are shown in the table, and a nightly failure is flagged there, but it
-does not hold the merge. Take the label off and the status goes back to pending. It is
-red only when a leg that counts actually fails.
+have passed in both. Each browser is its own segment of the gate's summary with its
+own table and verdict, and the status description names them: "Firefox: passed;
+Chrome: previous-2 failed". Nightly is Firefox Nightly and Chrome Canary, the daily
+builds: they run and are shown in their segment, and a nightly failure is flagged
+there, but it never holds the merge in either browser. Take the label off and the
+status goes back to pending. It is red only when a leg that counts actually fails.
 
 The eight legs report as `Full / Firefox nightly` through `Full / Firefox previous-2`
 and `Full / Chrome nightly` through `Full / Chrome previous-2`. None of them is required
 on its own, and neither is the `Full run gate` job that posts the status; only the
 status is, so adding or dropping a leg does not touch branch protection.
 
-The gate's summary is the place to read the result: one table with every leg, the
-Firefox version it resolved to, how many scenarios passed, the scenario time and the
+The gate's summary is the place to read the result: a table per browser with every
+leg, the version it resolved to, how many scenarios passed, the scenario time and the
 job's wall time. A green leg says nothing more than its row. A failed leg gets its
 scenario table and what missed, under the main table and in its own job summary.
 Each leg uploads a small `e2e-leg-<leg>` artifact for this; the gate reads them from

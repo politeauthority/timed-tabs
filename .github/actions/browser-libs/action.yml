@@ -1,0 +1,89 @@
+name: Browser libraries
+description: >
+  The system libraries a headless Firefox or Chrome needs on the runner image,
+  installed once and then cached as a tarball of every file the install put
+  down, so later runs untar instead of running apt and dpkg (nine minutes on a
+  starved CPU). One list for both browsers: what Chrome's package declares is
+  already here or pulled in by GTK, and the few Firefox-only names are harmless
+  to Chrome, so one cache serves every leg. Bump `key` after changing the list.
+
+inputs:
+  key:
+    description: Cache generation. Bump it after changing the package list.
+    required: false
+    default: v1
+  leg:
+    description: >
+      Something unique to this leg of a matrix, e.g. `firefox-stable`. Every leg is
+      cold at once on a fresh key and would otherwise race to save the same entry;
+      the restore prefix still hands any leg whatever another one cached.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # The tarball is untarred over /, so its key must carry the OS release it
+    # was built on.
+    - id: os
+      shell: bash
+      run: |
+        . /etc/os-release
+        echo "id=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+    - id: restore
+      uses: actions/cache/restore@v5
+      with:
+        path: ~/browser-libs.tar
+        key: browser-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.key }}-${{ inputs.leg }}
+        restore-keys: |
+          browser-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.key }}-
+    - id: install
+      shell: bash
+      env:
+        # Ubuntu 24.04 names. Both browsers: GTK 3 (which brings ATK, cairo,
+        # cups, pango, xkbcommon and the X libraries), ALSA, GBM, NSS, and the
+        # X composite/damage/randr trio. Chrome's package also declares
+        # libvulkan1 and fonts-liberation, which the image happened to have.
+        # Firefox alone: dbus-glib, Xt, x11-xcb, pci, Xtst, Xss. The archive
+        # tools unpack what setup-firefox downloads.
+        PACKAGES: >-
+          libgtk-3-0 libasound2t64 libgbm1 libnss3 libxcomposite1 libxdamage1 libxrandr2
+          libvulkan1 fonts-liberation
+          libdbus-glib-1-2 libxt6 libx11-xcb1 libpci3 libxtst6 libxss1
+          bzip2 xz-utils binutils
+      run: |
+        set -euo pipefail
+        if [ -f ~/browser-libs.tar ]; then
+          sudo tar -C / -xpf ~/browser-libs.tar
+          sudo ldconfig
+          echo "restored $(tar -tf ~/browser-libs.tar | wc -l) files from the cache"
+          exit 0
+        fi
+        # The runner pod cannot reach the Ubuntu mirrors on port 80 (no IPv6
+        # route, and IPv4 connections fail too), while HTTPS is fine. Point
+        # apt at an HTTPS mirror and keep it on IPv4.
+        sudo sed -i -E 's#https?://(archive|security)\.ubuntu\.com/ubuntu/?#https://mirrors.kernel.org/ubuntu/#g' \
+          /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
+        { grep -h "^URIs:\|^deb " /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true; } | sort -u | head -3
+        APT="-o Acquire::ForceIPv4=true -o Acquire::Retries=3"
+        sudo apt-get $APT update -qq
+        # shellcheck disable=SC2086
+        sudo DEBIAN_FRONTEND=noninteractive apt-get $APT install -y -qq $PACKAGES > /dev/null
+        # Everything apt installed just now, dependencies included, from its history.
+        # Entries read "pkg:amd64 (1.2-3, automatic)"; drop the parentheses, then split.
+        NEW=$({ awk '/^Install:/{line=$0} END{print line}' /var/log/apt/history.log 2>/dev/null || true; } | sed -E 's/^Install: //; s/ \([^)]*\)//g' | tr ',' '\n' | sed -E 's/^ *//; s/:[a-z0-9]+$//' | { grep -E '^[a-z0-9.+-]+$' || true; } | sort -u)
+        if [ -z "$NEW" ]; then
+          echo "apt installed nothing new (already present on this image); nothing to cache"
+          exit 0
+        fi
+        echo "$NEW" | tr '\n' ' '; echo
+        # shellcheck disable=SC2086
+        dpkg -L $NEW | sort -u | while read -r f; do if [ -f "$f" ] || [ -L "$f" ]; then echo "$f"; fi; done > ~/browser-libs.list
+        sed 's#^/##' ~/browser-libs.list > ~/browser-libs.rel
+        sudo tar -C / -cpf ~/browser-libs.tar --no-recursion -T ~/browser-libs.rel
+        echo "packed $(wc -l < ~/browser-libs.list) files for the cache"
+        echo "packed=true" >> "$GITHUB_OUTPUT"
+    - if: always() && steps.install.outputs.packed == 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ~/browser-libs.tar
+        key: ${{ steps.restore.outputs.cache-primary-key }}
