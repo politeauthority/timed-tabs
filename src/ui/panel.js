@@ -449,16 +449,14 @@ function applyManagementState() {
 }
 
 // ---- Saying whether it worked ----------------------------------------------
-// Two ways of reporting the same thing, chosen by the "settings-toasts" flag.
-// Off, a save confirms itself with a "Saved" tick on the row it changed and a
-// failure is only in the console. On, an outcome that has no natural home on
-// the page goes to a toast instead: a success fades, a failure stays until it
-// is dismissed, and the tick is left off so nothing is said twice.
+// An outcome with no natural home on the page goes to a toast: a success
+// fades, a failure stays until it is dismissed. A rule card or a per-tab
+// control keeps its "Saved" tick instead, since that sits on the thing that
+// changed, which a message at the bottom of the window cannot do.
 
 // The popup is 320px wide and only as tall as its content, so a pile deep
 // enough for the full page would cover most of it.
 const toasts = mountToasts(document.body, isPopup ? { max: 2 } : {});
-const toastsOn = () => featureOn(settings, "settings-toasts");
 
 /** The label of a settings field, for naming what was just saved. */
 function fieldLabel(key) {
@@ -486,14 +484,12 @@ async function write(run, { what, key = null, note = "Nothing was changed." }) {
     return true;
   } catch (err) {
     console.warn(`[timed-tabs] could not save ${what}:`, err);
-    if (toastsOn()) {
-      const reason = reasonFor(err);
-      toasts.error(
-        `Could not save ${what}`,
-        [reason, note].filter(Boolean).join(" "),
-        key ? `save:${key}` : null,
-      );
-    }
+    const reason = reasonFor(err);
+    toasts.error(
+      `Could not save ${what}`,
+      [reason, note].filter(Boolean).join(" "),
+      key ? `save:${key}` : null,
+    );
     return false;
   }
 }
@@ -518,16 +514,7 @@ async function save(partial) {
   // A flag can show or hide whole sections; the rules page depends on site-groups.
   if ("featureFlags" in partial) renderFlagged();
   updateFieldVisibility();
-  if (toastsOn()) {
-    toasts.success("Saved", what, keys.length === 1 ? keys[0] : "settings");
-  } else {
-    for (const key of keys) {
-      const row = $("fields").querySelector(
-        `.field[data-key="${CSS.escape(key)}"]`,
-      );
-      if (row && !row.classList.contains("field-group")) markSaved(row);
-    }
-  }
+  toasts.success("Saved", what, keys.length === 1 ? keys[0] : "settings");
   if (isPopup) refreshTab();
   if ($("overview").open) refreshOverview();
   return true;
@@ -536,14 +523,14 @@ async function save(partial) {
 /**
  * Inline confirmation on the row whose value has just been written to storage.
  *
- * A settings row says nothing while the toasts are on, because `save` has
- * already raised one naming the setting. Everywhere else the tick stays: on a
- * rule card or a per-tab control it sits on the thing that changed, which a
- * message at the bottom of the window cannot do.
+ * A settings row says nothing, because `save` has already raised a toast
+ * naming the setting. Everywhere else the tick stays: on a rule card or a
+ * per-tab control it sits on the thing that changed, which a message at the
+ * bottom of the window cannot do.
  */
 function markSaved(el, container = null) {
   if (!el) return;
-  if (toastsOn() && $("fields").contains(el)) return;
+  if ($("fields").contains(el)) return;
   container ??= el.querySelector(":scope > .field-control") ?? el;
   let mark = container.querySelector(":scope > .saved-mark");
   if (!mark) {
@@ -1005,24 +992,12 @@ async function tabAction(action, value, sourceEl = null) {
   if (!reply) flashTabError();
 }
 
-let tabErrorTimer;
 function flashTabError() {
-  if (toastsOn()) {
-    toasts.error(
-      "Could not change this tab",
-      "Timed Tabs did not answer. Try again.",
-      "tab-action",
-    );
-    return;
-  }
-  const note = $("remaining-note");
-  const prev = note.textContent;
-  note.textContent = "could not save, try again";
-  clearTimeout(tabErrorTimer);
-  tabErrorTimer = setTimeout(() => {
-    if (note.textContent === "could not save, try again")
-      note.textContent = prev;
-  }, 2500);
+  toasts.error(
+    "Could not change this tab",
+    "Timed Tabs did not answer. Try again.",
+    "tab-action",
+  );
 }
 
 // ---- Fold state, remembered across page opens ------------------------------
@@ -2762,9 +2737,6 @@ function renderFlagsNote() {
 /** Every part of the UI a feature flag can show or hide. */
 function renderFlagged() {
   renderFlagsNote();
-  // With the toasts switched off there is no host on the page any more, so
-  // anything still showing would sit there unreachable.
-  if (!toastsOn()) toasts.clear();
   if (!isPopup) {
     renderGroups();
     renderRules();
@@ -2786,7 +2758,6 @@ watchGroups((next) => {
 // ---- Backup ----------------------------------------------------------------
 
 const backupText = $("backup-text");
-const backupStatus = $("backup-status");
 
 /**
  * Fill the box with everything as it stands, stamped with the build writing
@@ -2799,21 +2770,15 @@ const backupStatus = $("backup-status");
 async function showBackup() {
   const v = await getDisplayVersion().catch(() => null);
   backupText.value = exportText(settings, rules, groups, v?.display ?? "");
-  backupStatus.textContent = "";
 }
 
 /**
- * The outcome of a backup action. It has no row to sit on, so with the toasts
- * on it goes to one; without them it stays on the small line under the box,
- * where a failure has always been easy to miss.
+ * The outcome of a backup action. It has no row to sit on, so it goes to a
+ * toast rather than the small line under the box, where a failure was easy to
+ * miss.
  */
 function backupNote(text, level = "info") {
-  if (toastsOn()) {
-    backupStatus.textContent = "";
-    toasts.show({ level, message: text, key: "backup" });
-    return;
-  }
-  backupStatus.textContent = text;
+  toasts.show({ level, message: text, key: "backup" });
 }
 
 $("backup-refresh").addEventListener("click", showBackup);
@@ -2943,14 +2908,7 @@ async function applyBackup() {
 let backupTimer;
 function showBackupSoon() {
   clearTimeout(backupTimer);
-  backupTimer = setTimeout(async () => {
-    // `showBackup` clears the line as it refills the box, so what was just
-    // said has to be put back after it — and awaited, or it is put back
-    // before the clearing rather than after it.
-    const note = backupStatus.textContent;
-    await showBackup();
-    backupStatus.textContent = note;
-  }, 300);
+  backupTimer = setTimeout(showBackup, 300);
 }
 
 // ---- Theme -----------------------------------------------------------------

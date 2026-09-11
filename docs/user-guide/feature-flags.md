@@ -27,7 +27,7 @@ set you had.
 ## 🚩 Knowing one is on
 
 While any beta feature is on, a line at the foot of the popup and of every page names
-which ones — `2 beta features on: Site groups, Settings toasts` — with **Change** to
+which ones — `2 beta features on: Site groups, Statistics` — with **Change** to
 go straight back to the switches. It is there so that a screen which no longer matches
 this guide explains itself, rather than leaving you to wonder which switch did it.
 
@@ -77,27 +77,6 @@ One thing to know before you turn it off again: **while the flag is off, rules t
 target a group match nothing**. The rules are still there and their cards say so, but
 they stop applying. If a group rule is the only thing keeping a site's tabs short,
 turning the flag off silently gives those tabs your default lifetime instead.
-
-### Settings toasts
-
-Changes a setting's confirmation from a small **Saved** tick beside the setting into a
-message that slides in at the bottom of the window, naming what you changed.
-
-A success fades after a few seconds, with a line burning down the bottom of it so you
-can see how long it has. **A failure stays until you dismiss it**, and says what went
-wrong: a setting that could not be written is one you would otherwise go on believing
-you had changed. Resting the pointer on a message holds every countdown, so nothing
-slips away mid-sentence.
-
-Rules and the per-tab controls keep their **Saved** tick. It sits on the row you
-edited, which a message at the bottom of the window cannot do. What moves to a message
-is the Settings page, and anything that never had a good place to be said: the outcome
-of a **Backup** copy, load or reset, and any save that fails.
-
-These are the extension's own messages, drawn inside the popup or the page you are
-looking at. They are nothing to do with the desktop notifications in
-[features.md](features.md), which come from your operating system when a tab is closed,
-need a permission, and show up whether or not Timed Tabs is open.
 
 ### Statistics
 

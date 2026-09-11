@@ -167,8 +167,8 @@ describe("activeFeatures", () => {
   });
 
   it("lists several in the order the settings page does", () => {
-    const ids = activeFeatures(on("beta-features", "settings-toasts", "mini-ui-page-settings")).map((f) => f.id);
-    expect(ids).toEqual(["mini-ui-page-settings", "settings-toasts"]);
+    const ids = activeFeatures(on("beta-features", "statistics-panel", "mini-ui-page-settings")).map((f) => f.id);
+    expect(ids).toEqual(["mini-ui-page-settings", "statistics-panel"]);
     const declared = FLAGS.map((f) => f.id);
     expect(ids).toEqual([...ids].sort((a, b) => declared.indexOf(a) - declared.indexOf(b)));
   });

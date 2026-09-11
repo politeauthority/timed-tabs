@@ -208,8 +208,14 @@ Some details worth knowing:
 
 ![The Settings page](../../assets/screenshots/settings.png)
 
-Settings save as soon as they change and show a Saved mark. Settings sync
-through the browser's extension storage; rules are kept locally.
+Settings save as soon as they change and say so in a message that slides in at the
+bottom of the window, naming what you changed. A success fades after a few seconds,
+with a line burning down the bottom of it; a failure stays until you dismiss it and
+says what went wrong, because a setting that could not be written is one you would
+otherwise go on believing you had changed. Resting the pointer on a message holds
+every countdown. Rules and the per-tab controls keep their **Saved** tick instead —
+it sits on the row you edited, which a message at the bottom of the window cannot do.
+Settings sync through the browser's extension storage; rules are kept locally.
 
 - **Manage tabs** is the master switch. Off leaves every tab alone, with no timers,
   no closing and no colours, and undoes every mark already made. Back on, every tab
