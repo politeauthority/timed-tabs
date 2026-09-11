@@ -31,35 +31,39 @@ on:
     # disarm, or the PR merges anyway and the label is a lie.
     #
     # `labeled` and `unlabeled` fire for every label on the repo, and GitHub
-    # gives no way to filter the trigger by name, so each job below checks
+    # gives no way to filter the trigger by name, so the one job below checks
     # `github.event.label` and stands down for labels that are none of its
-    # business. Skipping is safe here in a way it is not for CI or E2E: no job
-    # in this file is a required check, so a skip overwrites nothing that branch
-    # protection reads.
-    types:
-      [labeled, unlabeled, opened, reopened, synchronize, ready_for_review,
-       auto_merge_enabled, auto_merge_disabled]
+    # business. Skipping is safe here in a way it is not for CI or E2E: this is
+    # not a required check, so a skip overwrites nothing that branch protection
+    # reads. One job rather than three, because every job in a workflow shows
+    # up as a check on the PR, skipped or not, and three names per label event
+    # was most of the clutter on every pull request.
+    #
+    # No `opened`, `reopened` or `synchronize`: a label added at creation still
+    # fires `labeled`, and once armed, auto-merge survives new commits on its
+    # own. Every event this listens to is one that could change the answer.
+    types: [labeled, unlabeled, ready_for_review, auto_merge_enabled, auto_merge_disabled]
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  # Someone armed auto-merge without the label. Put the label on so the PR reads
-  # the way it behaves, and so `gh pr list --label automerge` finds it.
-  #
-  # This cannot loop. Adding the label wakes `arm` below, which finds auto-merge
-  # already armed and stops. Removing it wakes `disarm`, which finds auto-merge
-  # already off and stops. Both directions also check the label before touching
-  # it, so a no-op edit never emits the webhook that would start the cycle over.
-  # And it costs nothing now that the heavy CI job no longer wakes on label
-  # events -- only `Not paused` does, which takes seconds.
-  label:
-    name: Keep the label honest
-    if: github.event.action == 'auto_merge_enabled' || github.event.action == 'auto_merge_disabled'
+  # One job, three concerns, each a step that only runs for its own event:
+  #   - auto_merge_enabled/disabled: keep the label honest. Cannot loop: adding
+  #     the label wakes the arm step, which finds auto-merge armed and stops;
+  #     removing it wakes the disarm step, which finds it off and stops.
+  #   - unlabeled (automerge): disarm, or the PR merges itself anyway.
+  #   - the label present and the PR not a draft: arm.
+  automerge:
+    name: Auto-merge
+    # Stand down entirely for a label that is none of this workflow's business,
+    # so the run is a single skipped check rather than three.
+    if: github.event.action != 'labeled' || github.event.label.name == 'automerge'
     runs-on: ubuntu-latest
     steps:
       - name: Match the label to the state
+        if: github.event.action == 'auto_merge_enabled' || github.event.action == 'auto_merge_disabled'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -93,12 +97,9 @@ jobs:
   # that no longer claims to be auto-merging would still merge itself the moment
   # the checks went green -- which is the opposite of what taking the label off
   # is asking for.
-  disarm:
-    name: Disarm auto-merge
-    if: github.event.action == 'unlabeled' && github.event.label.name == 'automerge'
-    runs-on: ubuntu-latest
-    steps:
+
       - name: Turn auto-merge off
+        if: github.event.action == 'unlabeled' && github.event.label.name == 'automerge'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -143,19 +144,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
-  arm:
-    name: Arm auto-merge
-    # Only labelled PRs, and never a draft: arming one would merge it the moment
-    # it is marked ready, before anyone has looked.
-    if: >-
-      contains(github.event.pull_request.labels.*.name, 'automerge')
-      && !github.event.pull_request.draft
-      && github.event.action != 'auto_merge_disabled'
-      && github.event.action != 'unlabeled'
-      && (github.event.action != 'labeled' || github.event.label.name == 'automerge')
-    runs-on: ubuntu-latest
-    steps:
       - name: Enable auto-merge
+        if: contains(github.event.pull_request.labels.*.name, 'automerge') && !github.event.pull_request.draft && github.event.action != 'auto_merge_disabled' && github.event.action != 'unlabeled' && (github.event.action != 'labeled' || github.event.label.name == 'automerge')
         env:
           GH_TOKEN: ${{ github.token }}
           # There is no checkout in this job, so gh cannot work out the repo from

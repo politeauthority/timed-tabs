@@ -19,7 +19,7 @@ explaining why it is shaped the way it is; this section is the map over the top.
 |---|---|---|
 | **CI** (`ci.yaml`) | every PR, every push to `main`, dispatch | Lints, unit-tests and builds both dist targets, then calls E2E. |
 | **E2E** (`e2e.yaml`) | called by CI; dispatch | The extension in a real headless Firefox, two versions in parallel. See [e2e.md](../e2e.md). |
-| **Not paused** (`pause.yaml`) | every PR, including every label change | Goes red while the `ci pause` label is on. |
+| **Not paused** (`pause.yaml`) | every PR, including every label change and review | Goes red while the `ci pause` label is on. Also dispatches Release Please when a review or the `release-approved` label lands on the release PR, so that workflow need not listen to PR events itself. |
 | **Auto-merge** (`automerge.yaml`) | the `automerge` label, both directions | Arms and disarms GitHub's auto-merge, and keeps the label and the state agreeing. |
 | **Release Please** (`release-please.yaml`) | push to `main`, review, label, dispatch | Maintains the release PR, and on merge tags, packages and publishes. |
 | **Beta Release** (`beta-release.yaml`) | dispatch | Cuts a beta from a snapshot of `main`. |
