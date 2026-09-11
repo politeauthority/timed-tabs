@@ -7,8 +7,8 @@ how a release is cut, and what must not quietly break.
   the test commands and the Taskfile.
 - [e2e.md](e2e.md) — the headless-Firefox end-to-end tests: how a scenario is written
   and how to run one.
-- [releasing.md](releasing.md) — versions, channels and build tags, how a beta is cut
-  and why stable releases are paused.
+- [releasing.md](releasing.md) — versions, channels and build tags, how a beta is cut,
+  how stable releases are gated, and how a release reaches AMO.
 - [security-notes.md](security-notes.md) — the guarantees the extension makes about
   remote code, data and permissions, and the gaps that are known.
 - [amo-review-notes.md](amo-review-notes.md) — the text to paste into the add-on
