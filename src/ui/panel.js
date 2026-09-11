@@ -2779,9 +2779,32 @@ function renderFlagsNote() {
     "Timed Tabs may not match the user guide while a beta feature is on. Settings \u2192 Feature flags.";
 }
 
+/**
+ * A small "beta" pill in the header while the "Beta features" switch is on.
+ *
+ * The note above only speaks when a feature is actually in force, which is
+ * right for a note that names things. This badge answers a different
+ * question -- is this profile opted into beta at all -- so it reads the
+ * master switch itself, and stays up even when nothing under it is on yet.
+ * It goes to the switch, so turning it back off is one click away.
+ */
+function renderBetaBadge() {
+  const badge = $("beta-badge");
+  const on = flagOn(settings, "beta-features");
+  badge.hidden = !on;
+  if (!on) return;
+  const count = activeFeatures(settings).length;
+  badge.title =
+    (count === 0
+      ? "Beta features is on, with nothing under it switched on yet."
+      : `Beta features is on, with ${count === 1 ? "1 feature" : `${count} features`} in force.`) +
+    " Timed Tabs may not match the user guide. Click to see the switches.";
+}
+
 /** Every part of the UI a feature flag can show or hide. */
 function renderFlagged() {
   renderFlagsNote();
+  renderBetaBadge();
   if (!isPopup) {
     renderGroups();
     renderRules();
@@ -3194,7 +3217,8 @@ const FLAGS_GROUP = FIELDS.find((f) => f.key === "featureFlags")?.group;
  * a hidden section -- and `scrollIntoView` on one of those does nothing at
  * all, which lands you on Settings with no idea what you were sent to look at.
  */
-$("flags-note-manage").addEventListener("click", () => {
+/** Take the user to the feature flags: the note's "Change" and the header badge both land here. */
+function showFlagSettings() {
   // The popup has no page to scroll, so it asks the page it opens to arrive
   // on the right group, the way `site` asks the Rules page to arrive filtered.
   if (isPopup) return openPageView("#settings", FLAGS_GROUP ? { group: FLAGS_GROUP } : {});
@@ -3206,7 +3230,10 @@ $("flags-note-manage").addEventListener("click", () => {
       .querySelector('.field[data-key="featureFlags"]')
       ?.scrollIntoView({ block: "center", behavior: "smooth" });
   });
-});
+}
+
+$("flags-note-manage").addEventListener("click", showFlagSettings);
+$("beta-badge").addEventListener("click", showFlagSettings);
 
 $("diag-refresh").addEventListener("click", refreshDiag);
 $("diag-tick").addEventListener("click", async () => {

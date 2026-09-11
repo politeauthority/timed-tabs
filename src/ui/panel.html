@@ -35,6 +35,12 @@
           <svg class="icon" aria-hidden="true"><use href="#i-logo" /></svg>
           <span>Timed Tabs</span>
           <span id="channel-badge" class="channel-badge" hidden></span>
+          <!-- Every view, while the "Beta features" switch is on: a small
+               reminder that this profile is not running the documented
+               extension. It goes to the switch that turned it on. -->
+          <button type="button" id="beta-badge" class="beta-badge" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-flag" /></svg><span class="beta-badge-text">beta</span>
+          </button>
           <span id="version" class="version" title="Version"></span>
         </span>
         <nav class="pages" aria-label="Pages">
