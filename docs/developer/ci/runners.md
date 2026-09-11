@@ -14,7 +14,7 @@ workflows:
 | What was slow | Measured | What is cached instead |
 |---|---|---|
 | Unpacking Node | ~2 minutes | The extracted tool directory, so `setup-node` finds it and extracts nothing |
-| `apt` + `dpkg` for Firefox's libraries | ~9 minutes on a busy day | A tarball of the installed files, restored with one untar — see [e2e.md](../e2e.md) |
+| `apt` + `dpkg` for Firefox's libraries | ~9 minutes on a busy day | A tarball of the installed files, restored with one untar — see [e2e.md](e2e.md) |
 
 Firefox itself is not cached: fetching and extracting it takes under half a minute,
 which is not worth a cache key to get wrong.

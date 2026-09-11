@@ -7,8 +7,6 @@ how a release is cut, and what must not quietly break.
 
 - [building.md](building.md) — building and running it from source, the dist targets,
   the test commands and the Taskfile.
-- [e2e.md](e2e.md) — the headless-Firefox end-to-end tests: how a scenario is written
-  and how to run one.
 - [chrome.md](chrome.md) — what the Chrome build does differently, what the service
   worker cannot do, and what is still checked by hand.
 - [security-notes.md](security-notes.md) — the guarantees the extension makes about
@@ -22,6 +20,8 @@ Everything that happens in GitHub Actions rather than on your machine.
 
 - [ci/README.md](ci/README.md) — which workflows exist, what must be green before a
   merge, and how a pull request is paused.
+- [ci/e2e.md](ci/e2e.md) — the headless-Firefox end-to-end tests: how a scenario is
+  written and how to run one.
 - [ci/runners.md](ci/runners.md) — the self-hosted runner and the caching that makes
   it bearable.
 - [ci/releasing.md](ci/releasing.md) — versions, channels and build tags, betas, the

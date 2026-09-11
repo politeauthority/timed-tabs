@@ -34,7 +34,7 @@ To load a build by hand instead:
 ```sh
 npm run lint         # eslint, web-ext lint, and the icons are in sync
 npm test             # vitest, watch with npm run test:watch
-npm run e2e          # headless Firefox, see e2e.md
+npm run e2e          # headless Firefox, see ci/e2e.md
 ```
 
 ## Building

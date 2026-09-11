@@ -3,7 +3,7 @@ run-name: "E2E — ${{ github.ref_name }}"
 
 # 🦊 Runs the extension in a real, headless Firefox on the self-hosted runner and
 # checks each scenario in tests/e2e/scenarios against the log it produces. See
-# docs/developer/e2e.md.
+# docs/developer/ci/e2e.md.
 #
 # This is a reusable workflow with no triggers of its own. `jobs.e2e` in ci.yaml
 # calls it, with `needs: lint-test`, so Firefox is only installed once lint, the unit

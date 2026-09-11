@@ -106,7 +106,7 @@ tool directory and the Firefox libraries (on Ubuntu 24.04 the ALSA package is
 `browser-actions/setup-firefox`, then runs `npm run e2e`.
 
 The caches exist because the runner is short of CPU rather than bandwidth —
-[ci/runners.md](ci/runners.md) has that story, the Node tool cache both workflows
+[runners.md](runners.md) has that story, the Node tool cache both workflows
 share, and how cache scoping decides which runs see a warm one.
 
 What is specific to this job is the **Firefox libraries**. They are not restored with
@@ -146,7 +146,7 @@ The matrix comes from the workflow's `firefox` input, a JSON list of legs, and t
 resolve step also understands `previous-N`: N majors behind the current release, so
 `previous` is `previous-1`. The **CI run full** workflow calls it with ten legs,
 `latest` through `previous-9`, when a PR carries the `ci run full` label — see
-[ci/README.md](ci/README.md#the-full-run). To change the default pair, change the
+[README.md](README.md#the-full-run). To change the default pair, change the
 input's default and update branch protection in the same change, because those two
 legs are the required checks. See below.
 
@@ -167,7 +167,7 @@ That last part is the sharp edge: **changing the matrix renames a protected cont
 Add a third version, rename a leg, drop one — each of those silently stops a required
 check from being required, because branch protection goes on matching a name nothing
 reports any more. Update the required checks on `main` in the same change — the full list and the
-`gh api` call that sets it are in [ci/README.md](ci/README.md#what-must-be-green).
+`gh api` call that sets it are in [README.md](README.md#what-must-be-green).
 
 A PR with the label **ci pause** skips the matrix; GitHub counts a skipped required
 check as passed, so the label lets a PR merge without waiting for Firefox. CI does not wake on

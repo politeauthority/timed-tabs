@@ -5,6 +5,8 @@ release is cut. The workflows themselves are in
 [`.github/workflows/`](../../../.github/workflows/), each with a comment block
 explaining why it is shaped the way it is; this section is the map over the top.
 
+- [e2e.md](e2e.md) — the headless-Firefox end-to-end tests: how a scenario is
+  written, how to run one, and what the E2E workflow checks.
 - [runners.md](runners.md) — the self-hosted runner every job lands on, why it is
   slow in a particular way, and the caching that works around it.
 - [releasing.md](releasing.md) — versions, channels and build tags, how a beta is
@@ -18,7 +20,7 @@ explaining why it is shaped the way it is; this section is the map over the top.
 | Workflow | Runs on | What it does |
 |---|---|---|
 | **CI** (`ci.yaml`) | every PR, every push to `main`, dispatch | Lints, unit-tests and builds both dist targets, then calls E2E. |
-| **E2E** (`e2e.yaml`) | called by CI; dispatch | The extension in a real headless Firefox, two versions in parallel. See [e2e.md](../e2e.md). |
+| **E2E** (`e2e.yaml`) | called by CI; dispatch | The extension in a real headless Firefox, two versions in parallel. See [e2e.md](e2e.md). |
 | **CI run full** (`full.yaml`) | every PR, including every label change | Red until the `ci run full` label is on and the E2E scenarios have passed on the last ten Firefox releases. See [The full run](#the-full-run). |
 | **Not paused** (`pause.yaml`) | every PR, including every label change and review | Goes red while the `ci pause` label is on. Also dispatches Release Please when a review or the `release-approved` label lands on the release PR, so that workflow need not listen to PR events itself. |
 | **Auto-merge** (`automerge.yaml`) | the `automerge` label, both directions | Arms and disarms GitHub's auto-merge, and keeps the label and the state agreeing. |
