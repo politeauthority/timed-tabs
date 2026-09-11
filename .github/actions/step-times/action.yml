@@ -8,6 +8,12 @@ inputs:
   token:
     description: A token with actions:read, for the jobs API.
     required: true
+  slow-over:
+    description: >
+      Seconds above which a step is called out as slow, and the table is opened
+      rather than folded away. 0 disables the call-out.
+    required: false
+    default: "60"
 
 runs:
   using: composite
@@ -15,6 +21,7 @@ runs:
     - shell: bash
       env:
         API_TOKEN: ${{ inputs.token }}
+        SLOW_OVER: ${{ inputs.slow-over }}
       run: |
         set -uo pipefail
         # Best effort throughout. Anything missing means no table, not a failure.
@@ -62,7 +69,15 @@ runs:
         def clock(s):
             return f"{s:.0f}s" if s < 60 else f"{int(s // 60)}m {int(s % 60):02d}s"
 
-        print("<details><summary>⏱️ Where the time went</summary>\n")
+        try:
+            slow_over = float(os.environ.get("SLOW_OVER") or 60)
+        except ValueError:
+            slow_over = 60.0
+        slow = [(n, s) for n, s, _ in rows if s is not None and slow_over and s > slow_over]
+
+        # Fold the table away on a quick job; open it when something dragged, so
+        # the slow step is on screen without anyone going looking for it.
+        print(f"<details{' open' if slow else ''}><summary>⏱️ Where the time went</summary>\n")
         print("| Step | Time | Share |")
         print("|---|--:|--:|")
         for name, secs, note in rows:
@@ -71,8 +86,12 @@ runs:
                 continue
             share = (secs / total * 100) if total else 0
             bar = "█" * round(share / 10)
-            print(f"| {name} | {clock(secs)} | {bar} {share:.0f}% |")
+            mark = " 🐌" if (slow_over and secs > slow_over) else ""
+            print(f"| {name}{mark} | {clock(secs)} | {bar} {share:.0f}% |")
         print(f"| **Total** | **{clock(total)}** | |")
+        if slow:
+            worst = ", ".join(f"**{n}** ({clock(s)})" for n, s in sorted(slow, key=lambda r: -r[1]))
+            print(f"\n🐌 Over {clock(slow_over)}: {worst}.")
         print("\nQueue time before the runner picked the job up is not counted here.")
         print("</details>")
         PY

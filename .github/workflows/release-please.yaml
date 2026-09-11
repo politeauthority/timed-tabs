@@ -1,5 +1,5 @@
 name: Release Please
-run-name: "Release Please — ${{ github.event_name == 'pull_request_review' && 'review submitted' || github.ref_name }}"
+run-name: "Release Please — ${{ github.event_name == 'pull_request_review' && format('PR #{0} review', github.event.pull_request.number) || github.ref_name }}"
 
 # Mirrors quigley-web: release-please maintains a release PR from Conventional
 # Commits; merging it tags the version and (package) builds the Firefox + Chrome
