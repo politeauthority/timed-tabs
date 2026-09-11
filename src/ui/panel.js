@@ -9,12 +9,27 @@ import {
   DEFAULTS,
   FIELDS,
   GROUPS,
+  getGroups,
   getRules,
+  saveGroups,
   getSettings,
   saveRules,
   saveSettings,
+  watchGroups,
   watchRules,
 } from "../shared/settings.js";
+import {
+  cleanName,
+  cleanPatterns,
+  findGroup,
+  groupNameOf,
+  groupRef,
+  isGroupRef,
+  nameTaken,
+  newGroup,
+  renameGroup,
+  rulesUsingGroup,
+} from "../shared/groups.js";
 import {
   MAX_PRIORITY,
   RULE_FIELDS,
@@ -366,6 +381,11 @@ async function save(partial) {
   await saveSettings(partial);
   settings = { ...settings, ...partial };
   if ("tabManagement" in partial) applyManagementState();
+  // A flag can show or hide whole sections; the rules page depends on site-groups.
+  if ("featureFlags" in partial && !isPopup) {
+    renderGroups();
+    renderRules();
+  }
   updateFieldVisibility();
   for (const key of Object.keys(partial)) {
     const row = $("fields").querySelector(
@@ -1189,6 +1209,10 @@ function onPageShown(page) {
 // ---- Rules editor ----------------------------------------------------------
 
 let rules = [];
+/** Site groups (shared/groups.js). Only in force while the "site-groups" flag is on. */
+let groups = [];
+const groupsOn = () => flagOn(settings, "site-groups");
+const activeGroups = () => (groupsOn() ? groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
 const expandedRules = new Set();
 /** The rule "Add rule" just set up; its card flashes until this is cleared. */
@@ -1275,7 +1299,7 @@ const NEW_RULE_PATTERN = "https://";
 /** A rule with no usable pattern: blank, the untouched new-rule stub, or a host-less "/*" left over from a bad add. */
 function isEmptyRule(r) {
   const p = (r.pattern ?? "").trim();
-  return p === "" || p === "/*" || p === NEW_RULE_PATTERN;
+  return p === "" || p === "/*" || p === "@" || p === NEW_RULE_PATTERN;
 }
 
 /** Rules in display order: alphabetical by pattern, with the ones still being typed first. */
@@ -1287,6 +1311,175 @@ function sortedRules() {
     return a.pattern.localeCompare(b.pattern, undefined, { sensitivity: "base" });
   });
 }
+
+/** "Site group “news”, 4 sites" or why the rule currently matches nothing. */
+function describeGroupTarget(rule) {
+  const name = groupNameOf(rule.pattern);
+  if (!groupsOn()) return `Targets site group “${name}”, but site groups are off in Settings → Feature flags, so this rule matches nothing`;
+  const g = findGroup(groups, name);
+  if (!g) return `Targets site group “${name}”, which does not exist, so this rule matches nothing`;
+  const n = g.patterns.length;
+  return `Site group “${g.name}”, ${n} site${n === 1 ? "" : "s"}`;
+}
+
+/** Group ids expanded this session. New groups start open. */
+const expandedGroups = new Set();
+let groupsSaving = false;
+
+async function persistGroups() {
+  groupsSaving = true;
+  await saveGroups(groups);
+  groupsSaving = false;
+}
+
+function renderGroups() {
+  const section = $("site-groups");
+  if (!section) return;
+  section.hidden = !groupsOn();
+  if (section.hidden) return;
+  const list = $("groups-list");
+  if (!groups.length) {
+    const p = document.createElement("p");
+    p.className = "rules-empty";
+    p.textContent = "No groups yet. Add one, list the sites it covers, then point a rule at it.";
+    list.replaceChildren(p);
+    return;
+  }
+  const sorted = [...groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  list.replaceChildren(...sorted.map(renderGroup));
+}
+
+function renderGroup(group) {
+  const el = document.createElement("div");
+  el.className = "rule group";
+  el.dataset.groupId = group.id;
+  const open = expandedGroups.has(group.id);
+  el.classList.toggle("is-collapsed", !open);
+  const users = rulesUsingGroup(rules, group);
+
+  const head = document.createElement("div");
+  head.className = "rule-head";
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "rule-toggle chev";
+  toggle.classList.toggle("is-open", open);
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", open ? "Collapse group" : "Expand group");
+  toggle.addEventListener("click", () => {
+    if (expandedGroups.has(group.id)) expandedGroups.delete(group.id);
+    else expandedGroups.add(group.id);
+    renderGroups();
+  });
+  const name = document.createElement("input");
+  name.className = "group-name";
+  name.value = group.name;
+  name.placeholder = "Group name, e.g. news";
+  name.setAttribute("aria-label", "Group name");
+  name.addEventListener("change", async () => {
+    const next = cleanName(name.value);
+    if (!next || next === group.name) {
+      name.value = group.name;
+      return;
+    }
+    if (nameTaken(groups, next, group.id)) {
+      name.value = group.name;
+      name.title = `There is already a group called “${next}”`;
+      return;
+    }
+    // Renaming repoints every rule that used the old name.
+    const out = renameGroup(groups, rules, group.id, next);
+    groups = out.groups;
+    rules = out.rules;
+    await persistGroups();
+    await persistRules(false);
+    renderGroups();
+    renderRules();
+    markSaved(head, head);
+  });
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "rule-delete quiet";
+  del.replaceChildren(svgIcon("trash"), document.createTextNode("Delete group"));
+  if (users.length) {
+    del.disabled = true;
+    del.title = `Used by ${users.length} rule${users.length === 1 ? "" : "s"}. Point them elsewhere first.`;
+  }
+  let armed = null;
+  del.addEventListener("click", async () => {
+    if (!armed) {
+      del.replaceChildren(svgIcon("trash"), document.createTextNode("Click again to delete"));
+      del.classList.add("is-armed");
+      armed = setTimeout(() => {
+        armed = null;
+        del.replaceChildren(svgIcon("trash"), document.createTextNode("Delete group"));
+        del.classList.remove("is-armed");
+      }, 4000);
+      return;
+    }
+    clearTimeout(armed);
+    groups = groups.filter((g) => g.id !== group.id);
+    await persistGroups();
+    renderGroups();
+    renderRules();
+  });
+  head.append(toggle, name, del);
+  el.append(head);
+
+  const summary = document.createElement("button");
+  summary.type = "button";
+  summary.className = "rule-summary";
+  const n = group.patterns.length;
+  summary.textContent = `${n} site${n === 1 ? "" : "s"} — ${users.length ? `used by ${users.length} rule${users.length === 1 ? "" : "s"}` : "not used by any rule yet"}`;
+  summary.title = "Expand group";
+  summary.addEventListener("click", () => {
+    expandedGroups.add(group.id);
+    renderGroups();
+  });
+  el.append(summary);
+
+  const body = document.createElement("div");
+  body.className = "rule-body";
+  const patterns = document.createElement("textarea");
+  patterns.className = "group-patterns";
+  patterns.rows = Math.max(4, group.patterns.length + 1);
+  patterns.value = group.patterns.join("\n");
+  patterns.placeholder = "One address pattern per line, e.g.\n*.nytimes.com/*\nbbc.co.uk/*";
+  patterns.setAttribute("aria-label", `Sites in group ${group.name}`);
+  patterns.spellcheck = false;
+  patterns.addEventListener("change", async () => {
+    const next = cleanPatterns(patterns.value);
+    groups = groups.map((g) => (g.id === group.id ? { ...g, patterns: next } : g));
+    await persistGroups();
+    renderGroups();
+    renderRules();
+    markSaved(head, head);
+  });
+  const meta = document.createElement("p");
+  meta.className = "group-meta";
+  meta.textContent = users.length
+    ? `Rules that use this group: ${users.map((r) => r.description || groupRef(group.name)).join(", ")}. Point a rule at “Group: ${group.name}” in its target picker.`
+    : `No rule uses this group yet. Pick “Group: ${group.name}” as a rule's target to apply it.`;
+  body.append(patterns, meta);
+  el.append(body);
+  return el;
+}
+
+$("group-add")?.addEventListener("click", async () => {
+  let name = "New group";
+  for (let i = 2; nameTaken(groups, name); i++) name = `New group ${i}`;
+  const g = newGroup({ name, patterns: [] });
+  groups = [...groups, g];
+  expandedGroups.add(g.id);
+  await persistGroups();
+  renderGroups();
+  const card = $("groups-list").querySelector(`[data-group-id="${CSS.escape(g.id)}"]`);
+  card?.scrollIntoView({ block: "start", behavior: "smooth" });
+  const input = card?.querySelector(".group-name");
+  if (input) {
+    input.focus();
+    input.select();
+  }
+});
 
 function renderRules() {
   const list = $("rules-list");
@@ -1387,6 +1580,26 @@ function renderRule(rule) {
     updateRule(rule.id, { pattern: pattern.value.trim() }, true, "head"),
   );
   const patternWrap = mirrorWildcards(pattern);
+  const targetsGroup = isGroupRef(rule.pattern);
+  // With site groups on, the head gets a picker: an address, or one of the groups.
+  let target = null;
+  if (groupsOn()) {
+    target = document.createElement("select");
+    target.className = "rule-target";
+    target.setAttribute("aria-label", "What this rule applies to");
+    target.add(new Option("Address pattern", ""));
+    for (const g of groups) target.add(new Option(`Group: ${g.name}`, groupRef(g.name)));
+    const current = targetsGroup ? groupRef(groupNameOf(rule.pattern)) : "";
+    if (targetsGroup && !findGroup(groups, groupNameOf(rule.pattern))) {
+      target.add(new Option(`Group: ${groupNameOf(rule.pattern)} (missing)`, current));
+    }
+    target.value = current;
+    target.addEventListener("change", () => {
+      const next = target.value || NEW_RULE_PATTERN;
+      updateRule(rule.id, { pattern: next, match: "wildcard" }, true, "head");
+    });
+  }
+  patternWrap.hidden = targetsGroup;
   const del = document.createElement("button");
   del.type = "button";
   del.className = "rule-delete quiet";
@@ -1419,7 +1632,7 @@ function renderRule(rule) {
   del.addEventListener("blur", () => {
     if (armed) setTimeout(disarm, 200);
   });
-  head.append(toggle, patternWrap, del);
+  head.append(toggle, ...(target ? [target] : []), patternWrap, del);
   el.append(head);
 
   // Collapsed summary: description and what the rule changes, in one line.
@@ -1429,6 +1642,7 @@ function renderRule(rule) {
   const summaryParts = [];
   if (isEmptyRule(rule))
     summaryParts.push("No pattern yet, so this rule matches nothing");
+  else if (targetsGroup) summaryParts.push(describeGroupTarget(rule));
   if (rule.description) summaryParts.push(rule.description);
   summaryParts.push(
     `${rule.match === "prefix" ? "starts with" : "wildcard"}, priority ${rule.priority}`,
@@ -1445,6 +1659,13 @@ function renderRule(rule) {
   const body = document.createElement("div");
   body.className = "rule-body";
   el.append(body);
+
+  if (targetsGroup) {
+    const note = document.createElement("p");
+    note.className = "rule-group-note";
+    note.textContent = describeGroupTarget(rule) + ".";
+    body.append(note);
+  }
 
   const descWrap = document.createElement("div");
   descWrap.className = "rule-description-wrap";
@@ -1468,18 +1689,19 @@ function renderRule(rule) {
   match.addEventListener("change", () =>
     updateRule(rule.id, { match: match.value }, true, "match"),
   );
-  body.append(
-    withKey(
-      "match",
-      settingRow(
-        "Match",
-        rule.match === "prefix"
-          ? "The address must begin with the pattern."
-          : "The whole address must fit the pattern. * stands for anything.",
-        match,
-      ),
+  const matchRow = withKey(
+    "match",
+    settingRow(
+      "Match",
+      rule.match === "prefix"
+        ? "The address must begin with the pattern."
+        : "The whole address must fit the pattern. * stands for anything.",
+      match,
     ),
   );
+  // A group's entries are always wildcards, so the mode has nothing to say.
+  matchRow.hidden = targetsGroup;
+  body.append(matchRow);
 
   const prioInput = document.createElement("input");
   prioInput.type = "number";
@@ -1796,7 +2018,7 @@ function applyRulesFilter() {
   let shown = 0;
   for (const el of rows) {
     const rule = rules.find((r) => r.id === el.dataset.ruleId);
-    const hit = rule ? matchesRule(rule, url) || !rule.pattern.trim() : false;
+    const hit = rule ? matchesRule(rule, url, activeGroups()) || !rule.pattern.trim() : false;
     el.classList.toggle("is-filtered-out", !hit);
     if (hit) {
       shown += 1;
@@ -1822,13 +2044,23 @@ watchRules((next) => {
   if (isPopup) refreshTab();
 });
 
+watchGroups((next) => {
+  if (groupsSaving) return;
+  groups = next;
+  if (!isPopup) {
+    renderGroups();
+    renderRules();
+  }
+  if (isPopup) refreshTab();
+});
+
 // ---- Backup ----------------------------------------------------------------
 
 const backupText = $("backup-text");
 const backupStatus = $("backup-status");
 
 function showBackup() {
-  backupText.value = exportText(settings, rules);
+  backupText.value = exportText(settings, rules, groups);
   backupStatus.textContent = "";
 }
 
@@ -1897,8 +2129,12 @@ $("backup-reset").addEventListener("click", async () => {
   await api.storage.local.clear();
   settings = { ...DEFAULTS };
   rules = [];
+  groups = [];
   renderFields();
-  if (!isPopup) renderRules();
+  if (!isPopup) {
+    renderGroups();
+    renderRules();
+  }
   if ($("overview").open) refreshOverview();
   backupNote(
     "Reset. All settings are back to defaults and all rules are gone.",
@@ -1918,8 +2154,13 @@ async function applyBackup() {
   settings = { ...DEFAULTS, ...parsed.settings };
   rules = parsed.rules;
   await saveRules(rules);
+  groups = parsed.groups ?? [];
+  await saveGroups(groups);
   renderFields();
-  if (!isPopup) renderRules();
+  if (!isPopup) {
+    renderGroups();
+    renderRules();
+  }
   if ($("overview").open) refreshOverview();
   const ruleCount = `${rules.length} rule${rules.length === 1 ? "" : "s"}`;
   backupNote(
@@ -2187,7 +2428,9 @@ getDisplayVersion().then((v) => {
   applyBrowserTheme();
   settings = await getSettings();
   rules = await getRules();
+  groups = await getGroups();
   if (!isPopup) {
+    renderGroups();
     const site = params.get("site");
     if (site) $("rules-filter").value = site;
     renderRules();

@@ -252,3 +252,23 @@ export function watchRules(fn) {
     if (area === "local" && RULES_KEY in changes) getRules().then(fn);
   });
 }
+
+/** Site groups live beside the rules. See shared/groups.js for the shape. */
+const GROUPS_KEY = "siteGroups";
+
+export async function getGroups() {
+  const { [GROUPS_KEY]: groups } = await api.storage.local.get(GROUPS_KEY);
+  return Array.isArray(groups) ? groups : [];
+}
+
+export async function saveGroups(groups) {
+  await api.storage.local.set({ [GROUPS_KEY]: groups });
+}
+
+/** Calls `fn(groups)` now and whenever the groups change. */
+export function watchGroups(fn) {
+  getGroups().then(fn);
+  api.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && GROUPS_KEY in changes) getGroups().then(fn);
+  });
+}

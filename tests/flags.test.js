@@ -23,31 +23,31 @@ describe("FLAGS", () => {
 
 describe("mergeFlags", () => {
   it("starts from the defaults when nothing is stored", () => {
-    expect(mergeFlags(undefined)).toEqual({ "beta-features": false });
-    expect(mergeFlags(null)).toEqual({ "beta-features": false });
-    expect(mergeFlags({})).toEqual({ "beta-features": false });
+    expect(mergeFlags(undefined)).toEqual({ "beta-features": false, "site-groups": false });
+    expect(mergeFlags(null)).toEqual({ "beta-features": false, "site-groups": false });
+    expect(mergeFlags({})).toEqual({ "beta-features": false, "site-groups": false });
   });
 
   it("keeps a stored value", () => {
-    expect(mergeFlags({ "beta-features": true })).toEqual({ "beta-features": true });
+    expect(mergeFlags({ "beta-features": true })).toEqual({ "beta-features": true, "site-groups": false });
   });
 
   it("drops a flag this build no longer declares", () => {
     const merged = mergeFlags({ "beta-features": true, "flag-that-was-retired": true });
-    expect(merged).toEqual({ "beta-features": true });
+    expect(merged).toEqual({ "beta-features": true, "site-groups": false });
     expect("flag-that-was-retired" in merged).toBe(false);
   });
 
   it("falls back to the default for a value that is not a switch", () => {
-    expect(mergeFlags({ "beta-features": "yes" })).toEqual({ "beta-features": false });
-    expect(mergeFlags({ "beta-features": 1 })).toEqual({ "beta-features": false });
-    expect(mergeFlags({ "beta-features": null })).toEqual({ "beta-features": false });
+    expect(mergeFlags({ "beta-features": "yes" })).toEqual({ "beta-features": false, "site-groups": false });
+    expect(mergeFlags({ "beta-features": 1 })).toEqual({ "beta-features": false, "site-groups": false });
+    expect(mergeFlags({ "beta-features": null })).toEqual({ "beta-features": false, "site-groups": false });
   });
 
   it("survives junk where the flags should be, rather than throwing", () => {
     for (const junk of ["", 0, [], "beta-features", true]) {
       expect(() => mergeFlags(junk)).not.toThrow();
-      expect(mergeFlags(junk)).toEqual({ "beta-features": false });
+      expect(mergeFlags(junk)).toEqual({ "beta-features": false, "site-groups": false });
     }
   });
 });

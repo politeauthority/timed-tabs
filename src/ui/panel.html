@@ -182,6 +182,21 @@
         <div id="rules-list" class="rules-list"></div>
       </section>
 
+      <!-- Site groups (feature flag "site-groups"): named lists of sites a rule can target as one. -->
+      <section id="site-groups" class="rules site-groups" data-pages="rules" data-page-only hidden>
+        <header class="rules-head">
+          <h2 class="settings-title">Site groups</h2>
+          <span class="rules-head-actions">
+            <button type="button" id="group-add" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>Add group</button>
+          </span>
+        </header>
+        <p class="rules-help">
+          A group is a named list of address patterns. Point a rule at <code>@name</code> and it
+          applies to every site in the group, so one rule can cover all your news sites.
+        </p>
+        <div id="groups-list" class="rules-list"></div>
+      </section>
+
       <!-- Settings page -->
       <div id="permission-warning" class="notice" data-pages="settings" hidden>
         <p>Site access is off, so favicons cannot be coloured.</p>
