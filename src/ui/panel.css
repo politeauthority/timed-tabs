@@ -1574,13 +1574,6 @@ body:not([data-context="popup"]) .field {
   padding-left: var(--sp-3);
 }
 
-.status {
-  min-height: 1.4em;
-  margin: var(--sp-1) 0 0;
-  color: var(--ink-2);
-  font-size: var(--fs-sm);
-}
-
 .notice {
   margin: 0;
   padding: 10px var(--gutter);
@@ -2119,7 +2112,7 @@ body:not([data-context="popup"]) .field {
   grid-column: 2;
 }
 
-/* ---- Toasts (flag "settings-toasts") ------------------------------------------
+/* ---- Toasts -------------------------------------------------------------------
    In-page messages, raised by ui/toasts.js and held by shared/toasts.js. Fixed
    to the bottom of the viewport so all three contexts get them without being
    laid out around them: a column across the popup's 320px, a stack in the
