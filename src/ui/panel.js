@@ -532,13 +532,13 @@ function renderTabRules() {
   }
   const matched = tabState?.rules ?? [];
   const allOff = Boolean(tabState?.ignoreRules);
+  // The count in the heading says it all; with none, the section is just the heading.
+  $("tab-rules-count").textContent = String(matched.length);
+  $("tab-rules-count").classList.toggle("is-zero", !matched.length);
   $("act-ignore-wrap").hidden = !matched.length;
   $("tab-rules-note").hidden = !matched.length;
   if (!matched.length) {
-    const p = document.createElement("p");
-    p.className = "tab-rules-empty";
-    p.textContent = "No rules match this page.";
-    list.replaceChildren(p);
+    list.replaceChildren();
     return;
   }
   // Highest priority first, so the rule that wins is at the top.

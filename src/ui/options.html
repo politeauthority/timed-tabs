@@ -17,6 +17,7 @@
       <symbol id="i-open" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 8 8M11 9.5v4h-8.5v-8.5h4"/></symbol>
       <symbol id="i-reopen" viewBox="0 0 16 16"><path d="M2.5 8A5.5 5.5 0 1 0 5 3.4"/><path d="M4.75 1.75v2.75H7.5"/><path d="M8 5.5V8l1.75 1.5"/></symbol>
       <symbol id="i-tabs" viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9.5" rx="1.5"/><path d="M2 6.5h12M5 3.5v3M9.5 3.5v3"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 16 16"><path d="M11.25 2.75l2 2L5.5 12.5l-2.75.75.75-2.75z"/><path d="M9.75 4.25l2 2"/></symbol>
       <symbol id="i-rules" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h7M2.5 12h4"/><circle cx="12" cy="11" r="2.25"/><path d="M13.6 12.6 15 14"/></symbol>
       <symbol id="i-settings" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.25"/><path d="M8 1.75v2M8 12.25v2M1.75 8h2M12.25 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4"/></symbol>
       <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5"/></symbol>
@@ -77,12 +78,12 @@
                happened is said once in #act-flash rather than on the button. -->
           <button type="button" id="act-reset" class="icon-btn" title="Restart timer" aria-label="Restart timer"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg></button>
           <button type="button" id="act-snooze" class="icon-btn" title="Snooze" aria-label="Snooze"><svg class="icon" aria-hidden="true"><use href="#i-snooze" /></svg></button>
-          <span id="act-flash" class="act-flash" role="status" aria-live="polite"></span>
           <label class="switch tab-never" data-saved-key="never">
             <input type="checkbox" id="act-never" />
             <span class="switch-track"></span>
-            <span>Never expire this tab</span>
+            <span>Never expire</span>
           </label>
+          <span id="act-flash" class="act-flash" role="status" aria-live="polite"></span>
         </div>
       </section>
 
@@ -102,8 +103,8 @@
 
       <section id="tab-rules" class="tab tab-rules-section" hidden>
         <div class="section-head">
-          <h2 class="settings-title">📋 Rules for this page</h2>
-          <button type="button" id="tab-rules-open" class="quiet" title="Open the Rules page, filtered to this site">Make / edit</button>
+          <h2 class="settings-title">📋 Rules for this page <span id="tab-rules-count" class="count-badge" title="Rules that match this page">0</span></h2>
+          <button type="button" id="tab-rules-open" class="icon-btn quiet" title="Make or edit rules for this page" aria-label="Make or edit rules for this page"><svg class="icon" aria-hidden="true"><use href="#i-edit" /></svg></button>
         </div>
         <div id="tab-rules-list" class="tab-rules-list"></div>
         <label class="switch tab-never" id="act-ignore-wrap" data-saved-key="ignore-all">
