@@ -31,11 +31,22 @@ def clock(seconds):
 
 
 def leg_order(leg):
-    """latest, previous, previous-2, previous-3 ... in that order."""
-    if leg == "latest":
+    """latest/stable, previous, previous-2, previous-3 ... in that order."""
+    if leg in ("latest", "stable"):
         return 0
     m = re.fullmatch(r"previous(?:-(\d+))?", leg)
     return int(m.group(1) or 1) if m else 99
+
+
+def leg_name(record):
+    """'Firefox latest', 'Chrome previous-2': the leg's job name without the
+    caller's prefix. Records written before Chrome joined carry only `leg`, and
+    those were all Firefox."""
+    return record.get("name") or f"Firefox {record['leg']}"
+
+
+def browser_order(record):
+    return 1 if record.get("browser") == "chrome" else 0
 
 
 def wall(job):
@@ -58,13 +69,14 @@ def main():
                 records.append(json.load(fh))
         except (OSError, ValueError):
             continue
-    records.sort(key=lambda r: leg_order(r["leg"]))
+    records.sort(key=lambda r: (browser_order(r), leg_order(r["leg"])))
 
     jobs = {}
     try:
         with open(jobs_path, encoding="utf-8") as fh:
             for job in json.load(fh)["jobs"]:
-                m = re.fullmatch(r".*Firefox (\S+)", job["name"])
+                # Keyed on the leg's own name, whichever browser it is.
+                m = re.fullmatch(r".*((?:Firefox|Chrome) \S+)", job["name"])
                 if m:
                     jobs[m.group(1)] = job
     except (OSError, ValueError, KeyError):
@@ -72,20 +84,23 @@ def main():
 
     out = []
     if not records:
-        out.append("_No leg records were uploaded; see the Firefox jobs on this run._")
+        out.append("_No leg records were uploaded; see the leg jobs on this run._")
         print("\n".join(out))
         return 0
 
     passed = sum(1 for r in records if r["outcome"] == "success")
     versions = [r["version"] for r in records if r["version"]]
-    span = f" ({versions[-1]} → {versions[0]})" if len(versions) > 1 else ""
-    out.append(f"**{passed}/{len(records)} Firefoxes passed**{span}.\n")
-    out.append("| Leg | Firefox | Scenarios | Scenario time | Job time | Result |")
+    # A span only reads as one when every leg is the same browser.
+    one_browser = len({browser_order(r) for r in records}) == 1
+    span = f" ({versions[-1]} → {versions[0]})" if len(versions) > 1 and one_browser else ""
+    out.append(f"**{passed}/{len(records)} legs passed**{span}.\n")
+    out.append("| Leg | Version | Scenarios | Scenario time | Job time | Result |")
     out.append("|---|---|--:|--:|--:|---|")
     for r in records:
-        job = jobs.get(r["leg"], {})
+        name = leg_name(r)
+        job = jobs.get(name, {})
         url = job.get("url") or ""
-        leg = f"[`{r['leg']}`]({url})" if url else f"`{r['leg']}`"
+        leg = f"[`{name}`]({url})" if url else f"`{name}`"
         scenarios = r.get("scenarios") or []
         if r.get("skipped"):
             count, secs = "—", "—"
@@ -106,7 +121,7 @@ def main():
     for r in records:
         if r["outcome"] == "success" or not r.get("scenarios"):
             continue
-        out.append(f"\n<details open><summary>{ICON.get(r['outcome'], '❓')} <b>Firefox {r['leg']}"
+        out.append(f"\n<details open><summary>{ICON.get(r['outcome'], '❓')} <b>{leg_name(r)}"
                    f"{' (' + r['version'] + ')' if r['version'] else ''}</b> — what happened</summary>\n")
         out.append(leg_summary.render(r["scenarios"]))
         out.append("\n</details>")
