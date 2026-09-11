@@ -5,9 +5,10 @@ run-name: "CI — ${{ github.ref_name }}"
 # the gate that keeps main releasable; the Release Please pipeline re-runs it on the
 # tag before it packages, so a green release is never assumed from a stale run.
 #
-# No infra: GitHub-hosted runners, plain `npm ci`. `npm run lint` covers both eslint
-# and `web-ext lint`, so manifest/WebExtension problems are caught here rather than
-# at AMO submission time.
+# Runs on the self-hosted `timed-tabs` ARC scale set (defined in private-ops under
+# arc/runners/values-timed-tabs.yaml); setup-node installs the Node it needs. `npm run
+# lint` covers both eslint and `web-ext lint`, so manifest/WebExtension problems are
+# caught here rather than at AMO submission time.
 
 on:
   pull_request:
@@ -25,7 +26,7 @@ concurrency:
 jobs:
   lint-test:
     name: Lint, test & build
-    runs-on: ubuntu-latest
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
