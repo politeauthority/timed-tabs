@@ -130,11 +130,12 @@
           <span>📑 All open tabs</span>
           <span id="overview-count" class="overview-count"></span>
         </summary>
-        <p class="overview-legend">
-          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg> snooze</span>
-          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-timer" /></svg> timer on</span>
-          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg> restart on focus</span>
-          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-close" /></svg> close tab</span>
+        <!-- No key for the row buttons. Each one carries its own title and
+             aria-label, and those say what this tab's button will do right now
+             ("Timer is on. Turn off", "Snooze: adds 5m"), which a static legend
+             cannot. Four icons laid out as a row of words also read as controls
+             rather than as a key to them. -->
+        <p class="overview-tools">
           <label class="overview-sort">
             Order by
             <!-- Options come from TAB_SORTS in shared/tab-sort.js. -->
