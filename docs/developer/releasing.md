@@ -48,7 +48,8 @@ from `src/` has no `build.json` and shows the manifest version alone.
    release-please derives the bump from them. Below 1.0.0 both `feat:` and `fix:` bump
    the patch and a breaking change bumps the minor, so the versions climb slowly
    while the project is in development; `chore:` and `docs:` do not release at all.
-   The first release is 0.0.1.
+   With no release yet, release-please ignores the bump rules and uses
+   `initial-version` from its config, which is 0.0.1.
 2. `.github/workflows/release-please.yaml` keeps a release PR open with the next
    version and the changelog.
 3. Nothing is released until someone with admin permission approves that PR on its

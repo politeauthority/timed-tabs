@@ -114,6 +114,9 @@ jobs:
           {
             echo "Beta build of the work on \`main\` since ${SINCE}. Installs as version \`${MANIFEST}\`; the UI shows \`${TAG#v}\` with a BETA badge."
             echo ""
+            echo "**Firefox:** load \`timed-tabs-firefox-*.zip\` from about:debugging → This Firefox → Load Temporary Add-on."
+            echo "**Chrome:** unzip \`timed-tabs-chrome-*.zip\`, then chrome://extensions → Developer mode → Load unpacked. The Chrome zip does not load in Firefox."
+            echo ""
             echo "## Changes since ${SINCE}"
             echo ""
             git log --no-merges --pretty='- %s (%h)' "${RANGE}"
