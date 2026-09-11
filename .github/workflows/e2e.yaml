@@ -527,7 +527,8 @@ jobs:
           fi
 
       - name: ⏱️ Step times
-        if: always() && (inputs.leg-summary != 'on-failure' || job.status != 'success')
+        # A local action needs the checkout a skipped leg never did.
+        if: always() && steps.skip.outputs.skip != 'true' && (inputs.leg-summary != 'on-failure' || job.status != 'success')
         uses: ./.github/actions/step-times
         with:
           token: ${{ github.token }}
