@@ -49,7 +49,7 @@ jobs:
         id: firefox
         with:
           firefox-version: latest
-      - run: "${{ steps.firefox.outputs.firefox-path }}" --version
+      - run: '"${{ steps.firefox.outputs.firefox-path }}" --version'
 
       - name: Run the scenarios
         env:
