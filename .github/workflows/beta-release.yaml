@@ -15,6 +15,19 @@ run-name: "Beta Release — ${{ github.ref_name }}"
 #
 # Refuses to run when there is no open release PR (nothing releasable on main)
 # or when the beta tag for the current commit already exists.
+#
+# Three jobs, in order. `version` resolves the tag and pins the commit, failing
+# fast on every mistake git and the PR list can see. `e2e` runs the scenario
+# suite in both Firefoxes against that commit. Only then does `beta` lint, test,
+# build and publish it.
+#
+# The E2E leg is a gate, not new coverage. Every commit on `main` already ran the
+# scenarios on the push that landed it, so a green beta is usually re-proving
+# what CI proved minutes earlier. What it buys is that the proof is about *this*
+# commit: a dispatch does not look at whether main's own run passed, is still
+# going, or went red, and without this a beta could be cut from a red main and
+# handed to someone to install. Re-running costs about eight minutes of Firefox;
+# checking main's existing conclusion instead would be cheaper and weaker.
 
 on:
   workflow_dispatch:
@@ -29,30 +42,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  beta:
-    name: Tag, build and publish a beta
-    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
+  # Resolve the version before anything expensive runs. Three of the four ways a
+  # beta dispatch is a mistake -- nothing new on main, no open release PR, a tag
+  # that already exists -- are visible from git and the PR list alone, and this
+  # job is where they stop. Firefox does not boot until they have all passed.
+  #
+  # It also pins the commit. The rest of the workflow builds and tests
+  # `outputs.built` rather than re-resolving `main`, so a commit landing mid-run
+  # cannot leave the scenarios testing one tree and the zips carrying another.
+  #
+  # ubuntu-latest, not the ARC scale set: this is git and gh, like Force Release.
+  version:
+    name: Work out the beta version
+    runs-on: ubuntu-latest
+    outputs:
+      stable: ${{ steps.ver.outputs.stable }}
+      range: ${{ steps.ver.outputs.range }}
+      since: ${{ steps.ver.outputs.since }}
+      next: ${{ steps.ver.outputs.next }}
+      n: ${{ steps.ver.outputs.n }}
+      tag: ${{ steps.ver.outputs.tag }}
+      manifest: ${{ steps.ver.outputs.manifest }}
+      zip: ${{ steps.ver.outputs.zip }}
+      built: ${{ steps.ver.outputs.built }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
-
-      # The action comes from the ref this workflow is running from, which is
-      # not what the job builds: the beta builds `main`, and `main` need not
-      # contain the action -- on the run that adds it, it does not. It lands in
-      # a path of its own so its sparse checkout cannot follow the build tree
-      # around and leave, say, package-lock.json unmaterialised.
-      - uses: actions/checkout@v7
-        with:
-          path: .gh-cli
-          sparse-checkout: |
-            .github/actions/gh-cli
-            .github/actions/node-toolcache
-            .github/actions/step-times
-          sparse-checkout-cone-mode: false
-      # The ARC image has no gh; GitHub-hosted ones do. A no-op on those.
-      - uses: ./.gh-cli/.github/actions/gh-cli
 
       - name: Work out the beta version
         id: ver
@@ -94,8 +111,50 @@ jobs:
             echo "tag=${TAG}"
             echo "manifest=${STABLE}.${N}"
             echo "zip=${NEXT}-beta.${N}"
+            echo "built=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
           echo "::notice::${TAG} (manifest ${STABLE}.${N}) from $(git rev-parse --short HEAD)"
+
+  # The same scenarios, in the same two Firefoxes, that gate a pull request --
+  # pinned to the exact commit this beta ships rather than to `main`, which may
+  # have moved since the version job read it. See the header on what this gate
+  # does and does not buy.
+  e2e:
+    name: E2E
+    needs: version
+    uses: ./.github/workflows/e2e.yaml
+    with:
+      ref: ${{ needs.version.outputs.built }}
+    permissions:
+      contents: read
+      actions: read
+
+  beta:
+    name: Tag, build and publish a beta
+    needs: [version, e2e]
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
+    steps:
+      # The commit the version job pinned, not `main` as it stands now.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.built }}
+          fetch-depth: 0
+
+      # The action comes from the ref this workflow is running from, which is
+      # not what the job builds: the beta builds the pinned commit on `main`,
+      # which need not contain the action -- on the run that adds it, it does not. It lands in
+      # a path of its own so its sparse checkout cannot follow the build tree
+      # around and leave, say, package-lock.json unmaterialised.
+      - uses: actions/checkout@v7
+        with:
+          path: .gh-cli
+          sparse-checkout: |
+            .github/actions/gh-cli
+            .github/actions/node-toolcache
+            .github/actions/step-times
+          sparse-checkout-cone-mode: false
+      # The ARC image has no gh; GitHub-hosted ones do. A no-op on those.
+      - uses: ./.gh-cli/.github/actions/gh-cli
 
       - uses: ./.gh-cli/.github/actions/node-toolcache
       - run: npm ci --prefer-offline --no-audit --no-fund
@@ -106,10 +165,10 @@ jobs:
       - name: Build beta zips
         env:
           BUILD_CHANNEL: beta
-          BUILD_SEMVER: ${{ steps.ver.outputs.next }}
-          BUILD_TAG: beta.${{ steps.ver.outputs.n }}
-          MANIFEST_VERSION: ${{ steps.ver.outputs.manifest }}
-          ZIP_VERSION: ${{ steps.ver.outputs.zip }}
+          BUILD_SEMVER: ${{ needs.version.outputs.next }}
+          BUILD_TAG: beta.${{ needs.version.outputs.n }}
+          MANIFEST_VERSION: ${{ needs.version.outputs.manifest }}
+          ZIP_VERSION: ${{ needs.version.outputs.zip }}
         run: |
           npm run package
           # Lint what ships, not src/: the built manifest carries the beta
@@ -122,10 +181,11 @@ jobs:
         id: publish
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.ver.outputs.tag }}
-          SINCE: ${{ steps.ver.outputs.since }}
-          RANGE: ${{ steps.ver.outputs.range }}
-          MANIFEST: ${{ steps.ver.outputs.manifest }}
+          TAG: ${{ needs.version.outputs.tag }}
+          SINCE: ${{ needs.version.outputs.since }}
+          RANGE: ${{ needs.version.outputs.range }}
+          MANIFEST: ${{ needs.version.outputs.manifest }}
+          BUILT: ${{ needs.version.outputs.built }}
         run: |
           set -euo pipefail
           NOTES=$(mktemp)
@@ -139,12 +199,11 @@ jobs:
             echo ""
             git log --no-merges --pretty='- %s (%h)' "${RANGE}"
           } > "$NOTES"
-          # `gh release create` makes the tag on the given commit: the one this
-          # job checked out and built, not GITHUB_SHA, which is the dispatch
-          # ref and may be another branch. No PAT needed, nothing downstream
-          # has to be re-triggered by the push.
-          BUILT=$(git rev-parse HEAD)
-          echo "built=${BUILT}" >> "$GITHUB_OUTPUT"
+          # `gh release create` makes the tag on the given commit: the one the
+          # version job pinned, which is the commit E2E tested and this job
+          # built, not GITHUB_SHA, which is the dispatch ref and may be another
+          # branch. No PAT needed, nothing downstream has to be re-triggered
+          # by the push.
           gh release create "$TAG" web-ext-artifacts/*.zip \
             --repo "$GITHUB_REPOSITORY" --target "$BUILT" \
             --prerelease --title "$TAG" --notes-file "$NOTES"
@@ -158,9 +217,9 @@ jobs:
       - name: 📋 Summary
         if: always()
         env:
-          TAG: ${{ steps.ver.outputs.tag }}
-          ZIP: ${{ steps.ver.outputs.zip }}
-          MANIFEST: ${{ steps.ver.outputs.manifest }}
+          TAG: ${{ needs.version.outputs.tag }}
+          ZIP: ${{ needs.version.outputs.zip }}
+          MANIFEST: ${{ needs.version.outputs.manifest }}
         run: |
           if [ "${{ job.status }}" = "success" ]; then s="✅ published"; else s="❌ failed"; fi
           {
