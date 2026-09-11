@@ -271,6 +271,12 @@ function renderField(field) {
         return;
       }
       await save({ [field.key]: checked });
+      // Switching notifications on sends one straight away: the quickest way
+      // to find out whether the operating system lets them through.
+      if (checked && field.key === "notifyOnExpire") {
+        const r = await api.runtime.sendMessage({ type: "timed-tabs:notify-test" }).catch((e) => ({ ok: false, error: String(e) }));
+        if (r && !r.ok) console.warn("[timed-tabs] test notification failed:", r.error);
+      }
     });
     sw.input.id = `f-${field.key}`;
     label.htmlFor = sw.input.id;
@@ -2589,6 +2595,7 @@ async function refreshDiag() {
     `last error: ${d.lastError ?? "none"}`,
     `active indicators: ${d.activeIndicators.join(", ") || "none"}`,
     `site access granted: ${d.hasHostPermission} (origins: ${(d.origins ?? []).join(", ") || "none"})`,
+    `notifications: ${d.notifications ? `setting ${d.notifications.enabled ? "on" : "off"}, permission ${d.notifications.available ? "granted" : "not granted"}, click handler ${d.notifications.listening ? "armed" : "not armed"}` : "unknown"}`,
     `lifetime: ${d.settings?.tabLifetimeSeconds}s, tick every ${d.settings?.tickSeconds}s`,
   ].join("\n");
   document.querySelector("#diag-tabs tbody").replaceChildren(

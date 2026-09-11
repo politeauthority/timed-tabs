@@ -32,8 +32,10 @@ const MAX_TITLE_CHARS = 60;
 
 const RECENT_PAGE = "ui/panel.html?view=page#tabs";
 
-export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
+export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS, log = null } = {}) {
   let enabled = false;
+  /** Dev builds trace every decision; release builds say nothing. */
+  const trace = (msg) => log?.(msg);
   let pending = [];
   let timer = null;
   let seq = 0;
@@ -53,7 +55,10 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
 
   /** Record a tab we just closed. Cheap and synchronous; the send is batched. */
   function tabClosed(tab) {
-    if (!enabled || !available()) return;
+    if (!enabled || !available()) {
+      trace(`skipped: enabled=${enabled} available=${available()} namespace=${typeof api.notifications}`);
+      return;
+    }
     const isPrivate = isPrivateTab(tab);
     pending.push({
       title: isPrivate ? "" : tab?.title || tab?.url || "Untitled tab",
@@ -72,13 +77,14 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
     // Private tabs contribute no url, so a click can never reopen one.
     targets.set(id, batch.filter((t) => !t.private).map((t) => t.url));
     try {
-      await api.notifications.create(id, {
+      const created = await api.notifications.create(id, {
         type: "basic",
         // Chrome requires an iconUrl and will not take an SVG, so this is the
         // raster mark from scripts/icons.mjs rather than icons/icon.svg.
         iconUrl: api.runtime?.getURL?.("icons/icon-96.png"),
         ...describe(batch),
       });
+      trace(`created ${created} for ${batch.length} tab(s)`);
     } catch (e) {
       targets.delete(id);
       console.warn("[timed-tabs] notification failed", String(e));
@@ -105,6 +111,34 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
     targets.delete(id);
   }
 
+  /**
+   * A notification on demand, sent when the setting is switched on, so the
+   * user sees at once whether notifications reach the screen. If the browser
+   * accepted it but nothing appeared, the operating system is holding them
+   * back, and that is worth knowing before a tab quietly closes.
+   */
+  async function test() {
+    if (!available()) return { ok: false, error: "the notifications permission has not been granted" };
+    const id = `timed-tabs:test:${++seq}`;
+    try {
+      await api.notifications.create(id, {
+        type: "basic",
+        iconUrl: api.runtime?.getURL?.("icons/icon-96.png"),
+        title: "Timed Tabs will tell you when a tab closes",
+        message: "If you can read this, notifications reach your screen.",
+      });
+      trace(`test notification ${id} created`);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: String(e) };
+    }
+  }
+
+  /** For the Diagnostics panel. */
+  function status() {
+    return { enabled, available: available(), listening };
+  }
+
   let listening = false;
   function start() {
     if (listening || !api.notifications?.onClicked) return;
@@ -126,7 +160,7 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
     timer = null;
   }
 
-  return { configure, tabClosed, start, stop, flush };
+  return { configure, tabClosed, start, stop, flush, test, status };
 }
 
 /** Notification title and message for one batch of closed tabs. */

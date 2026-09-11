@@ -27,7 +27,10 @@ function managing() {
 }
 
 const tracker = createTabTracker();
-const notifier = createNotifier();
+const notifier = createNotifier({
+  // Evaluated per call, since IS_DEV_BUILD is declared further down.
+  log: (msg) => IS_DEV_BUILD && console.log(`[timed-tabs] notify ${msg}`),
+});
 notifier.start();
 let settings = null;
 let rules = [];
@@ -313,7 +316,10 @@ api.runtime.onMessage.addListener((msg) => {
         activeIndicators: active.map((i) => i.id),
         hasHostPermission,
         origins,
+        notifications: notifier.status(),
       }));
+    case "timed-tabs:notify-test":
+      return notifier.test();
     case "timed-tabs:tick":
       return tick().then(() => "ok");
     case "timed-tabs:tab-state":
@@ -343,6 +349,11 @@ api.runtime.onMessage.addListener((msg) => {
       return undefined;
   }
 });
+
+// The notifications permission is optional and can be granted (or taken
+// away in about:addons) at any time; the notifier's listeners follow it.
+api.permissions?.onAdded?.addListener(() => notifier.configure(settings));
+api.permissions?.onRemoved?.addListener(() => notifier.configure(settings));
 
 api.runtime.onSuspend?.addListener(() => Promise.all(active.map((i) => i.stop())));
 

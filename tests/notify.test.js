@@ -198,3 +198,33 @@ describe("private windows", () => {
     expect(api.tabs.create).toHaveBeenCalledWith({ url: "https://reddit.com/" });
   });
 });
+
+describe("test notification and status", () => {
+  it("reports its state for diagnostics", () => {
+    const api = fakeApi();
+    const n = createNotifier({ api });
+    expect(n.status()).toEqual({ enabled: false, available: true, listening: false });
+    n.configure({ notifyOnExpire: true });
+    expect(n.status()).toEqual({ enabled: true, available: true, listening: true });
+  });
+  it("sends a test notification on demand, and says why when it cannot", async () => {
+    const api = fakeApi();
+    const n = createNotifier({ api });
+    await expect(n.test()).resolves.toEqual({ ok: true });
+    expect(api.created[0].title).toMatch(/tell you when a tab closes/);
+    const without = createNotifier({ api: fakeApi({ notifications: false }) });
+    const r = await without.test();
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/permission/);
+  });
+  it("arms its click handler when the permission arrives after load", () => {
+    const api = fakeApi({ notifications: false });
+    const n = createNotifier({ api });
+    n.start();
+    n.configure({ notifyOnExpire: true });
+    expect(n.status().listening).toBe(false);
+    api.notifications = fakeApi().notifications;
+    n.configure({ notifyOnExpire: true });
+    expect(n.status().listening).toBe(true);
+  });
+});
