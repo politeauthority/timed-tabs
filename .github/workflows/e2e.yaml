@@ -1,27 +1,31 @@
 name: E2E
-run-name: "E2E — ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.pull_request.number) || github.ref_name }}"
+run-name: "E2E — ${{ github.ref_name }}"
 
 # 🦊 Runs the extension in a real, headless Firefox on the self-hosted runner and
 # checks each scenario in tests/e2e/scenarios against the log it produces. See
 # docs/developer/e2e.md.
 #
-# When it runs: every push to main, and every push to an open PR. A PR labelled
-# "ci pause" skips the job. The job is a required status check, and GitHub counts a
-# skipped required check as passed, so the label lets a PR merge without waiting for
-# Firefox while still leaving the check in place for every other PR.
+# This is a reusable workflow with no triggers of its own. `jobs.e2e` in ci.yaml
+# calls it, with `needs: lint-test`, so Firefox is only installed once lint, the unit
+# tests and the build are green: a branch that does not compile never spends the
+# minutes. When it runs is decided there, and only there. It stays in its own file
+# because the Firefox plumbing below is long enough to bury the rest of CI, and it
+# keeps workflow_dispatch so a Firefox-only run is still one click.
 #
-# No label events. `on.pull_request.types` cannot filter by label name, so waking on
-# `labeled` would start a run for every label -- "needs review", "enhancement",
-# anything -- and each one would report `skipped` over whatever this check last said
-# about the commit, trading a real pass for a neutral. Applying "ci pause" therefore
-# does not retroactively skip a run that already happened; it does not need to,
-# because the `Not paused` check goes red the moment the label lands and no paused PR
-# can merge anyway. The next push picks the label up.
+# Called, the job reports as `E2E / headless Firefox`: GitHub prefixes a called
+# workflow's jobs with the calling job's name, and that whole string is the status
+# check branch protection matches. Renaming either half stops the check being
+# required. Dispatched rather than called, it reports under its bare name.
+#
+# A PR labelled "ci pause" skips the job. The job is a required status check, and
+# GitHub counts a skipped required check as passed, so the label lets a PR merge
+# without waiting for Firefox while still leaving the check in place for every other
+# PR. CI does not wake on label events, so applying "ci pause" does not retroactively
+# skip a run that already happened; it does not need to, because the `Not paused`
+# check goes red the moment the label lands and no paused PR can merge anyway. The
+# next push picks the label up.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -31,13 +35,13 @@ permissions:
 env:
   FIREFOX_LIBS_KEY: v1
 
-concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+# No concurrency group. Called from CI this job is part of the caller's run, and
+# `ci-<ref>` already cancels the whole thing when a newer commit lands; a group here
+# would only be a second way to say the same thing, scoped to a different key.
 
 jobs:
   e2e:
-    name: E2E (headless Firefox)
+    name: headless Firefox
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci pause')
     timeout-minutes: 20
