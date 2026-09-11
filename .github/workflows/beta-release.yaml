@@ -32,20 +32,23 @@ jobs:
     name: Tag, build and publish a beta
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
-      # gh first, and from this workflow's own ref rather than whatever the
-      # job goes on to check out. The build below wants `main`, which need not
-      # contain this action -- on the run that adds it, it certainly does not.
-      - uses: actions/checkout@v7
-        with:
-          sparse-checkout: .github/actions/gh-cli
-          sparse-checkout-cone-mode: false
-      # The ARC image has no gh; GitHub-hosted ones do. A no-op on those.
-      - uses: ./.github/actions/gh-cli
-
       - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
+
+      # The action comes from the ref this workflow is running from, which is
+      # not what the job builds: the beta builds `main`, and `main` need not
+      # contain the action -- on the run that adds it, it does not. It lands in
+      # a path of its own so its sparse checkout cannot follow the build tree
+      # around and leave, say, package-lock.json unmaterialised.
+      - uses: actions/checkout@v7
+        with:
+          path: .gh-cli
+          sparse-checkout: .github/actions/gh-cli
+          sparse-checkout-cone-mode: false
+      # The ARC image has no gh; GitHub-hosted ones do. A no-op on those.
+      - uses: ./.gh-cli/.github/actions/gh-cli
 
       - name: Work out the beta version
         id: ver
