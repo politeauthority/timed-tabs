@@ -115,7 +115,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "::notice::${TAG} (manifest ${STABLE}.${N}) from $(git rev-parse --short HEAD)"
 
-  # The same scenarios, in the same two Firefoxes, that gate a pull request --
+  # The same scenarios that gate a pull request, in Firefox stable and stable-1 --
   # pinned to the exact commit this beta ships rather than to `main`, which may
   # have moved since the version job read it. See the header on what this gate
   # does and does not buy.

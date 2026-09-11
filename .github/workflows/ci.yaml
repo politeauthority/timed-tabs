@@ -141,17 +141,14 @@ jobs:
       contents: read
       actions: read
     with:
-      # Stable and stable-1 are the required checks. Nightly runs beside them
-      # so a daily build breaking is seen on the PR that breaks it, not weeks
-      # later in a full run; e2e.yaml marks it continue-on-error, so a red
-      # nightly is a warning on its job and never holds a merge.
-      firefox: '["nightly", "stable", "stable-1"]'
+      # The one set of legs, on every PR and every push to main. Stable and the
+      # two majors before it are the required checks. Nightly runs beside them
+      # so a daily build breaking is seen on the PR that breaks it; e2e.yaml
+      # marks it continue-on-error, so a red nightly is a warning on its own
+      # job and never holds a merge. There used to be a second, larger set
+      # behind a `ci run full` label; it ran on every push anyway, so this is it.
+      firefox: '["nightly", "stable", "stable-1", "stable-2"]'
       # Nightly and stable, and no more, while Chrome is planned rather than
       # supported (docs/road-map.md); both are advisory, so neither can hold a
       # merge. The pair is what a Chrome user would meet first once it is.
       chrome: '["nightly", "stable"]'
-      # A PR to main carrying `ci run full` runs these same versions inside the
-      # full run, and the `CI run full` status holds the merge until they pass.
-      # So the legs skip here rather than run twice; a skipped required check
-      # reads as a pass, and the status is the thing actually holding the door.
-      skip-when-full: true
