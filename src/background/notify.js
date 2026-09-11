@@ -13,8 +13,15 @@
  * `notifications` is an optional permission: until the user turns the setting
  * on and grants it, Firefox does not expose the namespace at all, so every
  * entry point feature-detects rather than assuming it is there.
+ *
+ * A tab closed in a private window is still counted, because the user asked to
+ * be told when tabs close, but it is never named: the operating system keeps a
+ * notification history, and a click that reopened the page would put it back in
+ * an ordinary window. It appears as "a private tab" and nothing can be restored
+ * from it.
  */
 import { api as defaultApi } from "../shared/browser.js";
+import { isPrivateTab } from "../shared/recent.js";
 
 /** Tabs closed within this long of each other share one notification. */
 const FLUSH_MS = 500;
@@ -47,7 +54,12 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
   /** Record a tab we just closed. Cheap and synchronous; the send is batched. */
   function tabClosed(tab) {
     if (!enabled || !available()) return;
-    pending.push({ title: tab?.title || tab?.url || "Untitled tab", url: tab?.url ?? "" });
+    const isPrivate = isPrivateTab(tab);
+    pending.push({
+      title: isPrivate ? "" : tab?.title || tab?.url || "Untitled tab",
+      url: isPrivate ? "" : (tab?.url ?? ""),
+      private: isPrivate,
+    });
     timer ??= setTimeout(flush, flushMs);
   }
 
@@ -57,7 +69,8 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
     pending = [];
     if (!batch.length || !enabled || !available()) return;
     const id = `timed-tabs:closed:${++seq}`;
-    targets.set(id, batch.map((t) => t.url));
+    // Private tabs contribute no url, so a click can never reopen one.
+    targets.set(id, batch.filter((t) => !t.private).map((t) => t.url));
     try {
       await api.notifications.create(id, {
         type: "basic",
@@ -76,6 +89,11 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
     const urls = targets.get(id);
     if (!urls) return;
     targets.delete(id);
+    // Every tab in the batch was private: there is nothing to put back.
+    if (!urls.length) {
+      api.notifications?.clear?.(id);
+      return;
+    }
     const [only] = urls;
     // One tab: put it straight back. Several: the Tabs page lists them all.
     const opened = urls.length === 1 && only ? api.tabs.create({ url: only }) : Promise.reject();
@@ -113,7 +131,7 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
 
 /** Notification title and message for one batch of closed tabs. */
 export function describe(batch) {
-  const titles = batch.map((t) => truncate(t.title));
+  const titles = batch.map((t) => (t.private ? "A private tab" : truncate(t.title)));
   if (titles.length === 1) return { title: "Tab closed", message: titles[0] };
   const named = titles.slice(0, MAX_NAMED);
   const rest = titles.length - named.length;
