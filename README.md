@@ -46,17 +46,20 @@ Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
 - ⏱️ **Your call at zero.** Leave the tab, reload it, discard it, or close it.
 - ⏸️ **The clock can pause** while you're looking at a tab, and restart from the top
   when you come back to it.
-- 🔒 **Nothing leaves the browser.** The manifest declares no data collection, and
-  there is no server to talk to. [What is kept on your
-  machine](docs/user-guide/privacy.md), and how to control it.
+- 🔒 **Nothing leaves the browser.** No collection, no tracking, no server to talk to;
+  the manifest declares it and the [privacy policy](PRIVACY.md) spells it out. [What
+  is kept on your machine](docs/user-guide/privacy.md), and how to control it.
 
 The full list, with screenshots, is in the user guide:
 [docs/user-guide/features.md](docs/user-guide/features.md).
 
 ## 📚 Documentation
 
-- 📖 [User guide](docs/user-guide/) — [features](docs/user-guide/features.md) and
+- 📖 [User guide](docs/user-guide/) — [features](docs/user-guide/features.md),
+  [feature flags](docs/user-guide/feature-flags.md) and
   [privacy](docs/user-guide/privacy.md).
+- 🔒 [Privacy policy](PRIVACY.md) — what is stored, what is never sent, and why each
+  permission is asked for.
 - 🔧 [Developer docs](docs/developer/) — [build it
   yourself](docs/developer/building.md), tests, releases and security notes.
 - 🛣️ [Road map](docs/road-map.md) — what is not there yet.
