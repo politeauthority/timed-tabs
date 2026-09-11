@@ -13,6 +13,16 @@
   const api = globalThis.browser ?? globalThis.chrome;
   const SIZE = 32;
 
+  /**
+   * The ink the mark is drawn in, for when the background did not say.
+   *
+   * It says so on Firefox, where its event page has a matchMedia to ask. A
+   * Chrome service worker has none, so the choice falls here, to the one
+   * context that can still see what the user's colour scheme is.
+   */
+  const ink = () =>
+    globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches ? "#ffffff" : "#15141a";
+
   let originalLinks = null; // [{ el, href }]
   let originalHref = null;
   let iconImage = null; // HTMLImageElement | null | "failed"
@@ -132,7 +142,7 @@
         // Thin outline so the dot stays visible on same-coloured icons.
         ctx.globalAlpha = alpha * 0.9;
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = msg.textColor ?? "#000";
+        ctx.strokeStyle = msg.textColor ?? ink();
         ctx.stroke();
       } else {
         roundRect(ctx, 0, 0, SIZE, SIZE, 7);
@@ -149,7 +159,7 @@
 
     const paintLetter = () => {
       const [x, y, w] = iconBox;
-      ctx.fillStyle = msg.textColor ?? "#000";
+      ctx.fillStyle = msg.textColor ?? ink();
       ctx.font = `bold ${w * 0.9}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
