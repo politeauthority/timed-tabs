@@ -117,7 +117,6 @@ body[data-context="page"] #app {
   padding: var(--sp-6) var(--gutter) 48px;
 }
 
-
 #app {
   display: flex;
   flex-direction: column;
@@ -636,7 +635,6 @@ body:not([data-context="popup"]) .pages {
 .tab-settings-list .override-control {
   transition: opacity 0.15s ease-out;
 }
-
 
 /* Fold a popup section away: the chevron and the title both toggle it. The
    section head stays, everything under it goes. */
@@ -1628,7 +1626,8 @@ body:not([data-context="popup"]) .field {
   flex: 1 1 auto;
   min-width: 0;
   font-size: var(--fs-sm);
-  padding: 0 10px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-pill);
 }
 
 .rules-empty {
@@ -1638,7 +1637,7 @@ body:not([data-context="popup"]) .field {
 
 .rules-list {
   display: grid;
-  gap: var(--sp-5);
+  gap: var(--sp-2);
 }
 
 /* A feature flag that needs another one on first. */
@@ -1680,7 +1679,8 @@ body:not([data-context="popup"]) .field {
 /* A rule's target: an address pattern, or one of the site groups. */
 .rule-target {
   flex: none;
-  max-width: 40%;
+  /* The picker repeats on every row, so it is held to what it needs. */
+  max-width: 150px;
 }
 
 .rule-group-note {
@@ -1690,9 +1690,29 @@ body:not([data-context="popup"]) .field {
 }
 
 .rule {
-  padding: var(--sp-1) var(--gutter) 6px;
-  border: 1px solid var(--line);
+  /* Everything below the head lines up under the pattern, past the chevron
+     and the priority badge. A group head has no badge, so its column starts
+     sooner. */
+  --rule-indent: 70px;
+  padding: 0 var(--sp-3) var(--sp-1);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: var(--r-card);
+  /* Cards sit on the same ground as the Settings page's rows: a soft fill, a
+     quiet line, and the head as the strong row. */
+  background: color-mix(in srgb, var(--control) 35%, transparent);
+  transition: border-color 0.15s ease-out, background 0.15s ease-out;
+}
+
+.rule.group {
+  --rule-indent: 36px;
+}
+
+.rule:hover {
+  border-color: var(--line-strong);
+}
+
+.rule:not(.is-collapsed) {
+  background: color-mix(in srgb, var(--control) 55%, transparent);
 }
 
 .rule.is-target {
@@ -1700,8 +1720,16 @@ body:not([data-context="popup"]) .field {
   outline-offset: 2px;
 }
 
-.rule.is-disabled {
-  opacity: 0.6;
+/* A rule switched off still has to be read and switched back on, so the card
+   keeps its contrast and only what it would have done is greyed. */
+.rule.is-disabled .rule-pattern-mirror,
+.rule.is-disabled .rule-target,
+.rule.is-disabled .rule-summary {
+  opacity: 0.55;
+}
+
+.rule.is-disabled .rule-priority {
+  color: var(--ink-3);
 }
 
 .rule.is-filtered-out {
@@ -1711,10 +1739,9 @@ body:not([data-context="popup"]) .field {
 .rule-head {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) 0;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
 }
-
 
 .rule-pattern-wrap {
   position: relative;
@@ -1784,13 +1811,22 @@ body:not([data-context="popup"]) .field {
   color: var(--ink-2);
 }
 
+.rule-delete:hover {
+  color: var(--danger);
+}
 
+/* Armed, the icon grows the word it needs: an icon alone cannot say "armed". */
+.rule-delete.is-armed {
+  width: auto;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
 
 .rule-description-wrap {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin: calc(var(--sp-1) * -1) 0 10px;
+  margin: 0 0 10px;
 }
 
 .rule-description {
@@ -1824,9 +1860,9 @@ body:not([data-context="popup"]) .field {
 
 .rule-overrides-title {
   margin: var(--sp-3) 0 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   font-weight: 600;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 
 .rule-overrides .field:first-of-type {
@@ -1869,13 +1905,17 @@ body:not([data-context="popup"]) .field {
   gap: 6px;
 }
 
-/* Collapsed rule cards. */
+/* Collapsed rule cards. Everything the card holds hangs under the pattern, so
+   a card reads as one column rather than two things stacked. */
 .rule-summary {
   display: none;
   width: 100%;
   min-height: 0;
-  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
-  padding: var(--sp-1) 2px var(--sp-2);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  padding: 0 2px var(--sp-1) var(--rule-indent);
   justify-content: flex-start;
   text-align: left;
   white-space: normal;
@@ -1885,7 +1925,6 @@ body:not([data-context="popup"]) .field {
   line-height: 1.4;
   border-radius: var(--r-control);
 }
-
 
 .rule-summary:hover {
   background: none;
@@ -1901,78 +1940,24 @@ body:not([data-context="popup"]) .field {
 }
 
 .rule.is-collapsed {
-  padding-bottom: 2px;
+  padding-bottom: 0;
 }
 
-/* ---- New rules display (flag "new-rules-display") ------------------------------
+/* ---- Rules page: the row controls ---------------------------------------------
 
-   Everything above draws the original Rules page, which is what a profile
-   without the flag still gets. panel.js sets body[data-rules-display] and
-   builds the extra head controls; this block is the rest of the difference.
+   A collapsed rule is a row: priority badge, pattern, on/off switch and a quiet
+   delete across the head, then the description and one chip per setting below
+   it, hanging under the pattern. */
 
-   A collapsed rule becomes a row: priority badge, pattern, on/off switch and a
-   quiet delete across the head, then the description and one chip per setting
-   below it, hanging under the pattern. */
-
-body[data-rules-display="new"][data-context="page"][data-page="rules"] #app {
+body[data-context="page"][data-page="rules"] #app {
   /* A rule is a row of controls, not a paragraph, so it is given more width
      than the measure the prose pages want. */
   max-width: 1040px;
 }
 
-body[data-rules-display="new"] .rules-list {
-  gap: var(--sp-2);
-}
-
-body[data-rules-display="new"] .rule {
-  /* Everything below the head lines up under the pattern, past the chevron
-     and the priority badge. A group head has no badge, so its column starts
-     sooner. */
-  --rule-indent: 70px;
-  padding: 0 var(--sp-3) var(--sp-1);
-}
-
-body[data-rules-display="new"] .rule.group {
-  --rule-indent: 36px;
-}
-
-body[data-rules-display="new"] .rule:hover {
-  border-color: var(--line-strong);
-}
-
-body[data-rules-display="new"] .rule.is-collapsed {
-  padding-bottom: 0;
-}
-
-/* A rule switched off still has to be read and switched back on, so the card
-   keeps its contrast and only what it would have done is greyed. */
-body[data-rules-display="new"] .rule.is-disabled {
-  opacity: 1;
-}
-
-body[data-rules-display="new"] .rule.is-disabled .rule-pattern-mirror,
-body[data-rules-display="new"] .rule.is-disabled .rule-target,
-body[data-rules-display="new"] .rule.is-disabled .rule-summary {
-  opacity: 0.55;
-}
-
-body[data-rules-display="new"] .rule.is-disabled .rule-priority {
-  color: var(--ink-3);
-}
-
-body[data-rules-display="new"] .rule-head {
-  gap: var(--sp-2);
-  padding: var(--sp-2) 0;
-}
-
 /* The "Saved" tick lands at the end of the head row. */
-body[data-rules-display="new"] .rule-head .saved-mark {
+.rule-head .saved-mark {
   flex: none;
-}
-
-/* The picker repeats on every row, so it is held to what it needs. */
-body[data-rules-display="new"] .rule-target {
-  max-width: 150px;
 }
 
 /* Priority, where the list can be scanned for it. The list is ordered by
@@ -2012,70 +1997,9 @@ body[data-rules-display="new"] .rule-target {
   margin-left: auto;
 }
 
-body[data-rules-display="new"] .rule-delete:hover {
-  color: var(--danger);
-}
-
-/* Armed, the icon grows the word it needs: an icon alone cannot say "armed". */
-body[data-rules-display="new"] .rule-delete.is-armed {
-  width: auto;
-  padding: 0 var(--sp-2);
-  font-size: var(--fs-sm);
-}
-
-body[data-rules-display="new"] .rule-description-wrap {
-  margin-top: 0;
-}
-
-/* Cards sit on the same ground as the Settings page's rows: a soft fill, a
-   quiet line, and the head as the strong row. Chips are the same pill as the
-   page's badges. */
-body[data-rules-display="new"] .rule {
-  background: color-mix(in srgb, var(--control) 35%, transparent);
-  border-color: color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: var(--r-card);
-  transition: border-color 0.15s ease-out, background 0.15s ease-out;
-}
-
-body[data-rules-display="new"] .rule:not(.is-collapsed) {
-  background: color-mix(in srgb, var(--control) 55%, transparent);
-}
-
-body[data-rules-display="new"] .rule-chip {
-  background: var(--control);
-  border-color: transparent;
-  color: var(--ink);
-  line-height: 1.7;
-}
-
-body[data-rules-display="new"] .rule-chip.is-empty {
-  background: transparent;
-  border-color: var(--line);
-  color: var(--ink-2);
-}
-
-body[data-rules-display="new"] .rule-overrides-title {
-  font-size: var(--fs-md);
-  color: var(--ink);
-}
-
-body[data-rules-display="new"] .rules-filter input {
-  border-radius: var(--r-pill);
-  padding-left: var(--sp-3);
-}
-
-/* Everything the card holds hangs under the pattern, so a card reads as one
-   column rather than two things stacked. */
-body[data-rules-display="new"] .rule-body {
+/* Everything the card holds hangs under the pattern. */
+.rule-body {
   padding-left: var(--rule-indent);
-}
-
-body[data-rules-display="new"] .rule-summary {
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-1) var(--sp-2);
-  margin: 0 0 var(--sp-2);
-  padding: 0 2px var(--sp-1) var(--rule-indent);
 }
 
 .rule-meta {
@@ -2089,18 +2013,24 @@ body[data-rules-display="new"] .rule-summary {
 }
 
 /* One chip per setting the rule changes, so the list can be read for what a
-   rule does rather than parsed out of a sentence. */
+   rule does rather than parsed out of a sentence. Chips are the same pill as
+   the page's badges. */
 .rule-chip {
   padding: 1px var(--sp-2);
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   border-radius: var(--r-pill);
+  background: var(--control);
   font-size: var(--fs-xs);
-  color: var(--ink-2);
+  line-height: 1.7;
+  color: var(--ink);
   white-space: nowrap;
 }
 
 .rule-chip.is-empty {
+  background: transparent;
+  border-color: var(--line);
   border-style: dashed;
+  color: var(--ink-2);
   font-style: italic;
 }
 
@@ -2429,7 +2359,6 @@ body[data-context="page"] .version {
   color: var(--ink);
   text-decoration: underline;
 }
-
 
 .page-foot {
   display: flex;
