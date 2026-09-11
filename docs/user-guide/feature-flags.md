@@ -100,6 +100,26 @@ looking at. They are nothing to do with the desktop notifications in
 [features.md](features.md), which come from your operating system when a tab is closed,
 need a permission, and show up whether or not Timed Tabs is open.
 
+### Statistics
+
+Adds a **Statistics** section to the Tabs page, below **Recently expired**: how many
+tabs have run out of time and how each one ended, a chart of the last fortnight a day
+at a time, your snoozes and the time they granted, timers you have restarted by hand,
+and the most tabs you have had open at once.
+
+**The counting does not depend on this switch.** Timed Tabs keeps its tally whether
+the flag is on or off, so turning it off loses nothing and turning it back on shows
+everything that happened in between, not a fresh start. What the flag decides is
+whether the section is there to read.
+
+Two things follow from that, both worth knowing before you leave it off:
+
+- **Clear statistics** lives inside the section, so while the flag is off there is no
+  way to empty the tally from the UI. Turn the flag on, clear it, turn it back off.
+- The tally is counts and dates only — never an address, a title or anything about a
+  particular tab — so there is nothing in it to leak whether you are reading it or
+  not. [privacy.md](privacy.md#-statistics) sets out exactly what it holds.
+
 ### Interactive toolbar clock
 
 Changes what the Timed Tabs button draws. Normally it is a ring that drains

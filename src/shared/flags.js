@@ -46,6 +46,13 @@ export const FLAGS = [
     requires: "beta-features",
   },
   {
+    id: "statistics-panel",
+    label: "Statistics",
+    help: "A Statistics section on the Tabs page: how many tabs have run out of time and how, a chart of the last fortnight, snoozes, restarts and the most tabs you have had open at once. The counting happens either way — this switch only decides whether the section is there to read, so turning it off loses nothing and turning it back on shows the whole tally.",
+    default: false,
+    requires: "beta-features",
+  },
+  {
     id: "primary-icon-interactive",
     label: "Interactive toolbar clock",
     help: "The toolbar button stops being a ring and becomes a clock face that empties as the tab you are on runs out of time, with a look of its own for a paused clock and for a tab that never expires. It follows the tab you are looking at rather than painting every tab.",

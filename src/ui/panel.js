@@ -1416,6 +1416,33 @@ function timeAgo(ts) {
 
 // ---- Statistics ------------------------------------------------------------
 
+const statsOn = () => featureOn(settings, "statistics-panel");
+
+/**
+ * Show or hide the whole section, which is all the flag does.
+ *
+ * The counting is not gated and must not be: the background tallies whatever
+ * the flag says, so turning it on shows everything that happened while it was
+ * off rather than starting from nothing. What the flag decides is whether
+ * there is anything here to read.
+ *
+ * Hiding empties the body too. A `hidden` section keeps its DOM, and leaving
+ * the last numbers sitting in it means they are still in the page for anything
+ * that reads the document -- and would be what the user saw for an instant on
+ * turning the flag back on, before the refresh landed.
+ */
+function renderStats() {
+  const section = $("stats");
+  if (!section) return;
+  section.hidden = !statsOn();
+  if (section.hidden) {
+    $("stats-headline").textContent = "";
+    $("stats-body").replaceChildren();
+    return;
+  }
+  if (section.open) refreshStats();
+}
+
 /**
  * The tally, as tiles and a small chart.
  *
@@ -1426,6 +1453,10 @@ function timeAgo(ts) {
  * "Recently expired", which keeps rather a lot, that is worth saying.
  */
 async function refreshStats() {
+  // Belt and braces: every caller checks, but the section is polled on a timer
+  // and asked to refresh from a few places, and a flag that is off should cost
+  // the background no messages at all.
+  if (!statsOn()) return;
   const s = await api.runtime.sendMessage({ type: "timed-tabs:stats" }).catch(() => null);
   const body = $("stats-body");
   const headline = $("stats-headline");
@@ -1615,12 +1646,12 @@ function onPageShown(page) {
       overviewTimer = setInterval(refreshOverview, 5000);
     }
     if ($("recent").open) refreshRecent();
-    if ($("stats").open) refreshStats();
+    if (statsOn() && $("stats").open) refreshStats();
     // Recent list keeps itself fresh while the page is open; the tally rides
     // along on the same beat, since it moves for the same reasons.
     recentTimer = setInterval(() => {
       if ($("recent").open) refreshRecent();
-      if ($("stats").open) refreshStats();
+      if (statsOn() && $("stats").open) refreshStats();
     }, 15000);
   } else if (page === "rules") {
     renderRules();
@@ -2736,6 +2767,7 @@ function renderFlagged() {
   if (!isPopup) {
     renderGroups();
     renderRules();
+    renderStats();
   }
   if (isPopup) renderTab();
 }
@@ -3222,6 +3254,9 @@ getDisplayVersion().then((v) => {
     rememberFold($("overview"), "overview", true);
     rememberFold($("recent"), "recent", false);
     rememberFold($("stats"), "stats", false);
+    // After the fold, so a section remembered open is refreshed on the way in
+    // -- and one the flag has off stays hidden whatever the fold said.
+    renderStats();
     route();
   }
   renderFields();
