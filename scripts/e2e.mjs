@@ -7,9 +7,9 @@
 // printed is matched against the expectations. `runSeconds` counts from the
 // extension's first log line, not from launch, so a slow browser start on a
 // busy runner does not eat into the scenario; launch itself is capped at 90s. Screenshots the
-// scenario captured, and the raw log, land in e2e-artifacts/<name>.*.
+// scenario captured, and the raw log, land in artifacts/<name>.*.
 //
-// Alongside those it writes e2e-artifacts/results.json, one record per scenario
+// Alongside those it writes artifacts/results.json, one record per scenario
 // with every expectation and whether it matched. CI renders that into the run
 // summary; nothing else reads it, so the console output below stays the source
 // of truth for a human running this locally.
@@ -30,7 +30,7 @@ import { runChrome } from "./e2e-chrome.mjs";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const SCENARIOS = path.join(ROOT, "tests", "e2e", "scenarios");
-const OUT = path.join(ROOT, "e2e-artifacts");
+const OUT = path.join(ROOT, "artifacts");
 const PREFS = [
   "devtools.console.stdout.content=true",
   "devtools.console.stdout.chrome=true",
@@ -108,7 +108,7 @@ for (const [i, name] of names.entries()) {
   }
   if (!ok) {
     failed += 1;
-    console.log(`  ❌ [${index}/${total}] FAIL ${name}: see e2e-artifacts/${name}.log`);
+    console.log(`  ❌ [${index}/${total}] FAIL ${name}: see artifacts/${name}.log`);
     const lines = log.match(/\[timed-tabs\][^"\n]*/g) ?? [];
     for (const l of lines.filter((l) => !l.includes("CAPTURE")).slice(-25)) console.log(`    ${l.slice(0, 160)}`);
   } else console.log(`  ✅ [${index}/${total}] PASS ${name}${capture ? " 📸" : ""}`);

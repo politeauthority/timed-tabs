@@ -25,7 +25,7 @@ A scenario is one file in `tests/e2e/scenarios/`:
 `scripts/e2e.mjs` builds the dev target with that `dev` object as its `dev.json`, runs
 it headless for `runSeconds`, stops it, and matches the log against the expectations.
 The log, and the screenshot the scenario captured, are written to
-`e2e-artifacts/<name>.*`, which CI uploads.
+`artifacts/<name>.*`, which CI uploads.
 
 `runSeconds` counts from the extension's **first log line**, not from launch, so a
 slow browser start on a busy runner does not eat into the scenario.
@@ -80,7 +80,7 @@ means the scenario captured a screenshot.
 
 ## What CI reports
 
-Alongside the per-scenario files, the run writes `e2e-artifacts/results.json`: one
+Alongside the per-scenario files, the run writes `artifacts/results.json`: one
 record per scenario with its position, duration, every expectation, and whether each
 one matched. `scripts/e2e-summary.py` turns that into the job summary — the same
 counts the console prints, a pass/fail table over the scenarios, the exact
