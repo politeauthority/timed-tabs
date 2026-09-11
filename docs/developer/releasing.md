@@ -16,6 +16,21 @@ Set it to `true` to resume stable releases; delete it to pause them again.
 Do not merge the release PR by hand while paused. The next workflow run would treat
 that merge as a stable release and tag it.
 
+## 🏷️ Auto-merge
+
+Label a PR `automerge` and GitHub squash-merges it once **Lint, test & build**
+passes, then deletes the branch. `.github/workflows/automerge.yaml` only arms
+GitHub's own auto-merge; the merge itself is GitHub's, so the push to `main`
+triggers the release pipeline as a hand merge would. Remove the label to cancel.
+
+This leans on `main` requiring the **Lint, test & build** check. Without a required
+check nothing blocks a PR, and GitHub refuses to arm auto-merge at all. Admins are
+deliberately exempt from the check (`enforce_admins` is off) so release-please and
+**Force Release** can still push to `main` directly.
+
+The release PR is not part of this. It stays admin-gated, it carries no `automerge`
+label, and it should not be given one.
+
 ## 🔢 Versions
 
 Stable releases use three-part semver, `0.8.0`. Betas use a prerelease suffix,
