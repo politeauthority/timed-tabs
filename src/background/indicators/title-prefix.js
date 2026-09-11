@@ -25,7 +25,13 @@ export async function start() {
 
 export async function update(tabs) {
   await Promise.all(
-    tabs.map((t) => injector.send(t, { type: "timed-tabs:title", prefix: t.exempt || t.quiet ? "" : emojiFor(t.progress) })),
+    tabs.map((t) =>
+      injector.send(t, {
+        type: "timed-tabs:title",
+        prefix: t.exempt || t.quiet ? "" : emojiFor(t.progress),
+        flash: Boolean(t.flashing),
+      }),
+    ),
   );
 }
 

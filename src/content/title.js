@@ -8,22 +8,42 @@
   globalThis.__timedTabsTitle = true;
 
   const api = globalThis.browser ?? globalThis.chrome;
-  const MARKS = ["🟢", "🟡", "🟠", "🔴"];
+  const MARKS = ["🟢", "🟡", "🟠", "🔴", "⚪"];
   const prefixRe = new RegExp(`^(?:${MARKS.join("|")})\\s`);
 
   let prefix = "";
+  let basePrefix = "";
   let applying = false;
   let observer = null;
+  let blinkTimer = null;
+
+  // About to expire: alternate the coloured dot with a hollow one.
+  function setBlink(on) {
+    if (!on) {
+      if (blinkTimer) clearInterval(blinkTimer);
+      blinkTimer = null;
+      return;
+    }
+    if (blinkTimer) return;
+    blinkTimer = setInterval(() => {
+      prefix = prefix === "⚪" ? basePrefix : "⚪";
+      apply();
+    }, 700);
+  }
 
   api.runtime.onMessage.addListener((msg) => {
     if (!msg || typeof msg !== "object") return;
     if (msg.type === "timed-tabs:title") {
-      prefix = msg.prefix || "";
+      basePrefix = msg.prefix || "";
+      prefix = basePrefix;
+      setBlink(Boolean(msg.flash));
       apply();
       watch();
       return Promise.resolve("ok");
     }
     if (msg.type === "timed-tabs:title-reset") {
+      setBlink(false);
+      basePrefix = "";
       prefix = "";
       observer?.disconnect();
       observer = null;

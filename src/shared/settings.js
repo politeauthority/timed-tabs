@@ -16,6 +16,10 @@ export const DEFAULTS = Object.freeze({
   hideWhileGreen: false,
   /** Percent of the lifetime that must pass before indicators appear (with hideWhileGreen). */
   quietUntilPercent: 40,
+  /** Flash the indicators when a tab is about to expire. */
+  flashBeforeExpiry: true,
+  /** How long before expiry the flashing starts (seconds). */
+  flashLeadSeconds: 60,
   /** Which indicator strategies signal remaining time. See background/indicators. */
   indicators: ["favicon", "theme-tint"],
   /** How the favicon indicator draws its colour: "square" | "ring" | "dot". */
@@ -89,6 +93,22 @@ export const FIELDS = [
     type: "indicators",
     label: "Show remaining time with",
     help: "Any combination. Colour runs green, yellow, red as time runs out.",
+  },
+  {
+    key: "flashBeforeExpiry",
+    group: "appearance",
+    type: "toggle",
+    label: "Flash when a tab is about to expire",
+    help: "Every indicator blinks during the last stretch before a tab runs out of time.",
+  },
+  {
+    key: "flashLeadSeconds",
+    group: "appearance",
+    type: "duration",
+    label: "Start flashing",
+    help: "How long before expiry the flashing begins.",
+    min: 5,
+    showWhen: (s) => s.flashBeforeExpiry,
   },
   {
     key: "hideWhileGreen",

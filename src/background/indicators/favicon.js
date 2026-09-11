@@ -59,6 +59,7 @@ export async function update(tabs) {
             active: t.active,
             progress: t.progress,
             style,
+            flash: Boolean(t.flashing),
           };
       const r = await injector.send(t, msg);
       if (r.skipped) {

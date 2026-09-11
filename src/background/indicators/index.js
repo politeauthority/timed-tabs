@@ -12,7 +12,9 @@
  *     start(ctx): Promise<void>,       // ctx: { api, tracker, settings }
  *     configure?(settings): void,      // optional: settings changed while running
  *     update(tabs): Promise<void>,     // tabs: [{ tabId, windowId, url, status, discarded,
- *                                      //          active, exempt, quiet, progress, remainingSeconds }]
+ *                                      //          active, exempt, quiet, flashing, progress,
+ *                                      //          remainingSeconds }]
+ *                                      // flashing: about to expire; blink if you can
  *                                      // quiet: show nothing for this tab (timer off, pinned,
  *                                      //        or still green with hideWhileGreen)
  *     stop(): Promise<void>,           // must undo any visible changes

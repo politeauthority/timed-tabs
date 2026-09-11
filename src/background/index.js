@@ -364,9 +364,12 @@ async function tick() {
       // (pinned, timer off), and while still green if the user asked for that.
       const quietUntil = Math.min(0.99, Math.max(0.01, (settings.quietUntilPercent ?? 40) / 100));
       const quiet = exempt || (settings.hideWhileGreen && progress < quietUntil);
+      const flashing =
+        settings.flashBeforeExpiry && !quiet && remainingSeconds > 0 && remainingSeconds <= settings.flashLeadSeconds;
       snapshot.push({
         exempt,
         quiet,
+        flashing,
         remainingSeconds,
         tabId: tab.id,
         windowId: tab.windowId,

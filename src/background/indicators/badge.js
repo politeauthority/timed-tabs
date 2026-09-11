@@ -22,12 +22,32 @@ export async function start() {
   await action().setBadgeTextColor?.({ color: "#15141a" }).catch?.(() => {});
 }
 
+let blinkTimer = null;
+let blinkOn = true;
+let lastTabs = [];
+
 export async function update(tabs) {
+  lastTabs = tabs;
+  const anyFlashing = tabs.some((t) => t.flashing);
+  if (anyFlashing && !blinkTimer) {
+    blinkTimer = setInterval(() => {
+      blinkOn = !blinkOn;
+      paint(lastTabs);
+    }, 700);
+  } else if (!anyFlashing && blinkTimer) {
+    clearInterval(blinkTimer);
+    blinkTimer = null;
+    blinkOn = true;
+  }
+  await paint(tabs);
+}
+
+async function paint(tabs) {
   const a = action();
   await Promise.all(
     tabs.map(async (t) => {
       touched.add(t.tabId);
-      const text = badgeText(t);
+      const text = t.flashing && !blinkOn ? "!" : badgeText(t);
       try {
         await a.setBadgeText({ tabId: t.tabId, text });
         if (text) await a.setBadgeBackgroundColor({ tabId: t.tabId, color: toHex(rampColor(t.progress, "vivid")) });
@@ -39,6 +59,9 @@ export async function update(tabs) {
 }
 
 export async function stop() {
+  if (blinkTimer) clearInterval(blinkTimer);
+  blinkTimer = null;
+  blinkOn = true;
   const a = action();
   await Promise.all([...touched].map((tabId) => a.setBadgeText({ tabId, text: "" }).catch(() => {})));
   touched.clear();
