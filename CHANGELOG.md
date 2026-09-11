@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/politeauthority/timed-tabs/compare/v0.1.1...v0.1.2) (2026-09-11)
+
+
+### Bug Fixes
+
+* validate settings the same way from a backup and from storage, and keep ids unique ([8ce31bb](https://github.com/politeauthority/timed-tabs/commit/8ce31bb974ac8713d940fa496013d82094f5b291))
+
 ## [0.1.1](https://github.com/politeauthority/timed-tabs/compare/v0.1.0...v0.1.1) (2026-09-11)
 
 
