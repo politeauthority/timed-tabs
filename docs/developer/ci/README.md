@@ -40,14 +40,16 @@ E2E / Firefox stable-1
 CI run full
 ```
 
-`E2E / Chrome nightly` and `E2E / Chrome stable` run on every PR and push beside the
-two Firefoxes but are not among them. Chrome is planned rather than supported (see the
+`E2E / Firefox nightly` runs on every PR and push beside the two required Firefoxes
+but is not among them: a daily build breaking is worth seeing on the PR that breaks
+it and not worth holding a merge for. `E2E / Chrome nightly` and `E2E / Chrome stable`
+run beside them on the same footing. Chrome is planned rather than supported (see the
 [road map](../../road-map.md)), so while that holds its legs are advisory and only
 those two channels run. When Chrome is supported, `Chrome stable` becomes a sixth
 required context: add it here and to the `gh api` call below. The older majors join
 the full run by adding them to `full.yaml`'s `chrome` list.
 
-CI's three E2E legs stand down on a PR to `main` that carries the `ci run full`
+CI's five E2E legs stand down on a PR to `main` that carries the `ci run full`
 label, because the full run below tests those same versions and more, and the
 `CI run full` status holds the merge until it has. A skipped required check reads as
 a pass, which is safe here only because the status is the thing actually holding the

@@ -141,11 +141,11 @@ jobs:
       contents: read
       actions: read
     with:
-      # The two Firefoxes are required checks; Chrome stable reports beside them
-      # and is advisory until branch protection says otherwise.
-      # The defaults, spelled out: the two Firefoxes are the required checks,
-      # Chrome stable reports beside them and is advisory.
-      firefox: '["stable", "stable-1"]'
+      # Stable and stable-1 are the required checks. Nightly runs beside them
+      # so a daily build breaking is seen on the PR that breaks it, not weeks
+      # later in a full run; e2e.yaml marks it continue-on-error, so a red
+      # nightly is a warning on its job and never holds a merge.
+      firefox: '["nightly", "stable", "stable-1"]'
       # Nightly and stable, and no more, while Chrome is planned rather than
       # supported (docs/road-map.md); both are advisory, so neither can hold a
       # merge. The pair is what a Chrome user would meet first once it is.

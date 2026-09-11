@@ -3,7 +3,7 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
 # the E2E scenarios run on nightly, stable and the two stables before it in
-# Firefox, and on nightly and stable in Chrome, instead of CI's four legs. Each
+# Firefox, and on nightly and stable in Chrome, instead of CI's five legs. Each
 # browser is its own
 # segment of the table with its own verdict. Nightly is advisory in both -- a
 # daily build breaking is worth seeing and not worth holding a merge for -- and

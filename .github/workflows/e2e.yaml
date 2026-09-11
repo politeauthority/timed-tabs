@@ -20,7 +20,7 @@ run-name: "E2E — ${{ github.ref_name }}"
 # Nightly is Firefox Nightly and Chrome Canary, the two daily builds. The
 # `firefox` and `chrome` inputs are the two lists; they default to Firefox stable
 # and stable-1 plus Chrome stable, which is what the beta gate runs. ci.yaml adds
-# Chrome nightly, and full.yaml passes nightly, stable, stable-1 and stable-2 of Firefox, and nightly
+# Firefox nightly and Chrome nightly, and full.yaml passes nightly, stable, stable-1 and stable-2 of Firefox, and nightly
 # and stable of Chrome while Chrome is planned rather than supported, for
 # the `ci run full` label. This file runs what it is told and holds no opinion about branches. No
 # Chrome leg is a required check yet; making one required is a branch protection
