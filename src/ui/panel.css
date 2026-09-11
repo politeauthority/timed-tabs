@@ -525,27 +525,20 @@ body:not([data-context="popup"]) .pages {
 }
 
 /* Page settings: where each value comes from, next to its label. */
+/* A tab override reads like the panel's other markers -- the count badge, the
+   rule meta -- and not like a primary action. The accent stays reserved for
+   those: at full strength on a dark theme it is #00ddff, which made a marker
+   the loudest thing on the panel. */
 .setting-source {
   flex: none;
   font-size: var(--fs-xs);
   font-weight: 400;
   color: var(--ink-2);
-  padding: 0 var(--sp-1);
+  padding: 0 6px;
   border-radius: var(--r-pill);
   background: var(--control);
   cursor: default;
-}
-
-.setting-source.is-tab {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-.setting-source.is-rule {
-  max-width: 12em;
-  overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 /* Stays the wrapping flex row the rest of the settings use. At popup width
@@ -601,16 +594,29 @@ body:not([data-context="popup"]) .pages {
   width: 100%;
 }
 
-/* A tab override can be handed back by clicking its badge. */
+/* A tab override can be handed back by clicking its badge. The cross is there
+   at rest but invisible, so revealing it costs no reflow and the badge does
+   not jump under the pointer. */
 button.setting-source {
   border: 0;
   font: inherit;
   cursor: pointer;
 }
 
-button.setting-source:hover {
-  color: var(--accent-ink);
-  background: var(--accent);
+button.setting-source::after {
+  content: " \00d7";
+  opacity: 0;
+}
+
+button.setting-source:hover,
+button.setting-source:focus-visible {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+button.setting-source:hover::after,
+button.setting-source:focus-visible::after {
+  opacity: 1;
 }
 
 .tab-rules-note {
