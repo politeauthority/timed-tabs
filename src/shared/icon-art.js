@@ -39,11 +39,15 @@ export const IDENTITY_PROGRESS = 0;
  * shorter, holding open a gap of at least a pixel between the hand tips and
  * the ring. Read as `ring` and `hand` being stroke widths, `minute` and
  * `hour` the lengths of the two hands from the centre.
+ *
+ * The ring's outer edge sits on the edge of the grid. Toolbar icons are drawn
+ * edge to edge in their 16px box, and a ring that stopped short of it read as
+ * the small one in the row.
  */
 export function metrics(size) {
-  if (size <= 20) return { radius: 11, ring: 5.2, hand: 3.4, minute: 4.7, hour: 3.4 };
-  if (size <= 40) return { radius: 11, ring: 5.2, hand: 3.2, minute: 5.6, hour: 4.2 };
-  return { radius: 11, ring: 5, hand: 3, minute: 5.8, hour: 4.4 };
+  if (size <= 20) return { radius: 13.2, ring: 5.6, hand: 3.6, minute: 5.8, hour: 4.2 };
+  if (size <= 40) return { radius: 13.3, ring: 5.4, hand: 3.4, minute: 6.6, hour: 4.9 };
+  return { radius: 13.4, ring: 5.2, hand: 3.2, minute: 7, hour: 5.2 };
 }
 
 /** Where a hand of length `len` ends, `turn` turns clockwise from twelve. */
@@ -72,7 +76,7 @@ function handEnd(turn, len) {
  * true` draws the ring the right way (spent part opening at twelve and
  * sweeping right), but the live button keeps the legacy direction until
  * `primary-icon-interactive` is folded in, rather than changing the mark every
- * user already has. The swatch set in src/icons/clock/ shows the clockwise ring.
+ * user already has. The swatch set in design/icons/clock/ shows the clockwise ring.
  *
  * Every shape is the one colour or a hole punched out of it. Nothing is white
  * and nothing is dark, because the same image has to sit on a light and a
@@ -128,9 +132,9 @@ export function dialShapes({
  * needs more width than a painted one to read at 16px.
  */
 export function faceMetrics(size) {
-  if (size <= 20) return { rim: 12.3, rimWidth: 2.6, face: 9.6, hand: 3.2, minute: 7, hour: 5 };
-  if (size <= 40) return { rim: 12.4, rimWidth: 2.2, face: 10, hand: 2.8, minute: 7.4, hour: 5.3 };
-  return { rim: 12.5, rimWidth: 2, face: 10.2, hand: 2.6, minute: 7.6, hour: 5.4 };
+  if (size <= 20) return { rim: 14.6, rimWidth: 2.8, face: 11.6, hand: 3.4, minute: 8.4, hour: 6 };
+  if (size <= 40) return { rim: 14.8, rimWidth: 2.4, face: 12, hand: 3, minute: 8.8, hour: 6.3 };
+  return { rim: 14.9, rimWidth: 2.2, face: 12.2, hand: 2.8, minute: 9.2, hour: 6.5 };
 }
 
 /** How faint the drained part of the face sits behind the part still to run. */
@@ -195,8 +199,8 @@ function handShapes(m) {
 /** The exclamation that marks an expired tab, punched out of a solid disc. */
 function bangShapes() {
   return [
-    { kind: "capsule", x1: 16, y1: 9.8, x2: 16, y2: 16.6, width: 3.4 },
-    { kind: "disc", cx: 16, cy: 21.6, r: 1.9 },
+    { kind: "capsule", x1: 16, y1: 8.6, x2: 16, y2: 17, width: 3.8 },
+    { kind: "disc", cx: 16, cy: 22.6, r: 2.2 },
   ];
 }
 
