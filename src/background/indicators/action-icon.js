@@ -116,8 +116,13 @@ async function paint(tabs) {
   // `tabs.onActivated` ticks, so a switch repaints in the same turn rather
   // than on the next timer -- but it changes the mark every user already has,
   // so it waits behind `primary-icon-interactive` with the rest of the clock.
-  const targets = interactive ? tabs.filter((t) => t.active) : tabs;
-  const live = new Set(targets.map((t) => t.tabId));
+  // Paired with the key each one is to carry, so a tab the mark is withheld
+  // from drops out here and is cleared by the loop below like any other tab
+  // that has stopped carrying one.
+  const targets = (interactive ? tabs.filter((t) => t.active) : tabs)
+    .map((t) => ({ tab: t, key: iconKey(t, blinkOn, interactive) }))
+    .filter(({ key }) => key !== null);
+  const live = new Set(targets.map(({ tab }) => tab.tabId));
   for (const tabId of painted.keys()) {
     if (live.has(tabId)) continue;
     painted.delete(tabId);
@@ -127,8 +132,7 @@ async function paint(tabs) {
   }
 
   await Promise.all(
-    targets.map(async (t) => {
-      const key = iconKey(t, blinkOn, interactive);
+    targets.map(async ({ tab: t, key }) => {
       if (painted.get(t.tabId) === key) return;
       try {
         await a.setIcon({ tabId: t.tabId, imageData: iconFor(key) });
@@ -205,6 +209,17 @@ async function clearIcon(tabId) {
 export function iconKey(tab, lit = true, live = false) {
   const prefix = live ? "face-" : "";
   if (live && tab.exempt) return "face-exempt";
+  // Null means no mark at all: the icon comes off and the button falls back to
+  // the packaged one. The clock has to say nothing rather than say the wrong
+  // thing -- a quiet tab is one this indicator is not painting (still fresh
+  // with "leave fresh tabs alone" on, or a rule has taken the toolbar off the
+  // page), and the resting mark is a *filled face at 75%*, which is not a
+  // resting look at all but a reading, and a false one: a tab with a sliver
+  // left showed three quarters full.
+  //
+  // The ring keeps the resting mark, because there it is the packaged icon
+  // redrawn and reads as one. Only the face has to be withheld.
+  if (live && tab.quiet) return null;
   if (tab.exempt || tab.quiet) return `${prefix}idle:${Math.round(IDENTITY_PROGRESS * BUCKETS)}`;
   const progress = Math.min(1, Math.max(0, tab.progress ?? 0));
   if (progress >= 1) return `${prefix}expired`;

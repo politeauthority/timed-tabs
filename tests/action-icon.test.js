@@ -32,7 +32,25 @@ describe("iconKey, interactive", () => {
 
   it("keeps a tab that never expires apart from one that is merely quiet", () => {
     expect(live({ exempt: true, progress: 0.9 })).toBe("face-exempt");
-    expect(live({ quiet: true, progress: 0.9 })).toBe(`face-idle:${Math.round(IDENTITY_PROGRESS * 60)}`);
+    // A quiet tab carries no mark at all, rather than the resting one: that is
+    // a face filled to 75%, and on a tab with a tenth of its life left it is
+    // not a resting look but a false reading. Null takes the icon off and lets
+    // the packaged one show through.
+    expect(live({ quiet: true, progress: 0.9 })).toBeNull();
+  });
+
+  it("withholds the mark whatever the fill, so none of it can be misread", () => {
+    for (const progress of [0, 0.02, 0.5, 0.95, 1]) {
+      expect(live({ quiet: true, progress })).toBeNull();
+    }
+  });
+
+  it("leaves the ring's resting mark alone, where it is the packaged icon", () => {
+    // Only the face is withheld. The ring draws `idle` as the mark it ships
+    // with, which reads as a resting button rather than as a measurement.
+    expect(iconKey({ quiet: true, progress: 0.9 }, true, false)).toBe(
+      `idle:${Math.round(IDENTITY_PROGRESS * 60)}`,
+    );
   });
 
   it("says a stopped clock is stopped, at the fill it stopped at", () => {
