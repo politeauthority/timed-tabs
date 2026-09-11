@@ -16,7 +16,7 @@ run-name: "E2E — ${{ github.ref_name }}"
 # before it. Both are resolved at run time from Mozilla's product-details feed
 # rather than pinned, so "previous" follows every release without anyone editing
 # this file. Both must pass. The `firefox` input replaces that list: `previous-N`
-# is N majors back, and full.yaml passes ten of them for the `ci run full` label.
+# is N majors back, and full.yaml passes four of them for the `ci run full` label.
 #
 # Each leg is its own status check: called from CI they report as
 # `E2E / Firefox latest` and `E2E / Firefox previous`, GitHub prefixing a called
@@ -59,6 +59,23 @@ on:
         type: string
         required: false
         default: '["latest", "previous"]'
+      max-parallel:
+        # Ten Firefoxes at once starved one another on the runner node until
+        # a scenario saw a single tick in its whole window. The scenarios time
+        # things, so contention reads as failure; run fewer legs at a time.
+        description: How many legs may run at once.
+        type: number
+        required: false
+        default: 2
+      leg-summary:
+        # `always` gives every leg its own step summary, which is right for the
+        # CI pair. `on-failure` keeps a green leg quiet so the caller can write
+        # one table for the lot: full.yaml does, from the leg records each leg
+        # uploads (see "Record the leg" below).
+        description: When a leg writes its own step summary, `always` or `on-failure`.
+        type: string
+        required: false
+        default: always
   workflow_dispatch:
     inputs:
       ref:
@@ -71,6 +88,16 @@ on:
         type: string
         required: false
         default: '["latest", "previous"]'
+      max-parallel:
+        description: How many legs may run at once.
+        type: number
+        required: false
+        default: 2
+      leg-summary:
+        description: When a leg writes its own step summary, `always` or `on-failure`.
+        type: string
+        required: false
+        default: always
 
 permissions:
   contents: read
@@ -110,6 +137,7 @@ jobs:
       # Not fail-fast: when one version breaks, the first thing worth knowing is
       # whether the other one broke too. Cancelling it throws that away.
       fail-fast: false
+      max-parallel: ${{ inputs.max-parallel }}
       matrix:
         firefox: ${{ fromJSON(inputs.firefox) }}
     steps:
@@ -291,6 +319,44 @@ jobs:
           FIREFOX: ${{ steps.firefox.outputs.firefox-path }}
         run: npm run e2e
 
+      # One small record per leg -- which Firefox this was, how it went, and
+      # the scenario results -- so a caller can sum several legs into one table
+      # instead of one summary each. Written whatever happened to the scenarios,
+      # a skipped docs-only leg included, so the table never has a hole.
+      - name: Record the leg
+        if: always()
+        env:
+          LEG: ${{ matrix.firefox }}
+          VERSION: ${{ steps.ffver.outputs.version }}
+          OUTCOME: ${{ steps.scenarios.outcome }}
+          CODE: ${{ steps.changed.outputs.code }}
+          REASON: ${{ steps.changed.outputs.reason }}
+        run: |
+          mkdir -p e2e-artifacts
+          python3 - <<'PY'
+          import json, os
+          record = {
+              "leg": os.environ["LEG"],
+              "version": os.environ["VERSION"],
+              # success | failure | cancelled | skipped (docs-only, or never reached)
+              "outcome": os.environ["OUTCOME"] or "skipped",
+              "skipped": os.environ["REASON"] if os.environ["CODE"] != "true" else "",
+              "scenarios": [],
+          }
+          try:
+              with open("e2e-artifacts/results.json", encoding="utf-8") as fh:
+                  record["scenarios"] = json.load(fh)["scenarios"]
+          except (OSError, ValueError, KeyError):
+              pass
+          with open("e2e-artifacts/leg.json", "w", encoding="utf-8") as fh:
+              json.dump(record, fh, indent=2)
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-leg-${{ matrix.firefox }}
+          path: e2e-artifacts/leg.json
+
       - uses: actions/upload-artifact@v7
         id: artifacts
         # always(), so a failed run still uploads its logs -- but not when the
@@ -309,7 +375,8 @@ jobs:
       # record per scenario. The console output of the run is the same data, but
       # it is 2000 lines down inside a log nobody opens on a green run.
       - name: 📋 Summary
-        if: always()
+        # A green leg stays quiet when the caller writes the table itself.
+        if: always() && (inputs.leg-summary != 'on-failure' || job.status != 'success')
         # Values from expressions go through env: pasted into bash they would
         # run as code, and the changed-paths reason contains a file path.
         env:
@@ -342,7 +409,7 @@ jobs:
           fi
 
       - name: ⏱️ Step times
-        if: always()
+        if: always() && (inputs.leg-summary != 'on-failure' || job.status != 'success')
         uses: ./.github/actions/step-times
         with:
           token: ${{ github.token }}

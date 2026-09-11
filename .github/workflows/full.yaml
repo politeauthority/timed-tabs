@@ -2,7 +2,7 @@ name: CI run full
 run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
-# the E2E scenarios run on the last ten Firefox releases instead of two.
+# the E2E scenarios run on the last four Firefox releases instead of two.
 #
 # GitHub has no such thing as a required label, so the label is enforced by a
 # required status named `CI run full` that reads it. The gate job at the bottom
@@ -11,15 +11,15 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # failure, it is a merge requirement not yet met, so the gate reports it as
 # *pending*: the merge box says "Waiting" and stays locked, and nothing on the
 # PR is red for a label nobody has had a reason to add yet. The status goes
-# green once the label is on and the ten Firefoxes have passed, back to pending
+# green once the label is on and the four Firefoxes have passed, back to pending
 # the moment the label comes off, and to failure only when the Firefoxes fail.
 # Auto-merge adds the label when it arms (see automerge.yaml), so a PR marked to
 # merge itself gets the full run without anyone remembering.
 #
 # Three jobs:
 #   - plan     decides what this event needs, on a hosted runner in seconds
-#   - Full     the ten legs, e2e.yaml called with a longer `firefox` list, so
-#              they report as `Full / Firefox latest` ... `Full / Firefox previous-9`
+#   - Full     the four legs, e2e.yaml called with a longer `firefox` list, so
+#              they report as `Full / Firefox latest` ... `Full / Firefox previous-3`
 #   - Full run gate   posts the `CI run full` status, which is the only thing
 #              branch protection reads. Its own check is not required and is
 #              named differently on purpose, so the two cannot be confused.
@@ -27,7 +27,7 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # It wakes on every label event, and it must: the gate is a required check, so
 # it can never filter itself down to its own label -- a skipped required check
 # is a pass, and on an unlabelled PR that would hand back the merge the label
-# is holding. What keeps that cheap is `plan`. Ten Firefoxes only run when the
+# is holding. What keeps that cheap is `plan`. Four Firefoxes only run when the
 # head commit has not already passed them: any later event on the same commit
 # (another label, a review) finds the earlier green run and reuses it, and
 # events on an older commit are cancelled outright.
@@ -71,6 +71,9 @@ jobs:
       # exempt | paused | missing | reuse | run
       mode: ${{ steps.plan.outputs.mode }}
       reason: ${{ steps.plan.outputs.reason }}
+      # The run whose leg records the gate should read: this one, or the
+      # earlier one whose result is being reused.
+      run: ${{ steps.plan.outputs.run }}
     steps:
       - id: plan
         env:
@@ -81,7 +84,10 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_ID: ${{ github.run_id }}
-          WORKFLOW: ${{ github.workflow }}
+          RUN_NUMBER: ${{ github.run_number }}
+          # A run's `name` in the API is its run-name ("CI run full — PR #7"),
+          # so runs of this workflow are picked out by file instead.
+          WORKFLOW: .github/workflows/full.yaml
           LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'ci run full') }}
           PAUSED: ${{ contains(github.event.pull_request.labels.*.name, 'ci pause') }}
         run: |
@@ -92,11 +98,13 @@ jobs:
             echo "$1: $2"
           }
 
-          # Older commits of this PR still running the ten legs are answering a
-          # question nobody will merge any more.
+          # Older commits of this PR still running the four legs are answering a
+          # question nobody will merge any more. Older only: two pushes in
+          # quick succession start two runs, and the first one's plan must not
+          # cancel the newer one that is about to cancel it.
           for status in queued in_progress; do
             gh api "repos/${GH_REPO}/actions/runs?event=pull_request&status=${status}&branch=${HEAD_REF}&per_page=100" \
-              --jq ".workflow_runs[] | select(.name == \"${WORKFLOW}\" and .head_sha != \"${HEAD_SHA}\") | .id" \
+              --jq ".workflow_runs[] | select(.path == \"${WORKFLOW}\" and .head_sha != \"${HEAD_SHA}\" and .run_number < ${RUN_NUMBER}) | .id" \
               | while read -r id; do
                   echo "cancelling run ${id}: an older commit of this PR"
                   gh api -X POST "repos/${GH_REPO}/actions/runs/${id}/cancel" > /dev/null || true
@@ -125,18 +133,20 @@ jobs:
           # later `labeled` event wave the commit through untested.
           earlier=""
           for id in $(gh api "repos/${GH_REPO}/actions/runs?event=pull_request&head_sha=${HEAD_SHA}&per_page=100" \
-                        --jq ".workflow_runs[] | select(.name == \"${WORKFLOW}\" and .id != ${RUN_ID}) | .id"); do
+                        --jq ".workflow_runs[] | select(.path == \"${WORKFLOW}\" and .id != ${RUN_ID}) | .id"); do
             if gh api "repos/${GH_REPO}/actions/runs/${id}/jobs?per_page=100" \
                  --jq '[.jobs[] | select(.name | startswith("Full / "))] | length > 0 and all(.conclusion == "success")' | grep -qx true; then
               earlier="$id"; break
             fi
           done
           if [ -n "$earlier" ]; then
-            decide reuse "run ${earlier} already passed the ten Firefoxes on ${HEAD_SHA:0:7}"; exit 0
+            echo "run=${earlier}" >> "$GITHUB_OUTPUT"
+            decide reuse "run ${earlier} already passed the four Firefoxes on ${HEAD_SHA:0:7}"; exit 0
           fi
-          decide run "the label is on and ${HEAD_SHA:0:7} has not been through the ten Firefoxes yet"
+          echo "run=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          decide run "the label is on and ${HEAD_SHA:0:7} has not been through the four Firefoxes yet"
 
-  # Ten legs: the current release and the nine majors before it. Each reports
+  # Four legs: the current release and the three majors before it. Each reports
   # as `Full / Firefox <leg>`; none of them is required on its own, the gate
   # below is. e2e.yaml resolves each leg to an exact version at run time.
   firefox:
@@ -148,7 +158,14 @@ jobs:
       contents: read
       actions: read
     with:
-      firefox: '["latest", "previous", "previous-2", "previous-3", "previous-4", "previous-5", "previous-6", "previous-7", "previous-8", "previous-9"]'
+      firefox: '["latest", "previous", "previous-2", "previous-3"]'
+      # Not all at once: ten at a time starved one another on the runner node
+      # until three legs saw one tick in their whole window and failed on
+      # timing alone. Two at a time is two waves of about four minutes.
+      max-parallel: 2
+      # The gate below writes one table for all four; a green leg's own summary
+      # would only repeat its row. A failed leg still writes its own.
+      leg-summary: on-failure
 
   gate:
     name: Full run gate
@@ -164,6 +181,31 @@ jobs:
       contents: read
       statuses: write     # the `CI run full` status on the head commit
     steps:
+      # Only the two scripts the summary needs; the gate is not a build.
+      - uses: actions/checkout@v7
+        if: needs.plan.outputs.mode == 'run' || needs.plan.outputs.mode == 'reuse'
+        with:
+          sparse-checkout: scripts
+          sparse-checkout-cone-mode: false
+      # Every leg's record, from this run or the one being reused.
+      - uses: actions/download-artifact@v7
+        if: needs.plan.outputs.mode == 'run' || needs.plan.outputs.mode == 'reuse'
+        with:
+          pattern: e2e-leg-*
+          path: legs
+          run-id: ${{ needs.plan.outputs.run }}
+          github-token: ${{ github.token }}
+      - name: Table of the legs
+        if: needs.plan.outputs.mode == 'run' || needs.plan.outputs.mode == 'reuse'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: ${{ needs.plan.outputs.run }}
+        run: |
+          set -euo pipefail
+          gh run view "$RUN" --json jobs > jobs.json || echo '{"jobs": []}' > jobs.json
+          python3 scripts/e2e-full-summary.py legs jobs.json > table.md \
+            || echo "_The leg table could not be built; see the Firefox jobs on this run._" > table.md
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -213,22 +255,22 @@ jobs:
               status pending "Add the 'ci run full' label to merge into main; arming auto-merge adds it for you"
               report 🏷️ "waiting for the label" \
                 "The merge is held, not failed: ${REASON}." "" \
-                "Merging into \`main\` needs the E2E scenarios to pass on the last ten Firefox releases." \
+                "Merging into \`main\` needs the E2E scenarios to pass on the last four Firefox releases." \
                 "Add the **\`ci run full\`** label to run them; arming auto-merge adds it for you." ;;
             reuse)
               status success "Passed on this commit already: ${REASON}"
-              report ✅ "passed" "Reused an earlier result: ${REASON}." ;;
+              report ✅ "passed" "Reused an earlier result: ${REASON}." "" "$(cat table.md)" ;;
             run)
               case "$FIREFOX" in
                 success)
-                  status success "All ten Firefox legs passed"
-                  report ✅ "passed" "All ten Firefox legs passed. Each leg's own summary lists its scenarios." ;;
+                  status success "All four Firefox legs passed"
+                  report ✅ "passed" "$(cat table.md)" ;;
                 cancelled)
                   status error "The Firefox legs were cancelled; re-run or push again"
-                  report ⏹️ "cancelled" "The Firefox legs were cancelled: a job timed out, or a newer commit took over."; exit 1 ;;
+                  report ⏹️ "cancelled" "The Firefox legs were cancelled: a job timed out, or a newer commit took over." "" "$(cat table.md)"; exit 1 ;;
                 *)
-                  status failure "At least one of the ten Firefox legs failed"
-                  report ❌ "failed" "At least one of the ten Firefox legs failed (\`${FIREFOX}\`). Open the red leg for its scenario table and artifacts."; exit 1 ;;
+                  status failure "At least one of the four Firefox legs failed"
+                  report ❌ "failed" "$(cat table.md)"; exit 1 ;;
               esac ;;
             *)
               status error "Plan mode '${MODE}' is not one the gate knows"
