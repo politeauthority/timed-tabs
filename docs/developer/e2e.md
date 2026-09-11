@@ -22,6 +22,23 @@ runs `web-ext run` headless for `runSeconds`, stops it, and matches the log agai
 the expectations. The log, and the screenshot the scenario captured, are written to
 `e2e-artifacts/<name>.*`, which CI uploads.
 
+## What CI reports
+
+Alongside the per-scenario files, the run writes `e2e-artifacts/results.json`: one
+record per scenario with its duration, every expectation, and whether each one
+matched. `scripts/e2e-summary.py` turns that into the job summary — a pass/fail table
+over the scenarios, the exact expectations that missed on a failure, and a link to
+the artifact. Running locally you can ignore it; the console output says the same
+thing.
+
+The summary also carries a timing table from `.github/actions/step-times`, which
+marks any step over a minute. Firefox on the runner is the usual reason a run drags:
+the pod is ephemeral, so every run re-installs the GTK libraries and re-downloads the
+browser.
+
+Screenshots cannot be linked individually — an artifact downloads as one zip — so the
+table names the files to look for once it is open.
+
 The dev hook is what makes this work. On load, the dev build seeds settings, rules and
 site groups, opens tabs and windows, replays clicks, and logs what it is doing. The
 lines the scenarios rely on, all prefixed `[timed-tabs]`, are:

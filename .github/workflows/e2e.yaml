@@ -5,20 +5,28 @@ run-name: "E2E — ${{ github.event_name == 'pull_request' && format('PR #{0}', 
 # checks each scenario in tests/e2e/scenarios against the log it produces. See
 # docs/developer/e2e.md.
 #
-# When it runs: every push to main, and every open PR, including when a label is
-# added or removed. A PR labelled "ci pause" skips the job. The job is a required
-# status check, and GitHub counts a skipped required check as passed, so the label
-# lets a PR merge without waiting for Firefox while still leaving the check in
-# place for every other PR. Remove the label to run it again.
+# When it runs: every push to main, and every push to an open PR. A PR labelled
+# "ci pause" skips the job. The job is a required status check, and GitHub counts a
+# skipped required check as passed, so the label lets a PR merge without waiting for
+# Firefox while still leaving the check in place for every other PR.
+#
+# No label events. `on.pull_request.types` cannot filter by label name, so waking on
+# `labeled` would start a run for every label -- "needs review", "enhancement",
+# anything -- and each one would report `skipped` over whatever this check last said
+# about the commit, trading a real pass for a neutral. Applying "ci pause" therefore
+# does not retroactively skip a run that already happened; it does not need to,
+# because the `Not paused` check goes red the moment the label lands and no paused PR
+# can merge anyway. The next push picks the label up.
 on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read        # the step-times action reads this run's job timings
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -57,18 +65,35 @@ jobs:
         run: npm run e2e
 
       - uses: actions/upload-artifact@v7
+        id: artifacts
         if: always()
         with:
           name: e2e-artifacts
           path: e2e-artifacts/
           if-no-files-found: ignore
 
+      # Reads e2e-artifacts/results.json, which scripts/e2e.mjs writes with one
+      # record per scenario. The console output of the run is the same data, but
+      # it is 2000 lines down inside a log nobody opens on a green run.
       - name: 📋 Summary
         if: always()
+        env:
+          ARTIFACT_URL: ${{ steps.artifacts.outputs.artifact-url }}
         run: |
           if [ "${{ job.status }}" = "success" ]; then head="### ✅ 🦊 E2E passed"; else head="### ❌ 🦊 E2E failed"; fi
           {
             echo "$head"
             echo ""
-            echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`. Scenarios in \`tests/e2e/scenarios\`; logs and screenshots in the **e2e-artifacts** artifact."
+            echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`. Scenarios in \`tests/e2e/scenarios\`."
+            echo ""
           } >> "$GITHUB_STEP_SUMMARY"
+
+          python3 scripts/e2e-summary.py e2e-artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
+            echo "_No scenario results were written; see the job log._" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: ⏱️ Step times
+        if: always()
+        uses: ./.github/actions/step-times
+        with:
+          token: ${{ github.token }}
+          slow-over: 60

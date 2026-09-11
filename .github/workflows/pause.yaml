@@ -1,5 +1,5 @@
 name: Not paused
-run-name: "Not paused — #${{ github.event.pull_request.number }}"
+run-name: "Not paused — PR #${{ github.event.pull_request.number }}"
 
 # ⏸️ The `ci pause` label, enforced on its own.
 #
@@ -8,6 +8,13 @@ run-name: "Not paused — #${{ github.event.pull_request.number }}"
 # job did that, every label change -- including the `automerge` one -- would
 # start a fresh build and the PR would wait a full cycle for it. This job runs
 # on a hosted runner in seconds, so it can afford to be woken by any label.
+#
+# It is the one label listener that must not filter itself down to `ci pause`.
+# The trigger cannot match on a label name, so a filter would have to be an `if`
+# on the job, and this job's whole value is the red it reports: skip it for an
+# unrelated label on a paused PR and the red turns into a neutral that branch
+# protection accepts, unblocking the merge the label was holding. Running and
+# passing in three seconds costs less than that hole.
 #
 # It fails while the label is on, and that is the point: a required job that is
 # *skipped* counts as passed, so a paused check reporting green would quietly
