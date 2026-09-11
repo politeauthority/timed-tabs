@@ -707,6 +707,18 @@ body:not([data-context="popup"]) .pages {
   display: none;
 }
 
+/* No rules match: the heading and its 0 are the whole section. The chevron
+   keeps its slot so the title sits where it does when there are rules, but
+   it is not shown and the title is not a toggle. */
+.tab.is-empty > .section-head > .section-toggle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tab.is-empty > .section-head > .settings-title[data-toggles] {
+  cursor: default;
+}
+
 .section-head .section-action {
   margin-left: auto;
   min-height: 0;
