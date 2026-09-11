@@ -61,7 +61,8 @@ export const GROUPS = [
     help: "Whether Timed Tabs does anything to your tabs at all.",
   },
   { id: "timing", emoji: "⏳", title: "Timing", short: "Timing", help: "How long tabs live and when the clock runs." },
-  { id: "expiry", emoji: "🔔", title: "When a tab expires", short: "Expiry", help: "What happens to a background tab once its time is up." },
+  { id: "expiry", emoji: "🚪", title: "When a tab expires", short: "Expiry", help: "What happens to a background tab once its time is up." },
+  { id: "notifications", emoji: "🔔", title: "Notifications", short: "Notifications", help: "What Timed Tabs tells you about, and when." },
   { id: "appearance", emoji: "🎨", title: "Appearance", short: "Appearance", help: "How remaining time is shown in the browser." },
   { id: "advanced", emoji: "🔧", title: "Advanced", short: "Advanced", help: "Rarely needed." },
 ];
@@ -136,7 +137,7 @@ export const FIELDS = [
   },
   {
     key: "notifyOnExpire",
-    group: "expiry",
+    group: "notifications",
     type: "toggle",
     label: "Tell me when a tab is closed",
     help: "A notification naming the tab, one for each batch we close. Click it to bring the tab back.",

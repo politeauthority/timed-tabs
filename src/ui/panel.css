@@ -616,7 +616,8 @@ body:not([data-context="popup"]) [data-pages] {
 
 body[data-page="tabs"]:not([data-context="popup"]) [data-pages="tabs"],
 body[data-page="rules"]:not([data-context="popup"]) [data-pages="rules"],
-body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"] {
+body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"],
+body[data-page="backup"]:not([data-context="popup"]) [data-pages="backup"] {
   display: block;
 }
 
@@ -1263,9 +1264,15 @@ body:not([data-context="popup"]) .trow {
   padding: var(--sp-3) var(--gutter) var(--sp-2);
 }
 
+/* The way through to the backup page, at the foot of the settings. */
+.settings-links {
+  margin: 0;
+  padding: var(--sp-3) var(--gutter) var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+
 /* Groups no longer need a rule between them: only one is ever on show, and a
    hidden sibling still matches `+`, so this would draw a line above it. */
-.settings + .backup,
 .backup + .diagnostics {
   border-top: 1px solid var(--line);
 }
