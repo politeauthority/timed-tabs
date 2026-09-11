@@ -4,6 +4,7 @@ import {
   applicableRules,
   applyOverrides,
   effectiveSettings,
+  explainSettings,
   matchesRule,
   newRule,
   patternForUrl,
@@ -146,5 +147,73 @@ describe("visual overrides", () => {
     ];
     expect(wantedIndicatorIds(base, rules).sort()).toEqual(["badge", "favicon", "theme-tint"]);
     expect(RULE_VISUAL_FIELDS).toContain("indicators");
+  });
+});
+
+describe("explainSettings", () => {
+  const globals = {
+    tabLifetimeSeconds: 1800,
+    onExpire: "none",
+    resetOnActivate: false,
+    pauseWhileActive: false,
+    indicators: ["favicon"],
+  };
+  const rule = (id, priority, set) => ({ id, priority, set, pattern: `${id}/*` });
+
+  it("falls back to the globals", () => {
+    const out = explainSettings(globals);
+    expect(out.tabLifetimeSeconds).toEqual({ value: 1800, from: "global", rule: null });
+    expect(out.onExpire.from).toBe("global");
+  });
+
+  it("defaults neverExpire to false rather than undefined", () => {
+    expect(explainSettings(globals).neverExpire).toEqual({
+      value: false,
+      from: "global",
+      rule: null,
+    });
+  });
+
+  it("names the rule a value came from", () => {
+    const r = rule("short", 5, { tabLifetimeSeconds: 300 });
+    const out = explainSettings(globals, [r]);
+    expect(out.tabLifetimeSeconds.value).toBe(300);
+    expect(out.tabLifetimeSeconds.from).toBe("rule");
+    expect(out.tabLifetimeSeconds.rule).toBe(r);
+    // Untouched keys still come from the globals.
+    expect(out.onExpire.from).toBe("global");
+  });
+
+  it("lets the last rule win, matching effectiveSettings' order", () => {
+    const low = rule("low", 5, { tabLifetimeSeconds: 300 });
+    const high = rule("high", 10, { tabLifetimeSeconds: 60 });
+    const out = explainSettings(globals, [low, high]);
+    expect(out.tabLifetimeSeconds.value).toBe(60);
+    expect(out.tabLifetimeSeconds.rule).toBe(high);
+  });
+
+  it("skips a rule the tab is ignoring", () => {
+    const ignored = { ...rule("short", 5, { tabLifetimeSeconds: 300 }), ignored: true };
+    const out = explainSettings(globals, [ignored]);
+    expect(out.tabLifetimeSeconds).toEqual({ value: 1800, from: "global", rule: null });
+  });
+
+  it("puts the tab's own override on top of everything", () => {
+    const r = rule("short", 5, { tabLifetimeSeconds: 300 });
+    const out = explainSettings(globals, [r], { tabLifetimeSeconds: 45 });
+    expect(out.tabLifetimeSeconds.value).toBe(45);
+    expect(out.tabLifetimeSeconds.from).toBe("tab");
+    expect(out.tabLifetimeSeconds.rule).toBe(null);
+  });
+
+  it("ignores an override that is not set, rather than blanking the value", () => {
+    const out = explainSettings(globals, [], { tabLifetimeSeconds: null, onExpire: undefined });
+    expect(out.tabLifetimeSeconds).toEqual({ value: 1800, from: "global", rule: null });
+    expect(out.onExpire.from).toBe("global");
+  });
+
+  it("replaces the indicator list outright rather than merging it", () => {
+    const r = rule("vis", 5, { indicators: ["badge"] });
+    expect(explainSettings(globals, [r]).indicators.value).toEqual(["badge"]);
   });
 });

@@ -82,6 +82,20 @@
         </div>
       </section>
 
+      <!-- Everything in force on this page: the globals, whatever a matching
+           rule changes, and whatever this tab overrides on top. -->
+      <section id="tab-settings" class="tab tab-settings-section" hidden>
+        <div class="section-head">
+          <h2 class="settings-title">Page settings</h2>
+          <button type="button" id="tab-settings-more" class="quiet" aria-expanded="false">Show more</button>
+        </div>
+        <div id="tab-settings-list" class="tab-settings-list"></div>
+        <p class="tab-rules-note">
+          <span>Changes here last until the tab is closed.</span>
+          <button type="button" id="tab-settings-clear" class="quiet" hidden>Reset this tab</button>
+        </p>
+      </section>
+
       <section id="tab-rules" class="tab tab-rules-section" hidden>
         <div class="section-head">
           <h2 class="settings-title">Rules for this page</h2>

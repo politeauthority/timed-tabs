@@ -21,6 +21,7 @@ import {
   RULE_TIMING_FIELDS,
   RULE_VISUAL_FIELDS,
   clampPriority,
+  explainSettings,
   matchesRule,
   newRule,
   patternForUrl,
@@ -409,6 +410,7 @@ function renderTab() {
   // The rules section only appears when a rule matches this page, or rules are already ignored.
   $("tab-rules").hidden = !(tabState.rules?.length || tabState.ignoreRules);
   renderTabRules();
+  renderTabSettings();
   if (hideTimer) return;
 
   const icon = $("tab-icon");
@@ -479,6 +481,123 @@ function renderTabRules() {
     list.querySelector(`[data-saved-key="${key}"]`)?.append(mark);
   }
 }
+
+// ---- Page settings ---------------------------------------------------------
+
+/**
+ * Settings that are details of another one. They say nothing on their own, so
+ * they wait behind "Show more" however they are set.
+ */
+const DEPENDENT_SETTINGS = new Set([
+  "flashLeadSeconds",
+  "quietUntilPercent",
+  "faviconStyle",
+]);
+
+/** Whether a setting is doing something, and so belongs in the short list. */
+function isSettingActive(key, value) {
+  if (key === "tabLifetimeSeconds") return true;
+  if (DEPENDENT_SETTINGS.has(key)) return false;
+  if (key === "onExpire") return value !== "none";
+  if (key === "indicators") {
+    const a = [...(value ?? [])].sort().join();
+    return a !== [...DEFAULTS.indicators].sort().join();
+  }
+  return Boolean(value);
+}
+
+let tabSettingsExpanded = false;
+
+/** The tab's own layer: explicit overrides, plus the two older per-tab switches. */
+function tabOverrides() {
+  const out = { ...(tabState?.overrides ?? {}) };
+  if (tabState?.neverExpire && !("neverExpire" in out)) out.neverExpire = true;
+  if (
+    tabState?.resetOnActivate !== null &&
+    tabState?.resetOnActivate !== undefined &&
+    !("resetOnActivate" in out)
+  ) {
+    out.resetOnActivate = tabState.resetOnActivate;
+  }
+  return out;
+}
+
+/** "global", the rule that won, or this tab -- shown next to each value. */
+function sourceBadge(entry) {
+  const el = document.createElement("span");
+  el.className = `setting-source is-${entry.from}`;
+  if (entry.from === "rule") {
+    const r = entry.rule;
+    el.textContent = r?.description || r?.pattern || "rule";
+    el.title = `From the rule ${r?.pattern ?? ""}${r?.priority !== undefined ? ` (priority ${r.priority})` : ""}`;
+  } else if (entry.from === "tab") {
+    el.textContent = "this tab";
+    el.title = "Set on this tab, until it closes";
+  } else {
+    el.textContent = "default";
+    el.title = "Your global setting, with no rule changing it here";
+  }
+  return el;
+}
+
+function renderTabSettings() {
+  const section = $("tab-settings");
+  if (!tabState || !settings) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  const overrides = tabOverrides();
+  const explained = explainSettings(settings, tabState.rules ?? [], overrides);
+
+  // The row's checkbox means "this tab sets this". Off, it shows what the
+  // rules and globals would give, which is exactly `explained` without the
+  // tab layer -- so base() reads from a second pass with no overrides.
+  const inherited = explainSettings(settings, tabState.rules ?? [], {});
+  const store = {
+    set: { ...(tabState.overrides ?? {}) },
+    base: (key) => inherited[key]?.value,
+    commit: async (next) => {
+      const before = tabState.overrides ?? {};
+      const keys = new Set([...Object.keys(before), ...Object.keys(next)]);
+      for (const key of keys) {
+        if (before[key] === next[key]) continue;
+        await tabAction("override", { key, value: key in next ? next[key] : null });
+      }
+    },
+  };
+
+  const defs = defsFor(RULE_FIELDS);
+  const list = $("tab-settings-list");
+  list.replaceChildren(
+    ...defs.map((def) => {
+      const entry = explained[def.key];
+      const row = renderOverride(def, store, () => renderTabSettings());
+      row.querySelector(".field-label")?.append(" ", sourceBadge(entry));
+      row.hidden = !tabSettingsExpanded && !isSettingActive(def.key, entry.value);
+      return row;
+    }),
+  );
+
+  const hiddenCount = defs.filter(
+    (d) => !isSettingActive(d.key, explained[d.key].value),
+  ).length;
+  const more = $("tab-settings-more");
+  more.hidden = hiddenCount === 0;
+  more.textContent = tabSettingsExpanded ? "Show less" : `Show more (${hiddenCount})`;
+  more.setAttribute("aria-expanded", String(tabSettingsExpanded));
+  $("tab-settings-clear").hidden = Object.keys(tabState.overrides ?? {}).length === 0;
+}
+
+$("tab-settings-more").addEventListener("click", () => {
+  tabSettingsExpanded = !tabSettingsExpanded;
+  renderTabSettings();
+});
+
+$("tab-settings-clear").addEventListener("click", async () => {
+  await tabAction("clearOverrides");
+  renderTabSettings();
+});
 
 function describeRule(r) {
   const parts = Object.entries(r.set ?? {}).map(

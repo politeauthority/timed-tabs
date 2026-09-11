@@ -518,6 +518,40 @@ body:not([data-context="popup"]) .pages {
   box-shadow: 0 0 0 1px var(--line);
 }
 
+/* Page settings: where each value comes from, next to its label. */
+.setting-source {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--ink-2);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-pill);
+  background: var(--control);
+  cursor: default;
+}
+
+.setting-source.is-tab {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.setting-source.is-rule {
+  max-width: 12em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tab-settings-list .field {
+  padding: var(--sp-1) 0;
+}
+
+.tab-rules-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
 /* Mini UI footer: the version and a way to the source, nothing to navigate. */
 .mini-foot {
   display: none;
