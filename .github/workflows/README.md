@@ -47,7 +47,7 @@ Manual workflows name what they produce rather than a ref, because the ref is al
 
 This one is load-bearing. A job's name is the status-check context that branch
 protection matches on, so renaming `Lint, test & build`, `E2E / Firefox stable`,
-`E2E / Firefox previous` or `Not paused` silently stops the check from being
+`E2E / Firefox stable-1` or `Not paused` silently stops the check from being
 required. Update branch protection in the same change or leave the name alone.
 
 A called workflow's jobs are named `<calling job's name> / <called job's name>`.
@@ -61,7 +61,7 @@ calling one, and worth knowing before moving a required check into one.
 waits on are not required on their own, so that list can change freely.
 
 A matrix job's name carries its matrix values, which is where the `stable` and
-`previous` in those contexts come from. So changing what the matrix covers renames a
+`stable-1` in those contexts come from. So changing what the matrix covers renames a
 protected context: adding a version, renaming a leg or dropping one all need the
 required checks on `main` updated in the same change, or branch protection goes on
 waiting for a name nothing reports.
