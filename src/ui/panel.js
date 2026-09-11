@@ -398,7 +398,6 @@ function renderTab() {
   // The rules section only appears when a rule matches this page, or rules are already ignored.
   $("tab-rules").hidden = !(tabState.rules?.length || tabState.ignoreRules);
   renderTabRules();
-  renderTabLook();
   if (hideTimer) return;
 
   const icon = $("tab-icon");
@@ -468,34 +467,6 @@ function renderTabRules() {
   for (const [key, mark] of liveMarks) {
     list.querySelector(`[data-saved-key="${key}"]`)?.append(mark);
   }
-}
-
-/** Per-tab appearance overrides: the same rows a rule offers, saved on this tab only. */
-function renderTabLook() {
-  const host = $("tab-look-list");
-  if (!tabState || !host) return;
-  // Rebuild only when the set of overrides changed, so open controls keep focus.
-  const sig = JSON.stringify(tabState.overrides ?? {});
-  if (host.dataset.sig === sig) return;
-  host.dataset.sig = sig;
-  const store = {
-    get set() {
-      return tabState?.overrides ?? {};
-    },
-    // Off rows show what the tab gets now: globals with any matching rules applied.
-    base: (key) => tabState?.effective?.[key] ?? settings[key],
-    commit: async (set) => {
-      const prev = tabState?.overrides ?? {};
-      for (const key of RULE_VISUAL_FIELDS) {
-        const next = key in set ? set[key] : null;
-        const before = key in prev ? prev[key] : null;
-        if (JSON.stringify(next) !== JSON.stringify(before)) await tabAction("override", { key, value: next });
-      }
-    },
-  };
-  const group = renderOverrideGroup("", defsFor(RULE_VISUAL_FIELDS, "tab"), store);
-  group.querySelector(".rule-overrides-title")?.remove();
-  host.replaceChildren(group);
 }
 
 function describeRule(r) {
@@ -1097,18 +1068,15 @@ const RULE_FIELD_TEXT = {
     help: "How long before expiry {tab} starts flashing.",
   },
 };
-/** Help text placeholders, worded for a rule (many tabs) or for the popup (one tab). */
-const SUBJECTS = {
-  rule: { tabs: "matching tabs", Tabs: "Matching tabs", tab: "a matching tab", they: "they", expire: "expire", show: "show", blink: "blink" },
-  tab: { tabs: "this tab", Tabs: "This tab", tab: "this tab", they: "it", expire: "expires", show: "shows", blink: "blinks" },
-};
-const wordFor = (text, subject) => text.replace(/\{(\w+)\}/g, (_, k) => SUBJECTS[subject][k] ?? k);
+/** Help text placeholders, worded for the tabs a rule matches. */
+const SUBJECT = { tabs: "matching tabs", Tabs: "Matching tabs", tab: "a matching tab", they: "they", expire: "expire", show: "show", blink: "blink" };
+const wordFor = (text) => text.replace(/\{(\w+)\}/g, (_, k) => SUBJECT[k] ?? k);
 const RULE_FIELD_DEFS = RULE_FIELDS.map((key) => {
   const base = FIELDS.find((f) => f.key === key) ?? { key, type: "toggle" };
   return { ...base, ...RULE_FIELD_TEXT[key] };
 });
-const defsFor = (keys, subject = "rule") =>
-  keys.map((k) => RULE_FIELD_DEFS.find((d) => d.key === k)).map((d) => ({ ...d, help: wordFor(d.help ?? "", subject) }));
+const defsFor = (keys) =>
+  keys.map((k) => RULE_FIELD_DEFS.find((d) => d.key === k)).map((d) => ({ ...d, help: wordFor(d.help ?? "") }));
 
 /** A rule with no usable pattern: blank, or a host-less "/*" left over from a bad add. */
 function isEmptyRule(r) {

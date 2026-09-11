@@ -122,21 +122,29 @@ describe("visual overrides", () => {
     const eff = effectiveSettings(base, [r("*", { set: { indicators: [] } })], "https://a.b/");
     expect(eff.indicators).toEqual([]);
   });
-  it("per-tab overrides sit above rules and ignore unknown keys", () => {
-    const eff = effectiveSettings(base, [r("*", { set: { faviconStyle: "ring" } })], "https://a.b/");
+  it("higher priority wins over lower for appearance, globals underneath", () => {
+    const rules = [
+      r("*", { priority: 8, set: { faviconStyle: "ring" } }),
+      r("*", { priority: 3, set: { faviconStyle: "dot", flashLeadSeconds: 5 } }),
+    ];
+    const eff = effectiveSettings(base, rules, "https://a.b/");
+    expect(eff.faviconStyle).toBe("ring");
+    expect(eff.flashLeadSeconds).toBe(5);
+    expect(eff.quietUntilPercent).toBe(40);
+  });
+  it("applyOverrides ignores unknown and unset keys", () => {
+    const eff = { ...base };
     applyOverrides(eff, { faviconStyle: "dot", bogus: 1, flashLeadSeconds: null });
     expect(eff.faviconStyle).toBe("dot");
     expect(eff.flashLeadSeconds).toBe(60);
     expect(eff.bogus).toBeUndefined();
   });
-  it("wantedIndicatorIds unions globals, enabled rules and tab overrides", () => {
+  it("wantedIndicatorIds unions globals and enabled rules", () => {
     const rules = [
       r("*", { set: { indicators: ["badge"] } }),
       r("*", { priority: 0, set: { indicators: ["title-prefix"] } }),
     ];
-    expect(wantedIndicatorIds(base, rules, [{ indicators: ["favicon"] }, {}]).sort()).toEqual(
-      ["badge", "favicon", "theme-tint"],
-    );
+    expect(wantedIndicatorIds(base, rules).sort()).toEqual(["badge", "favicon", "theme-tint"]);
     expect(RULE_VISUAL_FIELDS).toContain("indicators");
   });
 });

@@ -18,7 +18,7 @@
 /** Timer settings a rule may override, in display order. */
 export const RULE_TIMING_FIELDS = ["tabLifetimeSeconds", "onExpire", "resetOnActivate", "pauseWhileActive", "neverExpire"];
 
-/** Appearance settings a rule (or a single tab) may override, in display order. */
+/** Appearance settings a rule may override, in display order. */
 export const RULE_VISUAL_FIELDS = [
   "indicators",
   "faviconStyle",
@@ -108,16 +108,15 @@ export function applicableRules(rules, url) {
 }
 
 /**
- * Indicator ids any tab could need: the global list plus every enabled rule's
- * and every per-tab override's. Indicators are started from this union so a
- * rule can turn one on for a single site.
+ * Indicator ids any tab could need: the global list plus every enabled rule's.
+ * Indicators are started from this union so a rule can turn one on for a
+ * single site.
  */
-export function wantedIndicatorIds(settings, rules, tabOverrides = []) {
+export function wantedIndicatorIds(settings, rules) {
   const ids = new Set(settings?.indicators ?? []);
   for (const rule of rules ?? []) {
     if (rule.priority > 0) for (const id of rule.set?.indicators ?? []) ids.add(id);
   }
-  for (const o of tabOverrides) for (const id of o?.indicators ?? []) ids.add(id);
   return [...ids];
 }
 
