@@ -9,13 +9,6 @@
 [![Chrome](https://img.shields.io/badge/Chrome-supported-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![Data collected: none](https://img.shields.io/badge/data%20collected-none-success)](src/manifest.json)
 
-
-> [!WARNING]
-> 🚧 **Timed Tabs is in beta.** Every release is a snapshot of `main`, published as a
-> [pre-release](https://github.com/politeauthority/timed-tabs/releases). There is no
-> store listing yet, so installing means loading the extension yourself — see
-> [Install](#-install). Stable releases are paused until the beta ends.
-
 **Tabs that expire.** Every tab gets a lifetime. Its icon goes green, then yellow,
 then red as the clock runs down, and at zero the tab can close itself.
 
@@ -38,6 +31,11 @@ The full list, with screenshots, is in the user guide:
 [docs/user-guide/features.md](docs/user-guide/features.md).
 
 ## 📦 Install
+
+> [!WARNING]
+> 🚧 **Timed Tabs is in beta.** Every release is a snapshot of `main`, published as a
+> [pre-release](https://github.com/politeauthority/timed-tabs/releases). There is no
+> store listing yet, so installing means loading the extension yourself — see
 
 No store listing yet, and while the project is in development every release is a
 beta. Grab a zip from the newest pre-release under
