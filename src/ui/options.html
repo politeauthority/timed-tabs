@@ -208,12 +208,18 @@
 
       <section id="settings" class="settings" data-pages="settings" data-page-only>
         <div id="fields" class="fields"></div>
+        <p class="settings-links">
+          <button type="button" id="open-backup" class="quiet"><svg class="icon" aria-hidden="true"><use href="#i-open" /></svg>💾 Backup and restore</button>
+        </p>
       </section>
 
-      <section id="backup" class="backup group" data-pages="settings" data-page-only>
-        <h2 class="settings-title">💾 Backup</h2>
+      <section id="backup" class="backup group" data-pages="backup" data-page-only>
+        <div class="section-head">
+          <h2 class="settings-title">💾 Backup</h2>
+          <button type="button" id="backup-back" class="quiet" title="Back to Settings">← Settings</button>
+        </div>
         <p class="rules-help">
-          Everything above, including rules, as one JSON document. Copy or download it to keep,
+          Every setting and every rule, as one JSON document. Copy or download it to keep,
           and paste or choose a file to restore. Loading replaces all current settings and rules.
         </p>
         <div class="backup-actions">

@@ -69,7 +69,7 @@ const params = new URLSearchParams(location.search);
 // The full page and the preferences pane show one page at a time, chosen by
 // the URL hash: #tabs (default), #rules (also #rule-<id>), #settings.
 
-const PAGES = ["tabs", "rules", "settings"];
+const PAGES = ["tabs", "rules", "settings", "backup"];
 
 function pageFromHash() {
   const h = location.hash.replace(/^#/, "");
@@ -82,8 +82,11 @@ function route() {
   if (isPopup) return;
   const page = pageFromHash();
   document.body.dataset.page = page;
+  // Backup hangs off Settings and has no nav item of its own, so Settings
+  // stays marked while you are on it rather than nothing being current.
+  const nav = page === "backup" ? "settings" : page;
   for (const a of document.querySelectorAll("[data-page-link]")) {
-    if (a.dataset.pageLink === page) a.setAttribute("aria-current", "page");
+    if (a.dataset.pageLink === nav) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
   onPageShown(page);
@@ -1260,6 +1263,7 @@ function onPageShown(page) {
   } else if (page === "settings") {
     renderFields();
     refreshPermissionWarning();
+  } else if (page === "backup") {
     showBackup();
   }
 }
@@ -2471,6 +2475,14 @@ async function openPageView(hash = "", extraParams = {}) {
 }
 
 $("open-page").addEventListener("click", () => openPageView("#tabs"));
+
+// Backup has a page of its own; these are the ways in and out of it.
+$("open-backup").addEventListener("click", () => {
+  location.hash = "#backup";
+});
+$("backup-back").addEventListener("click", () => {
+  location.hash = "#settings";
+});
 $("diag-refresh").addEventListener("click", refreshDiag);
 $("diag-tick").addEventListener("click", async () => {
   await api.runtime.sendMessage({ type: "timed-tabs:tick" }).catch(() => {});
