@@ -151,8 +151,8 @@ many rules.
 
 ## 🗂️ Site groups
 
-Site groups are behind the **Site groups** feature flag under Settings, Feature
-flags. A group is a named list of address patterns, and a rule can target the group
+Site groups are behind the **Site groups** feature flag under Settings, Advanced,
+Feature flags — see [feature-flags.md](feature-flags.md). A group is a named list of address patterns, and a rule can target the group
 instead of one address. The rule then applies to every site in the group.
 
 ![The Rules page with a rule targeting the news group, and the group's list of sites below](../../assets/screenshots/site-groups.png)
@@ -202,6 +202,8 @@ through the browser's extension storage; rules are kept locally.
   download, and loads one back. Loading replaces everything.
 - **Diagnostics** shows what the background is doing for each tab, which is useful
   when an indicator does not seem to paint.
+- **Feature flags**, under Advanced, switch on the parts that are not finished enough
+  to be on for everyone. [feature-flags.md](feature-flags.md) lists them.
 - **Refresh every** sets how often colours and badges update, 5 seconds by default.
 
 ## 🔒 Privacy and permissions
