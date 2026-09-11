@@ -2,7 +2,7 @@
 
 `npm run e2e` runs the extension in a real, headless Firefox and checks what it did.
 CI runs the same thing on the self-hosted runner for every push to `main` and every
-open PR, in the **E2E** workflow.
+open PR, as the second half of the **CI** workflow.
 
 ## How a scenario works
 
@@ -71,7 +71,14 @@ particular binary; without it, web-ext finds the installed one.
 
 ## The CI job
 
-`.github/workflows/e2e.yaml` runs on the `timed-tabs` runner. It restores Node's
+`.github/workflows/e2e.yaml` is a reusable workflow with no triggers of its own.
+`jobs.e2e` in `ci.yaml` calls it, with `needs: lint-test`, so Firefox is only
+installed once lint, the unit tests and the build are green — a branch that does not
+compile never spends the minutes. It stays in its own file rather than becoming a
+second job in `ci.yaml` because the Firefox plumbing is long enough to bury
+everything around it.
+
+It runs on the `timed-tabs` runner. It restores Node's
 tool directory and the Firefox libraries (on Ubuntu 24.04 the ALSA package is
 `libasound2t64`) from the Actions cache, fetches Firefox with
 `browser-actions/setup-firefox`, then runs `npm run e2e`.
@@ -96,7 +103,17 @@ read from it and from `main`. A manual run on a branch reads only that branch an
 `main`. So the first run on `main` after this lands is a cold one, and every PR after
 that reads `main`'s caches.
 
-The job is a required status check on `main`. A PR with the label **ci pause** skips
-it; GitHub counts a skipped required check as passed, so the label lets a PR merge
-without waiting for Firefox. The workflow listens for label changes, so adding or
-removing the label re-evaluates the PR at once.
+The job is a required status check on `main`, under the name **E2E / headless
+Firefox**: GitHub prefixes a called workflow's jobs with the calling job's name, and
+the whole string is what branch protection matches. Renaming either half — `jobs.e2e`
+in `ci.yaml` or `jobs.e2e.name` here — silently stops the check being required.
+
+A PR with the label **ci pause** skips it; GitHub counts a skipped required check as
+passed, so the label lets a PR merge without waiting for Firefox. CI does not wake on
+label events, so applying the label does not retroactively skip a run that already
+happened — the next push picks it up, and in the meantime the `Not paused` check is
+red and holding the merge anyway.
+
+`workflow_dispatch` is still there, so a Firefox-only run on a branch is one click
+from the Actions tab. Dispatched rather than called, the job reports under its bare
+name, `headless Firefox`.
