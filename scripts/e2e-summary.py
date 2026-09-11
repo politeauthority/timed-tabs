@@ -29,17 +29,26 @@ def main():
     passed = [s for s in scenarios if s["ok"]]
     failed = [s for s in scenarios if not s["ok"]]
 
+    total = len(scenarios)
+    seconds = sum(s["seconds"] for s in scenarios)
+
     out = []
-    out.append(f"**{len(passed)}/{len(scenarios)} scenarios passed.**\n")
-    out.append("| Scenario | Result | Time | Checks | Artifacts |")
-    out.append("|---|---|--:|--:|---|")
-    for s in scenarios:
+    # The same counts the step log prints, so the summary and the log agree
+    # without anyone having to open the log to check.
+    verdict = "🏁" if not failed else "❌"
+    out.append(f"{verdict} **{len(passed)}/{total} scenarios passed** in {clock(seconds)}.\n")
+    out.append("| # | Scenario | Result | Time | Checks | Artifacts |")
+    out.append("|--:|---|---|--:|--:|---|")
+    for n, s in enumerate(scenarios, start=1):
         hits = sum(1 for c in s["checks"] if c["ok"])
         # A screenshot cannot be linked on its own: artifacts download as one
         # zip. Naming the files is what makes them findable once it is open.
         files = ", ".join(f"`{a}`" for a in s["artifacts"])
+        # The runner records its own position; fall back to the row order when
+        # reading a results.json written before it did.
+        position = s.get("index", n)
         out.append(
-            f"| `{s['name']}` | {'✅ pass' if s['ok'] else '❌ **fail**'} "
+            f"| {position}/{total} | `{s['name']}` | {'✅ pass' if s['ok'] else '❌ **fail**'} "
             f"| {clock(s['seconds'])} | {hits}/{len(s['checks'])} | {files} |"
         )
 
