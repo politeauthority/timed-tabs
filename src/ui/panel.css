@@ -459,6 +459,51 @@ body[data-channel="dev"] .channel-badge {
   color: var(--ground);
 }
 
+/* "Beta features" on: a small outlined pill beside the title, on every view.
+   Outlined rather than solid so it is not mistaken for the build badge next
+   to it, which says what was installed; this one says what was switched on. */
+.beta-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  padding: 0 6px;
+  border: 1px solid var(--yellow);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.beta-badge .icon {
+  width: 10px;
+  height: 10px;
+  color: var(--yellow);
+}
+
+.beta-badge:hover {
+  background: color-mix(in srgb, var(--yellow) 18%, transparent);
+}
+
+/* The popup is 320px wide, and a dev or beta build already wears one badge
+   there. Two words of badge push "Timed Tabs" onto two lines, so beside a
+   build badge the beta pill keeps its flag and drops its word: the tooltip
+   still says what it is, and the page view has room for both. */
+.topbar-title > span:first-of-type {
+  white-space: nowrap;
+}
+
+body[data-context="popup"][data-channel] .beta-badge-text {
+  display: none;
+}
+
 body:not([data-context="popup"]) .topbar {
   padding-bottom: var(--sp-3);
   border-bottom: 1px solid var(--line);
