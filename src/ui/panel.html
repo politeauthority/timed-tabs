@@ -172,9 +172,14 @@
             <button type="button" id="rule-add" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>Add rule</button>
           </span>
         </header>
+        <!-- The last sentence follows the "new-rules-display" flag: panel.js
+             shows whichever of the two spans matches the display in force. -->
         <p class="rules-help">
           Rules change settings for tabs whose address matches. Use <code>*</code> as a wildcard;
-          a pattern without <code>https://</code> matches any scheme. The number beside each rule is its priority: when two rules disagree the higher one wins. The switch parks a rule without deleting it.
+          a pattern without <code>https://</code> matches any scheme.
+          <span id="rules-help-classic">Higher priority wins, 0 disables a rule.</span>
+          <span id="rules-help-new" hidden>The number beside each rule is its priority: when two
+          rules disagree the higher one wins. The switch parks a rule without deleting it.</span>
         </p>
         <div class="rules-filter">
           <input type="url" id="rules-filter" placeholder="Show rules matching an address, e.g. https://github.com/foo" aria-label="Show rules matching an address" />

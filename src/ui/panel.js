@@ -1305,6 +1305,13 @@ let rules = [];
 /** Site groups (shared/groups.js). Needs its own flag and beta features both on. */
 let groups = [];
 const groupsOn = () => featureOn(settings, "site-groups");
+/**
+ * The reworked Rules page (flag "new-rules-display"). Off, `renderRule` builds
+ * the original head and one-line summary, and the stylesheet keeps the cards
+ * it had; the body -- description, match, priority, overrides -- is the same
+ * either way, so only the two parts that differ are written twice.
+ */
+const newRulesDisplay = () => featureOn(settings, "new-rules-display");
 const activeGroups = () => (groupsOn() ? groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
 const expandedRules = new Set();
@@ -1688,18 +1695,60 @@ function mirrorWildcards(input) {
   return wrap;
 }
 
-function renderRule(rule) {
-  const el = document.createElement("div");
-  el.className = "rule";
-  el.dataset.ruleId = rule.id;
-  el.classList.toggle("is-disabled", rule.priority === 0);
+/**
+ * Delete, armed by the first click and fired by the second. The new display
+ * has no room for a worded button, so it takes an icon that grows the word
+ * only once armed; an icon on its own cannot say "armed".
+ */
+function ruleDeleteButton(rule, { icon }) {
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = icon ? "rule-delete quiet icon-btn" : "rule-delete quiet";
+  const rest = () => {
+    del.replaceChildren(
+      svgIcon("trash"),
+      ...(icon ? [] : [document.createTextNode("Delete rule")]),
+    );
+    del.title = "Delete rule";
+    del.setAttribute("aria-label", "Delete rule");
+    del.classList.remove("is-armed");
+  };
+  rest();
+  let armed = null;
+  const disarm = () => {
+    clearTimeout(armed);
+    armed = null;
+    rest();
+  };
+  del.addEventListener("click", () => {
+    if (!armed) {
+      del.replaceChildren(
+        svgIcon("trash"),
+        document.createTextNode(icon ? "Click again" : "Click again to delete"),
+      );
+      del.title = "Click again to delete this rule";
+      del.setAttribute("aria-label", "Click again to delete this rule");
+      del.classList.add("is-armed");
+      armed = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    rules = rules.filter((r) => r.id !== rule.id);
+    persistRules();
+  });
+  del.addEventListener("blur", () => {
+    if (armed) setTimeout(disarm, 200);
+  });
+  return del;
+}
 
-  const open = expandedRules.has(rule.id);
-  el.classList.toggle("is-collapsed", !open);
-  el.classList.toggle("is-just-added", rule.id === justAddedRuleId);
-
-  // Header: one row that says which rule this is and what it is worth --
-  // expand, priority, what it targets, on/off, delete.
+/**
+ * The head of a rule card. Both displays carry the expand toggle, the target
+ * picker and the pattern; the new one adds the priority badge, the group size
+ * and the on/off switch, which is what turns the card into a row that can be
+ * read without opening it.
+ */
+function ruleHead(rule, el, targetsGroup, open) {
   const head = document.createElement("div");
   head.className = "rule-head";
   const toggle = document.createElement("button");
@@ -1712,6 +1761,41 @@ function renderRule(rule) {
   toggle.addEventListener("click", () =>
     setRuleExpanded(rule.id, !expandedRules.has(rule.id)),
   );
+
+  const pattern = document.createElement("input");
+  pattern.className = "rule-pattern";
+  pattern.placeholder = "Type an address pattern, e.g. example.com/*";
+  pattern.value = rule.pattern;
+  pattern.setAttribute("aria-label", "Address pattern");
+  pattern.addEventListener("change", () =>
+    updateRule(rule.id, { pattern: pattern.value.trim() }, true, "head"),
+  );
+  const patternWrap = mirrorWildcards(pattern);
+  patternWrap.hidden = targetsGroup;
+
+  // With site groups on, the head gets a picker: an address, or one of the groups.
+  let target = null;
+  if (groupsOn()) {
+    target = document.createElement("select");
+    target.className = "rule-target";
+    target.setAttribute("aria-label", "What this rule applies to");
+    target.add(new Option(newRulesDisplay() ? "Address" : "Address pattern", ""));
+    for (const g of groups) target.add(new Option(`Group: ${g.name}`, groupRef(g.name)));
+    const current = targetsGroup ? groupRef(groupNameOf(rule.pattern)) : "";
+    if (targetsGroup && !findGroup(groups, groupNameOf(rule.pattern))) {
+      target.add(new Option(`Group: ${groupNameOf(rule.pattern)} (missing)`, current));
+    }
+    target.value = current;
+    target.addEventListener("change", () => {
+      const next = target.value || NEW_RULE_PATTERN;
+      updateRule(rule.id, { pattern: next, match: "wildcard" }, true, "head");
+    });
+  }
+
+  if (!newRulesDisplay()) {
+    head.append(toggle, ...(target ? [target] : []), patternWrap, ruleDeleteButton(rule, { icon: false }));
+    return head;
+  }
 
   // Priority decides which rule wins, and the list is ordered by pattern
   // rather than by it, so it has to be readable without opening a card.
@@ -1729,35 +1813,6 @@ function renderRule(rule) {
     el.querySelector('[data-row-key="priority"] input')?.focus();
   });
 
-  const pattern = document.createElement("input");
-  pattern.className = "rule-pattern";
-  pattern.placeholder = "Type an address pattern, e.g. example.com/*";
-  pattern.value = rule.pattern;
-  pattern.setAttribute("aria-label", "Address pattern");
-  pattern.addEventListener("change", () =>
-    updateRule(rule.id, { pattern: pattern.value.trim() }, true, "head"),
-  );
-  const patternWrap = mirrorWildcards(pattern);
-  const targetsGroup = isGroupRef(rule.pattern);
-  // With site groups on, the head gets a picker: an address, or one of the groups.
-  let target = null;
-  if (groupsOn()) {
-    target = document.createElement("select");
-    target.className = "rule-target";
-    target.setAttribute("aria-label", "What this rule applies to");
-    target.add(new Option("Address", ""));
-    for (const g of groups) target.add(new Option(`Group: ${g.name}`, groupRef(g.name)));
-    const current = targetsGroup ? groupRef(groupNameOf(rule.pattern)) : "";
-    if (targetsGroup && !findGroup(groups, groupNameOf(rule.pattern))) {
-      target.add(new Option(`Group: ${groupNameOf(rule.pattern)} (missing)`, current));
-    }
-    target.value = current;
-    target.addEventListener("change", () => {
-      const next = target.value || NEW_RULE_PATTERN;
-      updateRule(rule.id, { pattern: next, match: "wildcard" }, true, "head");
-    });
-  }
-  patternWrap.hidden = targetsGroup;
   // A group rule hides the pattern box, so the head says how big the group is
   // in its place; without it the row would be a bare picker.
   let groupCount = null;
@@ -1766,9 +1821,7 @@ function renderRule(rule) {
     groupCount.className = "rule-group-count";
     const g = groupsOn() ? findGroup(groups, groupNameOf(rule.pattern)) : null;
     const n = g?.patterns.length ?? 0;
-    groupCount.textContent = g
-      ? `${n} site${n === 1 ? "" : "s"}`
-      : "matches nothing";
+    groupCount.textContent = g ? `${n} site${n === 1 ? "" : "s"}` : "matches nothing";
     groupCount.classList.toggle("is-problem", !g);
   }
 
@@ -1777,9 +1830,7 @@ function renderRule(rule) {
   const enabled = rule.priority > 0;
   const enable = makeSwitch(enabled, (on) => {
     if (!on) offPriorities.set(rule.id, rule.priority);
-    const next = on
-      ? (offPriorities.get(rule.id) || DEFAULT_RULE_PRIORITY)
-      : 0;
+    const next = on ? (offPriorities.get(rule.id) || DEFAULT_RULE_PRIORITY) : 0;
     updateRule(rule.id, { priority: next }, true, "head");
   });
   enable.el.classList.add("rule-enable");
@@ -1788,40 +1839,6 @@ function renderRule(rule) {
     : "Off (priority 0). Switch on to use it again.";
   enable.input.setAttribute("aria-label", "Rule on");
 
-  const del = document.createElement("button");
-  del.type = "button";
-  del.className = "rule-delete quiet icon-btn";
-  // Two clicks within a few seconds; the first only arms the button, which is
-  // where the icon grows a word, since an icon alone cannot say "armed".
-  const rest = () => {
-    del.replaceChildren(svgIcon("trash"));
-    del.title = "Delete rule";
-    del.setAttribute("aria-label", "Delete rule");
-    del.classList.remove("is-armed");
-  };
-  rest();
-  let armed = null;
-  const disarm = () => {
-    clearTimeout(armed);
-    armed = null;
-    rest();
-  };
-  del.addEventListener("click", () => {
-    if (!armed) {
-      del.replaceChildren(svgIcon("trash"), document.createTextNode("Click again"));
-      del.title = "Click again to delete this rule";
-      del.setAttribute("aria-label", "Click again to delete this rule");
-      del.classList.add("is-armed");
-      armed = setTimeout(disarm, 4000);
-      return;
-    }
-    disarm();
-    rules = rules.filter((r) => r.id !== rule.id);
-    persistRules();
-  });
-  del.addEventListener("blur", () => {
-    if (armed) setTimeout(disarm, 200);
-  });
   head.append(
     toggle,
     prio,
@@ -1829,26 +1846,47 @@ function renderRule(rule) {
     patternWrap,
     ...(groupCount ? [groupCount] : []),
     enable.el,
-    del,
+    ruleDeleteButton(rule, { icon: true }),
   );
-  el.append(head);
+  return head;
+}
 
-  // Collapsed summary, in two lines: what the rule is for and how it matches,
-  // then a chip for each setting it changes. One sentence held all of this
-  // before, and nothing in it could be found at a glance.
+/**
+ * What a collapsed card says. The original packs all of it into one sentence;
+ * the new display splits it into what the rule is for and a chip per setting
+ * it changes, which is what makes a page of rules readable at a glance.
+ */
+function ruleSummary(rule, targetsGroup) {
   const summary = document.createElement("button");
   summary.type = "button";
   summary.className = "rule-summary";
+  summary.title = "Expand rule";
+  summary.addEventListener("click", () => setRuleExpanded(rule.id, true));
+
+  if (!newRulesDisplay()) {
+    const parts = [];
+    if (isEmptyRule(rule)) parts.push("No pattern yet, so this rule matches nothing");
+    else if (targetsGroup) parts.push(describeGroupTarget(rule));
+    if (rule.description) parts.push(rule.description);
+    parts.push(
+      `${rule.match === "prefix" ? "starts with" : "wildcard"}, priority ${rule.priority}`,
+    );
+    const sets = Object.entries(rule.set ?? {}).map(
+      ([k, v]) => `${ruleFieldLabel(k)}: ${formatRuleValue(k, v)}`,
+    );
+    parts.push(sets.length ? sets.join(" \u00b7 ") : "changes nothing yet");
+    summary.textContent = parts.join(" \u2014 ");
+    return summary;
+  }
+
   const meta = document.createElement("span");
   meta.className = "rule-meta";
   const metaParts = [];
-  if (isEmptyRule(rule))
-    metaParts.push("No pattern yet, so this rule matches nothing");
+  if (isEmptyRule(rule)) metaParts.push("No pattern yet, so this rule matches nothing");
   const problem = targetsGroup ? groupTargetProblem(rule) : null;
   if (problem) metaParts.push(problem);
   if (rule.description) metaParts.push(rule.description);
-  if (!targetsGroup)
-    metaParts.push(rule.match === "prefix" ? "starts with" : "wildcard");
+  if (!targetsGroup) metaParts.push(rule.match === "prefix" ? "starts with" : "wildcard");
   meta.textContent = metaParts.join(" \u00b7 ");
   meta.hidden = !metaParts.length;
   summary.append(meta);
@@ -1869,9 +1907,22 @@ function renderRule(rule) {
     chips.append(chip);
   }
   summary.append(chips);
-  summary.title = "Expand rule";
-  summary.addEventListener("click", () => setRuleExpanded(rule.id, true));
-  el.append(summary);
+  return summary;
+}
+
+function renderRule(rule) {
+  const el = document.createElement("div");
+  el.className = "rule";
+  el.dataset.ruleId = rule.id;
+  el.classList.toggle("is-disabled", rule.priority === 0);
+
+  const open = expandedRules.has(rule.id);
+  el.classList.toggle("is-collapsed", !open);
+  el.classList.toggle("is-just-added", rule.id === justAddedRuleId);
+
+  const targetsGroup = isGroupRef(rule.pattern);
+  el.append(ruleHead(rule, el, targetsGroup, open));
+  el.append(ruleSummary(rule, targetsGroup));
 
   const body = document.createElement("div");
   body.className = "rule-body";
@@ -2286,11 +2337,26 @@ watchSettings((next) => {
 
 /** Every part of the UI a feature flag can show or hide. */
 function renderFlagged() {
+  applyRulesDisplay();
   if (!isPopup) {
     renderGroups();
     renderRules();
   }
   if (isPopup) renderTab();
+}
+
+/**
+ * Which Rules page the stylesheet should draw, and which help sentence goes
+ * with it. A data attribute rather than a class, like the other whole-UI
+ * switches (`data-context`, `data-page`, `data-managing`).
+ */
+function applyRulesDisplay() {
+  const on = newRulesDisplay();
+  document.body.dataset.rulesDisplay = on ? "new" : "classic";
+  const classic = $("rules-help-classic");
+  const fresh = $("rules-help-new");
+  if (classic) classic.hidden = on;
+  if (fresh) fresh.hidden = !on;
 }
 
 watchGroups((next) => {

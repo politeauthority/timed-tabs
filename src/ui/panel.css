@@ -117,11 +117,6 @@ body[data-context="page"] #app {
   padding: var(--sp-6) var(--gutter) 48px;
 }
 
-/* A rule is a row of controls, not a paragraph, so the rules page is given
-   more width than the measure the prose pages want. */
-body[data-context="page"][data-page="rules"] #app {
-  max-width: 1040px;
-}
 
 #app {
   display: flex;
@@ -1486,7 +1481,7 @@ body:not([data-context="popup"]) .field {
 
 .rules-list {
   display: grid;
-  gap: var(--sp-2);
+  gap: var(--sp-5);
 }
 
 /* A feature flag that needs another one on first. */
@@ -1501,10 +1496,6 @@ body:not([data-context="popup"]) .field {
 /* Site groups: cards like rules, with a name in the head and the patterns below. */
 .site-groups {
   margin-top: var(--sp-5);
-}
-
-.rule.group {
-  --rule-indent: 36px;
 }
 
 .group-name {
@@ -1532,7 +1523,7 @@ body:not([data-context="popup"]) .field {
 /* A rule's target: an address pattern, or one of the site groups. */
 .rule-target {
   flex: none;
-  max-width: 150px;
+  max-width: 40%;
 }
 
 .rule-group-note {
@@ -1542,16 +1533,9 @@ body:not([data-context="popup"]) .field {
 }
 
 .rule {
-  /* Everything below the head lines up under the pattern, past the chevron
-     and the priority badge. */
-  --rule-indent: 70px;
-  padding: 0 var(--sp-3) var(--sp-1);
+  padding: var(--sp-1) var(--gutter) 6px;
   border: 1px solid var(--line);
   border-radius: var(--r-card);
-}
-
-.rule:hover {
-  border-color: var(--line-strong);
 }
 
 .rule.is-target {
@@ -1559,16 +1543,8 @@ body:not([data-context="popup"]) .field {
   outline-offset: 2px;
 }
 
-/* A rule switched off still has to be read and switched back on, so the card
-   keeps its contrast and only what it would have done is greyed. */
-.rule.is-disabled .rule-pattern-mirror,
-.rule.is-disabled .rule-target,
-.rule.is-disabled .rule-summary {
-  opacity: 0.55;
-}
-
-.rule.is-disabled .rule-priority {
-  color: var(--ink-3);
+.rule.is-disabled {
+  opacity: 0.6;
 }
 
 .rule.is-filtered-out {
@@ -1578,46 +1554,10 @@ body:not([data-context="popup"]) .field {
 .rule-head {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) 0;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
 }
 
-/* Priority, where the list can be scanned for it. The list is ordered by
-   pattern, so nothing else says which rule wins. */
-.rule-priority {
-  flex: none;
-  min-width: 26px;
-  height: 22px;
-  min-height: 0;
-  padding: 0 6px;
-  border-radius: var(--r-pill);
-  background: var(--control);
-  color: var(--ink-2);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.rule-priority:hover {
-  background: var(--control-hover);
-  color: var(--ink);
-}
-
-.rule-group-count {
-  flex: none;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-
-.rule-group-count.is-problem {
-  color: var(--danger);
-}
-
-/* Held right whether or not a pattern box is there to push it. */
-.rule-enable {
-  flex: none;
-  margin-left: auto;
-}
 
 .rule-pattern-wrap {
   position: relative;
@@ -1687,22 +1627,13 @@ body:not([data-context="popup"]) .field {
   color: var(--ink-2);
 }
 
-.rule-delete:hover {
-  color: var(--danger);
-}
 
-/* Armed, the icon grows the word it needs: an icon alone cannot say "armed". */
-.rule-delete.is-armed {
-  width: auto;
-  padding: 0 var(--sp-2);
-  font-size: var(--fs-sm);
-}
 
 .rule-description-wrap {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin: 0 0 10px;
+  margin: calc(var(--sp-1) * -1) 0 10px;
 }
 
 .rule-description {
@@ -1724,12 +1655,6 @@ body:not([data-context="popup"]) .field {
 .rule-description:focus-visible {
   outline: none;
   border-bottom-color: var(--focus);
-}
-
-/* Everything the card holds hangs under the pattern, so a card reads as one
-   column rather than two things stacked. */
-.rule-body {
-  padding-left: var(--rule-indent);
 }
 
 .rule .field {
@@ -1790,13 +1715,10 @@ body:not([data-context="popup"]) .field {
 /* Collapsed rule cards. */
 .rule-summary {
   display: none;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-1) var(--sp-2);
   width: 100%;
   min-height: 0;
-  margin: 0 0 var(--sp-2);
-  padding: 0 2px var(--sp-1) var(--rule-indent);
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+  padding: var(--sp-1) 2px var(--sp-2);
   justify-content: flex-start;
   text-align: left;
   white-space: normal;
@@ -1805,6 +1727,161 @@ body:not([data-context="popup"]) .field {
   font-size: var(--fs-sm);
   line-height: 1.4;
   border-radius: var(--r-control);
+}
+
+
+.rule-summary:hover {
+  background: none;
+  color: var(--ink);
+}
+
+.rule.is-collapsed .rule-summary {
+  display: flex;
+}
+
+.rule.is-collapsed .rule-body {
+  display: none;
+}
+
+.rule.is-collapsed {
+  padding-bottom: 2px;
+}
+
+/* ---- New rules display (flag "new-rules-display") ------------------------------
+
+   Everything above draws the original Rules page, which is what a profile
+   without the flag still gets. panel.js sets body[data-rules-display] and
+   builds the extra head controls; this block is the rest of the difference.
+
+   A collapsed rule becomes a row: priority badge, pattern, on/off switch and a
+   quiet delete across the head, then the description and one chip per setting
+   below it, hanging under the pattern. */
+
+body[data-rules-display="new"][data-context="page"][data-page="rules"] #app {
+  /* A rule is a row of controls, not a paragraph, so it is given more width
+     than the measure the prose pages want. */
+  max-width: 1040px;
+}
+
+body[data-rules-display="new"] .rules-list {
+  gap: var(--sp-2);
+}
+
+body[data-rules-display="new"] .rule {
+  /* Everything below the head lines up under the pattern, past the chevron
+     and the priority badge. A group head has no badge, so its column starts
+     sooner. */
+  --rule-indent: 70px;
+  padding: 0 var(--sp-3) var(--sp-1);
+}
+
+body[data-rules-display="new"] .rule.group {
+  --rule-indent: 36px;
+}
+
+body[data-rules-display="new"] .rule:hover {
+  border-color: var(--line-strong);
+}
+
+body[data-rules-display="new"] .rule.is-collapsed {
+  padding-bottom: 0;
+}
+
+/* A rule switched off still has to be read and switched back on, so the card
+   keeps its contrast and only what it would have done is greyed. */
+body[data-rules-display="new"] .rule.is-disabled {
+  opacity: 1;
+}
+
+body[data-rules-display="new"] .rule.is-disabled .rule-pattern-mirror,
+body[data-rules-display="new"] .rule.is-disabled .rule-target,
+body[data-rules-display="new"] .rule.is-disabled .rule-summary {
+  opacity: 0.55;
+}
+
+body[data-rules-display="new"] .rule.is-disabled .rule-priority {
+  color: var(--ink-3);
+}
+
+body[data-rules-display="new"] .rule-head {
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+}
+
+/* The "Saved" tick lands at the end of the head row. */
+body[data-rules-display="new"] .rule-head .saved-mark {
+  flex: none;
+}
+
+/* The picker repeats on every row, so it is held to what it needs. */
+body[data-rules-display="new"] .rule-target {
+  max-width: 150px;
+}
+
+/* Priority, where the list can be scanned for it. The list is ordered by
+   pattern, so nothing else says which rule wins. */
+.rule-priority {
+  flex: none;
+  min-width: 26px;
+  height: 22px;
+  min-height: 0;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule-priority:hover {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+.rule-group-count {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.rule-group-count.is-problem {
+  color: var(--danger);
+}
+
+/* Held right whether or not a pattern box is there to push it. */
+.rule-enable {
+  flex: none;
+  margin-left: auto;
+}
+
+body[data-rules-display="new"] .rule-delete:hover {
+  color: var(--danger);
+}
+
+/* Armed, the icon grows the word it needs: an icon alone cannot say "armed". */
+body[data-rules-display="new"] .rule-delete.is-armed {
+  width: auto;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+body[data-rules-display="new"] .rule-description-wrap {
+  margin-top: 0;
+}
+
+/* Everything the card holds hangs under the pattern, so a card reads as one
+   column rather than two things stacked. */
+body[data-rules-display="new"] .rule-body {
+  padding-left: var(--rule-indent);
+}
+
+body[data-rules-display="new"] .rule-summary {
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  padding: 0 2px var(--sp-1) var(--rule-indent);
 }
 
 .rule-meta {
@@ -1831,28 +1908,6 @@ body:not([data-context="popup"]) .field {
 .rule-chip.is-empty {
   border-style: dashed;
   font-style: italic;
-}
-
-.rule-summary:hover {
-  background: none;
-  color: var(--ink);
-}
-
-.rule.is-collapsed .rule-summary {
-  display: flex;
-}
-
-.rule.is-collapsed .rule-body {
-  display: none;
-}
-
-.rule.is-collapsed {
-  padding-bottom: 0;
-}
-
-/* The "Saved" tick lands at the end of the head row. */
-.rule-head .saved-mark {
-  flex: none;
 }
 
 /* ---- Backup and diagnostics --------------------------------------------------- */
