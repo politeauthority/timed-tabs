@@ -35,7 +35,7 @@ Five contexts are required on `main`:
 ```
 Lint, test & build
 Not paused
-E2E / Firefox latest
+E2E / Firefox stable
 E2E / Firefox previous
 CI run full
 ```
@@ -61,7 +61,7 @@ Job names are the status-check contexts branch protection matches on, so **renam
 job silently stops its check being required** — branch protection goes on waiting for
 a name nothing reports. The E2E contexts are doubly brittle: a called workflow's jobs
 are prefixed with the calling job's name, and a matrix job's name carries its matrix
-values, so `E2E / Firefox latest` breaks if `jobs.e2e` in `ci.yaml` is renamed, if the
+values, so `E2E / Firefox stable` breaks if `jobs.e2e` in `ci.yaml` is renamed, if the
 leg is renamed, or if the matrix changes shape.
 
 Update protection in the same change that renames anything. `CI run full` is the odd
@@ -74,7 +74,7 @@ gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/requir
 {"strict": false,
  "checks": [{"context": "Lint, test & build", "app_id": 15368},
             {"context": "Not paused", "app_id": 15368},
-            {"context": "E2E / Firefox latest", "app_id": 15368},
+            {"context": "E2E / Firefox stable", "app_id": 15368},
             {"context": "E2E / Firefox previous", "app_id": 15368},
             {"context": "CI run full", "app_id": -1}]}
 JSON
@@ -105,14 +105,16 @@ so it is enforced by a required status, **CI run full**, that `full.yaml` posts 
 head commit. The label is a merge requirement, not a test, so a missing one is not a
 failure: the status sits at *pending*, the merge box says "Waiting" and stays locked,
 and nothing on the PR is red for a label nobody has had a reason to add yet. With the
-label on, the E2E scenarios run on the last four releases of Firefox and of Chrome —
-the current one and the three majors before it, each resolved from the browser's own
-feed the way `E2E` resolves its legs — and the status goes green once all eight have
-passed. Take the label off and it goes back to pending. It is red only when a browser
-actually fails.
+label on, the E2E scenarios run on the standard set in both browsers — `nightly`,
+`stable`, `previous` and `previous-2`, each resolved from the browser's own feed the way
+`E2E` resolves its legs — and the status goes green once stable and the two before it
+have passed in both. Nightly is Firefox Nightly and Chrome Canary, the daily builds:
+they run and are shown in the table, and a nightly failure is flagged there, but it
+does not hold the merge. Take the label off and the status goes back to pending. It is
+red only when a leg that counts actually fails.
 
-The eight legs report as `Full / Firefox latest` through `Full / Firefox previous-3`
-and `Full / Chrome stable` through `Full / Chrome previous-3`. None of them is required
+The eight legs report as `Full / Firefox nightly` through `Full / Firefox previous-2`
+and `Full / Chrome nightly` through `Full / Chrome previous-2`. None of them is required
 on its own, and neither is the `Full run gate` job that posts the status; only the
 status is, so adding or dropping a leg does not touch branch protection.
 

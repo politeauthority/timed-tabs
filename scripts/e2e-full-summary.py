@@ -31,11 +31,19 @@ def clock(seconds):
 
 
 def leg_order(leg):
-    """latest/stable, previous, previous-2, previous-3 ... in that order."""
+    """nightly, stable, previous, previous-2 ... in that order."""
+    if leg == "nightly":
+        return -1
     if leg in ("latest", "stable"):
         return 0
     m = re.fullmatch(r"previous(?:-(\d+))?", leg)
     return int(m.group(1) or 1) if m else 99
+
+
+def counts(record):
+    """Whether a leg holds the merge. Nightly is a daily build: worth watching,
+    not worth blocking on, so it is reported and then ignored."""
+    return record.get("leg") != "nightly"
 
 
 def leg_name(record):
@@ -89,11 +97,17 @@ def main():
         return 0
 
     passed = sum(1 for r in records if r["outcome"] == "success")
+    required_failed = [r for r in records if counts(r) and r["outcome"] != "success"]
+    advisory_failed = [r for r in records if not counts(r) and r["outcome"] != "success"]
     versions = [r["version"] for r in records if r["version"]]
     # A span only reads as one when every leg is the same browser.
     one_browser = len({browser_order(r) for r in records}) == 1
     span = f" ({versions[-1]} → {versions[0]})" if len(versions) > 1 and one_browser else ""
     out.append(f"**{passed}/{len(records)} legs passed**{span}.\n")
+    if advisory_failed:
+        names = ", ".join(f"`{leg_name(r)}`" for r in advisory_failed)
+        out.append(f"⚠️ {names} did not pass. Nightly is a daily build and advisory: "
+                   "it is shown here and does not hold the merge.\n")
     out.append("| Leg | Version | Scenarios | Scenario time | Job time | Result |")
     out.append("|---|---|--:|--:|--:|---|")
     for r in records:
@@ -116,7 +130,7 @@ def main():
             f"| {clock(seconds) if seconds is not None else '—'} | {result} |"
         )
 
-    # Only the legs that failed get their scenario table. Four green tables say
+    # Only the legs that failed get their scenario table. Eight green tables say
     # nothing a row has not already said.
     for r in records:
         if r["outcome"] == "success" or not r.get("scenarios"):
@@ -127,7 +141,8 @@ def main():
         out.append("\n</details>")
 
     print("\n".join(out))
-    return 0
+    # 3, not 1: a 1 would look like the script itself falling over.
+    return 3 if required_failed else 0
 
 
 if __name__ == "__main__":
