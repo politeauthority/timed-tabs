@@ -8,7 +8,7 @@ run-name: "CI — ${{ github.event_name == 'pull_request' && format('PR #{0}', g
 #
 # Both halves live here. The E2E half is a reusable workflow rather than a job
 # inlined below, because its Firefox plumbing is long enough to bury everything
-# else; see e2e.yaml. It reports as `E2E / headless Firefox`, a called workflow's
+# else; see e2e.yaml. It reports as `E2E / Firefox <channel>`, a called workflow's
 # checks always being prefixed with the calling job's name.
 #
 # Runs on the self-hosted `timed-tabs` ARC scale set (defined in private-ops under

@@ -62,7 +62,7 @@ The runner counts as it goes, so a log being watched halfway through says where 
 rather than only what has happened:
 
 ```
-🦊 3 scenarios to run: appearance-overrides, close-on-expire, navigation
+🦊 Firefox: 3 scenarios to run: appearance-overrides, close-on-expire, navigation
 
 🧪 [2/3] close-on-expire — up to 25s
   ⏱️  extension up after 3s; running 25s
@@ -134,7 +134,8 @@ compile never spends the minutes. It stays in its own file rather than becoming 
 second job in `ci.yaml` because the Firefox plumbing is long enough to bury
 everything around it.
 
-It runs on the `timed-tabs` runner, as a matrix of two jobs. It restores Node's
+It runs on the `timed-tabs` runner, as two jobs, one per browser, each a matrix of
+legs. It restores Node's
 tool directory and the Firefox libraries (on Ubuntu 24.04 the ALSA package is
 `libasound2t64`) from the Actions cache, fetches Firefox with
 `browser-actions/setup-firefox`, then runs `npm run e2e`.
@@ -145,8 +146,8 @@ share, and how cache scoping decides which runs see a warm one.
 
 What is specific to this job is the **Firefox libraries**. They are not restored with
 an off-the-shelf apt action: the workflow installs the packages once, works out every
-file `dpkg` put down, and packs those into `~/firefox-libs.tar`, which later runs
-restore with a single untar. Bump `FIREFOX_LIBS_KEY` after changing the package list.
+file `dpkg` put down, and packs those into `~/browser-libs.tar`, which later runs
+restore with a single untar. Bump `BROWSER_LIBS_KEY` after changing the package list.
 On Ubuntu 24.04 the ALSA package is `libasound2t64`. Firefox itself is not cached: its
 download and extraction take under half a minute.
 

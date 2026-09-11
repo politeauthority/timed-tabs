@@ -6,12 +6,12 @@ run-name: "Force Release — ${{ inputs.version != '' && inputs.version || forma
 # or to cut an exact version.
 #
 # It pushes an empty `Release-As: X.Y.Z` commit to `main` using the PAT. That push
-# re-triggers the **Release Please** workflow, which opens + auto-merges the release
-# PR, tags `vX.Y.Z` and packages the zips. So this workflow does the *trigger*; the
+# re-triggers the **Release Please** workflow, which opens the release
+# PR (merged once an admin clears it), tags `vX.Y.Z` and packages the zips. So this workflow does the *trigger*; the
 # existing release pipeline does the packaging.
 #
-# Requires the same setup as a normal release: the `PAT` secret and the release-PR
-# auto-merge step in release-please.yaml. A PAT (not GITHUB_TOKEN) is mandatory —
+# Requires the same setup as a normal release: the `PAT` secret and the admin-gated
+# merge job in release-please.yaml. A PAT (not GITHUB_TOKEN) is mandatory —
 # GITHUB_TOKEN-caused pushes do not trigger workflows, so the release would never
 # fire.
 
@@ -97,7 +97,7 @@ jobs:
             echo "# 🔧 Force Release — \`v${NEXT}\`"
             echo ""
             echo "Pushed an empty \`Release-As: ${NEXT}\` commit to \`main\`."
-            echo "➡️ **Release Please** now opens + auto-merges the release PR, tags \`v${NEXT}\` and attaches the extension zips."
+            echo "➡️ **Release Please** now opens the release PR (merged once an admin clears it), tags \`v${NEXT}\` and attaches the extension zips."
             echo ""
             echo "Follow it in the **Release Please** workflow runs."
           } >> "$GITHUB_STEP_SUMMARY"

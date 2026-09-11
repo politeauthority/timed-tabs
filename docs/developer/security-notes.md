@@ -20,7 +20,8 @@ worth re-checking when the surface changes:
   title and hostname and write the marked versions. Neither file calls
   `runtime.sendMessage`.
 - **The dev hook cannot fire in a release.** It is gated on an extension id
-  containing `-dev@`, and `scripts/build.mjs` deletes `dev.json` from every target.
+  containing `-dev@` (or, for Chrome, a manifest name ending in `(dev)`), and
+  `scripts/build.mjs` deletes `dev.json` from every target.
 
 ## 🔑 Permissions, and why each is there
 

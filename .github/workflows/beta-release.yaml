@@ -18,8 +18,8 @@ run-name: "Beta Release — ${{ github.ref_name }}"
 #
 # Three jobs, in order. `version` resolves the tag and pins the commit, failing
 # fast on every mistake git and the PR list can see. `e2e` runs the scenario
-# suite in both Firefoxes against that commit. Only then does `beta` lint, test,
-# build and publish it.
+# suite in Firefox stable, stable-1 and Chrome stable against that commit. Only then
+# does `beta` lint, test, build and publish it.
 #
 # The E2E leg is a gate, not new coverage. Every commit on `main` already ran the
 # scenarios on the push that landed it, so a green beta is usually re-proving

@@ -129,7 +129,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # Nothing to turn off: the label was decorative, or `auto_merge_disabled`
-          # already fired and the `label` job took the label off in response.
+          # already fired and the "Match the label to the state" step took the label off in response.
           state=$(gh pr view "$PR" --json state,autoMergeRequest --jq '.state + " " + ((.autoMergeRequest != null) | tostring)')
           if [ "${state#* }" != "true" ]; then
             echo "✅ Auto-merge was not armed. Nothing to do." >> "$GITHUB_STEP_SUMMARY"
