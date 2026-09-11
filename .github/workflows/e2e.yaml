@@ -28,6 +28,9 @@ permissions:
   contents: read
   actions: read        # the step-times action reads this run's job timings
 
+env:
+  FIREFOX_LIBS_KEY: v1
+
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
@@ -57,13 +60,37 @@ jobs:
           cache: npm
       - run: npm ci --prefer-offline --no-audit --no-fund
 
-      - name: Firefox libraries
-        # Ubuntu 24.04 on the runner; ALSA is libasound2t64 there. Cached as
-        # installed files; bump `version` to invalidate after changing the list.
-        uses: awalsh128/cache-apt-pkgs-action@v1
+      # Firefox's system libraries. Installed once, then cached as a tarball of
+      # every file the install put down, so later runs untar instead of running
+      # apt and dpkg (nine minutes on a starved CPU). Bump FIREFOX_LIBS_KEY after
+      # changing the package list. Ubuntu 24.04: ALSA is libasound2t64.
+      - name: Restore the Firefox libraries
+        id: libs
+        uses: actions/cache@v4
         with:
-          packages: libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils
-          version: 1.0
+          path: ~/firefox-libs.tar
+          key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ env.FIREFOX_LIBS_KEY }}
+      - name: Firefox libraries
+        env:
+          PACKAGES: libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils
+        run: |
+          set -euo pipefail
+          if [ -f ~/firefox-libs.tar ]; then
+            sudo tar -C / -xpf ~/firefox-libs.tar
+            sudo ldconfig
+            echo "restored $(tar -tf ~/firefox-libs.tar | wc -l) files from the cache"
+            exit 0
+          fi
+          sudo apt-get update -qq
+          # shellcheck disable=SC2086
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $PACKAGES > /dev/null
+          # Everything apt installed just now, dependencies included, from its history.
+          NEW=$(awk '/^Install:/{line=$0} END{print line}' /var/log/apt/history.log | sed 's/^Install: //' | tr ',' '\n' | sed -E 's/^ *([^ :]+).*/\1/' | sort -u)
+          echo "$NEW" | tr '\n' ' '; echo
+          # shellcheck disable=SC2086
+          dpkg -L $NEW | sort -u | while read -r f; do [ -f "$f" ] || [ -L "$f" ] && echo "$f"; done > ~/firefox-libs.list
+          sudo tar -C / -cpf ~/firefox-libs.tar --no-recursion -T <(sed 's#^/##' ~/firefox-libs.list)
+          echo "packed $(wc -l < ~/firefox-libs.list) files for the cache"
 
       # setup-firefox downloads a ~90 MB tarball every run; that took 14s and is
       # the smallest cost here, so it is left alone until a version is pinned.
