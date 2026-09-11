@@ -23,6 +23,7 @@ function fakeApi({ notifications = true } = {}) {
 }
 
 const closed = (title, url) => ({ id: 1, title, url });
+const closedPrivate = (title, url) => ({ id: 1, title, url, incognito: true });
 
 describe("notifier", () => {
   let api;
@@ -142,5 +143,58 @@ describe("batch wording", () => {
     const { message } = describeBatch([{ title: "x".repeat(80), url: "" }]);
     expect(message).toHaveLength(60);
     expect(message.endsWith("…")).toBe(true);
+  });
+});
+
+describe("private windows", () => {
+  let api;
+  let notifier;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    api = fakeApi();
+    notifier = createNotifier({ api, flushMs: 500 });
+    notifier.start();
+    notifier.configure({ notifyOnExpire: true });
+  });
+
+  it("still says a tab closed, but never names it", async () => {
+    notifier.tabClosed(closedPrivate("Something personal", "https://example.test/secret"));
+    await vi.runAllTimersAsync();
+    expect(api.created).toHaveLength(1);
+    expect(api.created[0]).toMatchObject({ title: "Tab closed", message: "A private tab" });
+  });
+
+  it("keeps the address out of the notification entirely", async () => {
+    notifier.tabClosed(closedPrivate("Something personal", "https://example.test/secret"));
+    await vi.runAllTimersAsync();
+    expect(JSON.stringify(api.created[0])).not.toContain("example.test");
+    expect(JSON.stringify(api.created[0])).not.toContain("Something personal");
+  });
+
+  it("cannot be clicked to reopen the page in an ordinary window", async () => {
+    notifier.tabClosed(closedPrivate("Something personal", "https://example.test/secret"));
+    await vi.runAllTimersAsync();
+    api.listeners.clicked[0](api.created[0].id);
+    await vi.runAllTimersAsync();
+    expect(api.tabs.create).not.toHaveBeenCalled();
+    expect(api.notifications.clear).toHaveBeenCalledWith(api.created[0].id);
+  });
+
+  it("names the ordinary tabs in a mixed batch and no more", async () => {
+    notifier.tabClosed(closed("Reddit", "https://reddit.com/"));
+    notifier.tabClosed(closedPrivate("Something personal", "https://example.test/secret"));
+    await vi.runAllTimersAsync();
+    expect(api.created[0].title).toBe("2 tabs closed");
+    expect(api.created[0].message).toBe("Reddit, A private tab");
+  });
+
+  it("reopens only the ordinary tab from a mixed batch", async () => {
+    notifier.tabClosed(closed("Reddit", "https://reddit.com/"));
+    notifier.tabClosed(closedPrivate("Something personal", "https://example.test/secret"));
+    await vi.runAllTimersAsync();
+    api.listeners.clicked[0](api.created[0].id);
+    await vi.runAllTimersAsync();
+    // One restorable url in the batch, so it goes straight back.
+    expect(api.tabs.create).toHaveBeenCalledWith({ url: "https://reddit.com/" });
   });
 });
