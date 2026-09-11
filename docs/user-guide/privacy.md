@@ -46,6 +46,11 @@ issue tracker.
 snoozes and the time they bought, timer restarts, the most tabs you have had open at
 once, and a per-day count of expiries for the last 30 days.
 
+The section is behind a feature flag, but **the counting is not**: the tally is kept
+whether the flag is on or off, and the flag only decides whether the section is there
+to read. Turning it off is not a way to stop the counting — **Clear statistics**,
+inside the section, is what empties it.
+
 It holds **numbers and dates and nothing else**. No address, no title, no icon —
 so unlike the list above, there is nothing in it that could say which pages you had
 open, and a private tab is counted without leaving any trace that it existed.
