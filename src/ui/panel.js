@@ -27,6 +27,7 @@ import {
 } from "../shared/rules.js";
 import { exportText, parseBundle } from "../shared/backup.js";
 import { getDisplayVersion } from "../shared/version.js";
+import { groupRecent } from "../shared/recent.js";
 import {
   formatDuration,
   formatRemaining,
@@ -942,7 +943,8 @@ async function refreshRecent() {
     root.replaceChildren(p);
     return;
   }
-  root.replaceChildren(...list.map(renderRecentRow));
+  // One row per address; a page that keeps expiring shows a count instead of a pile of rows.
+  root.replaceChildren(...groupRecent(list).map(renderRecentRow));
 }
 
 function renderRecentRow(item) {
@@ -957,7 +959,15 @@ function renderRecentRow(item) {
   title.textContent = item.title || item.url;
   const when = document.createElement("span");
   when.className = "trow-when";
-  when.textContent = `closed ${timeAgo(item.expiredAt)}`;
+  if (item.count > 1) {
+    const count = document.createElement("span");
+    count.className = "trow-count";
+    count.textContent = `×${item.count}`;
+    count.title = `Closed ${item.count} times`;
+    when.append(count, `last closed ${timeAgo(item.expiredAt)}`);
+  } else {
+    when.textContent = `closed ${timeAgo(item.expiredAt)}`;
+  }
   const url = document.createElement("span");
   url.className = "trow-url";
   url.textContent = item.url;
@@ -976,12 +986,13 @@ function renderRecentRow(item) {
   remove.type = "button";
   remove.className = "qtoggle trow-remove";
   remove.replaceChildren(svgIcon("close"));
-  remove.title = "Remove from this list";
-  remove.setAttribute("aria-label", "Remove from this list");
+  const removeLabel = item.count > 1 ? `Remove all ${item.count} from this list` : "Remove from this list";
+  remove.title = removeLabel;
+  remove.setAttribute("aria-label", removeLabel);
   remove.addEventListener("click", async () => {
     row.remove();
     await api.runtime
-      .sendMessage({ type: "timed-tabs:recent-remove", id: item.id })
+      .sendMessage({ type: "timed-tabs:recent-remove", ids: item.ids ?? [item.id] })
       .catch(() => {});
     refreshRecent();
   });

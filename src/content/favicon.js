@@ -32,6 +32,12 @@
       setBlink(false);
       restore();
     }
+    // The background asks before closing an expired tab, so its "recently
+    // expired" entry can show the site's icon rather than our painted one.
+    if (msg.type === "timed-tabs:original-icon") {
+      captureOriginal();
+      return Promise.resolve(originalHref ?? "");
+    }
     return Promise.resolve("ok");
   });
 
