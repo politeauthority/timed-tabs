@@ -8,6 +8,14 @@ src/dev.json   # must never exist; test seeding lives in dist/dev
 backups/
 docs/personal
 
+# Python, from the scripts/ helpers. `python3 scripts/e2e-summary.py` on its own
+# writes nothing, but one helper importing another does: an import compiles the
+# module and leaves __pycache__ beside it.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
 # Development
 worktrees/
 
