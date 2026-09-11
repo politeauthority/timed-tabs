@@ -4,7 +4,7 @@
  */
 import { api, withTimeout } from "../shared/browser.js";
 import { watchRules, watchSettings } from "../shared/settings.js";
-import { RULE_FIELDS, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
+import { RULE_FIELDS, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
 import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
@@ -118,18 +118,18 @@ watchRules(async (next) => {
 });
 
 /**
- * Start every indicator any tab could need (globals, rules, per-tab overrides)
+ * Start every indicator any tab could need (globals and every enabled rule)
  * and stop the rest. Which of them paint a given tab is decided per tab in tick().
  */
 async function syncIndicators() {
-  const wanted = findIndicators(wantedIndicatorIds(settings, rules, tracker.allOverrides()));
+  const wanted = findIndicators(wantedIndicatorIds(settings, rules));
   await Promise.all(active.filter((i) => !wanted.includes(i)).map((i) => i.stop()));
   await Promise.all(wanted.filter((i) => !active.includes(i)).map((i) => i.start({ api, tracker, settings })));
   for (const i of wanted) if (active.includes(i)) i.configure?.(settings);
   active = wanted;
 }
 
-/** Settings that apply to one tab: globals, then matching rules, then per-tab overrides. */
+/** Settings that apply to one tab: globals, then matching rules, then per-tab timer choices. */
 function settingsFor(tab, tabState) {
   const url = tab.url ?? "";
   const ignoredIds = new Set(tabState?.ignoredRules ?? []);
@@ -142,7 +142,6 @@ function settingsFor(tab, tabState) {
     eff.resetOnActivate = tabState.resetOnActivate;
   }
   if (tabState?.neverExpire) eff.neverExpire = true;
-  applyOverrides(eff, tabState?.overrides);
   return eff;
 }
 
@@ -265,7 +264,6 @@ async function tabState(tabId, tab) {
     resetOnActivate: s.resetOnActivate,
     ignoreRules: s.ignoreRules,
     ignoredRules: s.ignoredRules ?? [],
-    overrides: { ...(s.overrides ?? {}) },
     effective: Object.fromEntries(RULE_FIELDS.map((k) => [k, eff[k]])),
     rules: eff.allMatched.map((r) => ({
       id: r.id,
@@ -347,13 +345,6 @@ async function tabAction({ tabId, action, value }) {
     case "resetOnActivate":
       await tracker.setResetOnActivate(tabId, value);
       break;
-    case "override":
-      if (!RULE_FIELDS.includes(value?.key)) break;
-      await tracker.setOverride(tabId, value.key, value.value);
-      expired.delete(tabId);
-      await syncIndicators();
-      await applyPauseSetting();
-      break;
     case "ignoreRules":
       await tracker.setIgnoreRules(tabId, value);
       expired.delete(tabId);
@@ -407,8 +398,8 @@ async function tick() {
       );
       // quiet: show nothing for this tab. Always for tabs that cannot expire
       // (pinned, timer off), and while still green if the user asked for that.
-      // Appearance comes from the tab's effective settings, so rules and
-      // per-tab overrides can change how (and whether) a tab is painted.
+      // Appearance comes from the tab's effective settings, so rules can
+      // change how (and whether) a tab is painted.
       const quietUntil = Math.min(0.99, Math.max(0.01, (eff.quietUntilPercent ?? 40) / 100));
       const quiet = exempt || (eff.hideWhileGreen && progress < quietUntil);
       const flashing =
