@@ -142,10 +142,23 @@ Open the **Beta Release** workflow in the Actions tab and run it. It:
    N.
 2. Reads the next version from the open release PR's title, for example
    `chore(main): release 0.8.0`.
-3. Runs lint and tests, then builds with `BUILD_CHANNEL=beta`, `BUILD_SEMVER=0.8.0`,
+3. Pins the commit `main` is on, so every step below is about that commit and not
+   about whatever `main` becomes while the run is going.
+4. Runs the **E2E scenarios in both Firefoxes** against it, the same matrix that
+   gates a pull request. Nothing is built or published until they pass.
+5. Runs lint and tests, then builds with `BUILD_CHANNEL=beta`, `BUILD_SEMVER=0.8.0`,
    `BUILD_TAG=beta.N` and `MANIFEST_VERSION=0.7.0.N`.
-4. Tags `v0.8.0-beta.N` on the current `main` commit and publishes a GitHub Release
+6. Tags `v0.8.0-beta.N` on the pinned commit and publishes a GitHub Release
    marked as a prerelease, with the commits since the last stable as its notes.
+
+Steps 1 and 2 run first and on a hosted runner, so a dispatch that cannot produce a
+beta — nothing new on `main`, no open release PR, a tag that already exists — stops
+there rather than after eight minutes of Firefox.
+
+The E2E leg is a gate rather than extra coverage: every commit on `main` already ran
+the scenarios on the push that landed it. What it adds is that the beta cannot be cut
+from a commit whose own run failed or is still going, which a dispatch does not
+otherwise check.
 
 It refuses to run when there is no open release PR, because that means nothing
 releasable is on `main`, and when the tag for the current commit already exists.

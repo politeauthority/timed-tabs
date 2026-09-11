@@ -38,7 +38,25 @@ run-name: "E2E — ${{ github.ref_name }}"
 # job's own comment.
 on:
   workflow_call:
+    inputs:
+      ref:
+        # Empty means "whatever ref this workflow was called on", which is what CI
+        # wants: a PR's merge ref, or the commit just pushed to main. The beta
+        # release passes an explicit commit instead, because it does not build the
+        # ref it was dispatched from -- it resolves `main` to a sha first and ships
+        # that, so the scenarios have to run against that sha and not against
+        # whatever `main` has become by the time this job starts.
+        description: Commit-ish to test. Defaults to the calling ref.
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit-ish to test. Defaults to the branch this is dispatched from.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -84,6 +102,9 @@ jobs:
       # Full history: the changed-paths action diffs against the base commit.
       - uses: actions/checkout@v7
         with:
+          # actions/checkout treats an empty ref as "unset", so the default keeps
+          # the behaviour this job had before the input existed.
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       # Like CI: the job always runs and reports, because it is a required
