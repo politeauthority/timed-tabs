@@ -6,15 +6,38 @@
     <link rel="stylesheet" href="panel.css" />
   </head>
   <body data-context="options" data-page="tabs">
+    <!-- Icon sprite: 16px grid, 1.5px strokes, currentColor. Use <svg class="icon"><use href="#i-name"/></svg>. -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none" aria-hidden="true">
+      <symbol id="i-timer" viewBox="0 0 16 16"><circle cx="8" cy="9" r="5.25"/><path d="M8 6.5V9l1.75 1.5M6.5 1.75h3M8 1.75v2M12.5 4.5l1-1"/></symbol>
+      <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13.25 8A5.25 5.25 0 1 1 11 3.7"/><path d="M11.25 1.5v2.75H8.5"/></symbol>
+      <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.25 4.5l.6 8.5h6.3l.6-8.5M6.75 7v4M9.25 7v4"/></symbol>
+      <symbol id="i-open" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 8 8M11 9.5v4h-8.5v-8.5h4"/></symbol>
+      <symbol id="i-reopen" viewBox="0 0 16 16"><path d="M2.5 8A5.5 5.5 0 1 0 5 3.4"/><path d="M4.75 1.75v2.75H7.5"/><path d="M8 5.5V8l1.75 1.5"/></symbol>
+      <symbol id="i-tabs" viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9.5" rx="1.5"/><path d="M2 6.5h12M5 3.5v3M9.5 3.5v3"/></symbol>
+      <symbol id="i-rules" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h7M2.5 12h4"/><circle cx="12" cy="11" r="2.25"/><path d="M13.6 12.6 15 14"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.25"/><path d="M8 1.75v2M8 12.25v2M1.75 8h2M12.25 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4"/></symbol>
+      <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5"/></symbol>
+      <symbol id="i-infinity" viewBox="0 0 16 16"><path d="M8 8c-1.5-2.25-2.5-3-4-3a3 3 0 0 0 0 6c1.5 0 2.5-.75 4-3 1.5-2.25 2.5-3 4-3a3 3 0 0 1 0 6c-1.5 0-2.5-.75-4-3z"/></symbol>
+      <symbol id="i-logo" viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="10" rx="1.75"/><path d="M1.5 6h6V3"/><circle cx="9.75" cy="9.25" r="2.25"/><path d="M9.75 8v1.25l.9.75"/></symbol>
+    </svg>
+
     <main id="app">
       <header class="topbar">
-        <span class="topbar-title">Timed Tabs <span id="version" class="version" title="Version"></span></span>
+        <span class="topbar-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-logo" /></svg>
+          <span>Timed Tabs</span>
+          <span id="version" class="version" title="Version"></span>
+        </span>
         <nav class="pages" aria-label="Pages">
-          <a href="#tabs" data-page-link="tabs">Tabs</a>
-          <a href="#rules" data-page-link="rules">Rules</a>
-          <a href="#settings" data-page-link="settings">Settings</a>
+          <a href="#tabs" data-page-link="tabs"><svg class="icon" aria-hidden="true"><use href="#i-tabs" /></svg>Tabs</a>
+          <a href="#rules" data-page-link="rules"><svg class="icon" aria-hidden="true"><use href="#i-rules" /></svg>Rules</a>
+          <a href="#settings" data-page-link="settings"><svg class="icon" aria-hidden="true"><use href="#i-settings" /></svg>Settings</a>
         </nav>
-        <button type="button" id="open-page" class="topbar-link">Open in a tab</button>
+        <button type="button" id="open-page" class="topbar-link" title="Open Timed Tabs in its own tab">
+          <svg class="icon" aria-hidden="true"><use href="#i-open" /></svg>Open in a tab
+        </button>
       </header>
 
       <!-- Mini UI only: the current tab -->
@@ -36,8 +59,8 @@
         </div>
 
         <div class="tab-actions">
-          <button type="button" id="act-reset">Restart timer</button>
-          <button type="button" id="act-snooze">Snooze</button>
+          <button type="button" id="act-reset"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg>Restart timer</button>
+          <button type="button" id="act-snooze"><svg class="icon" aria-hidden="true"><use href="#i-timer" /></svg>Snooze</button>
           <label class="switch tab-never" data-saved-key="never">
             <input type="checkbox" id="act-never" />
             <span class="switch-track"></span>
@@ -47,7 +70,9 @@
       </section>
 
       <section id="tab-rules" class="tab tab-rules-section" hidden>
-        <h2 class="settings-title">Rules for this page</h2>
+        <div class="section-head">
+          <h2 class="settings-title">Rules for this page</h2>
+        </div>
         <div id="tab-rules-list" class="tab-rules-list"></div>
         <label class="switch tab-never" id="act-ignore-wrap" data-saved-key="ignore-all">
           <input type="checkbox" id="act-ignore" />
@@ -68,35 +93,35 @@
 
       <!-- Tabs page -->
       <details id="overview" class="overview" data-pages="tabs" data-page-only>
-        <summary>
+        <summary class="chev">
           <span>All open tabs</span>
           <span id="overview-count" class="overview-count"></span>
         </summary>
         <p class="overview-legend">
-          <span class="legend-key"><span class="legend-icon">⏱</span> timer on</span>
-          <span class="legend-key"><span class="legend-icon">↻</span> restart on focus</span>
-          <span class="legend-key"><span class="legend-icon">✕</span> close tab</span>
+          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-timer" /></svg> timer on</span>
+          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg> restart on focus</span>
+          <span class="legend-key"><svg class="icon" aria-hidden="true"><use href="#i-close" /></svg> close tab</span>
         </p>
         <div id="overview-list" class="overview-list"></div>
       </details>
 
       <details id="recent" class="overview recent" data-pages="tabs" data-page-only>
-        <summary>
+        <summary class="chev">
           <span>Recently expired</span>
           <span id="recent-count" class="overview-count"></span>
         </summary>
         <p class="overview-legend">Tabs that Timed Tabs closed when they ran out of time. Reopen them from here.</p>
         <div id="recent-list" class="overview-list"></div>
         <p class="recent-actions">
-          <button type="button" id="recent-clear">Clear list</button>
+          <button type="button" id="recent-clear" class="quiet"><svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>Clear list</button>
         </p>
       </details>
 
       <!-- Mini UI footer -->
       <nav class="mini-nav" aria-label="More">
-        <button type="button" data-open="tabs">All tabs</button>
-        <button type="button" data-open="rules-for-site">Rules for this site</button>
-        <button type="button" data-open="settings">Settings</button>
+        <button type="button" data-open="tabs"><svg class="icon" aria-hidden="true"><use href="#i-tabs" /></svg>All tabs</button>
+        <button type="button" data-open="rules-for-site"><svg class="icon" aria-hidden="true"><use href="#i-rules" /></svg>Rules for this site</button>
+        <button type="button" data-open="settings"><svg class="icon" aria-hidden="true"><use href="#i-settings" /></svg>Settings</button>
         <span id="version-mini" class="version version-mini" title="Version"></span>
       </nav>
 
@@ -105,8 +130,8 @@
         <header class="rules-head">
           <h2 class="settings-title">Rules</h2>
           <span class="rules-head-actions">
-            <button type="button" id="rules-remove-empty" class="danger" hidden>Remove empty rules</button>
-            <button type="button" id="rule-add">Add rule</button>
+            <button type="button" id="rules-remove-empty" class="danger" hidden><svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>Remove empty rules</button>
+            <button type="button" id="rule-add" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>Add rule</button>
           </span>
         </header>
         <p class="rules-help">
@@ -150,14 +175,14 @@
         <textarea id="backup-text" class="backup-text" rows="8" spellcheck="false" aria-label="Settings JSON"></textarea>
         <div class="backup-actions">
           <button type="button" id="backup-refresh">Show current settings</button>
-          <button type="button" id="backup-apply">Load settings from text</button>
+          <button type="button" id="backup-apply" class="primary">Load settings from text</button>
           <button type="button" id="backup-reset" class="danger">Reset everything to defaults</button>
         </div>
         <p id="backup-status" class="status" role="status"></p>
       </section>
 
       <details id="diagnostics" class="diagnostics" data-pages="settings" data-page-only>
-        <summary>Diagnostics</summary>
+        <summary class="chev">Diagnostics</summary>
         <p class="diag-actions">
           <button type="button" id="diag-refresh">Refresh</button>
           <button type="button" id="diag-tick">Force tick</button>

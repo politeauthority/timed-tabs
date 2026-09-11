@@ -1,23 +1,69 @@
-/* Timed Tabs panel: shared by the toolbar popup and the preferences pane. */
+/* Timed Tabs panel: shared by the toolbar popup (mini UI), the full page and
+   the preferences pane.
+
+   Visual language
+   - Colour: the ground and ink come from the live Firefox theme (panel.js);
+     everything else is mixed from them, so the panel sits inside the chrome.
+     The only saturated colours are the fuse ramp and the accent on primary
+     actions.
+   - Type: one family, a six-step scale, two weights.
+   - Space: a 4px scale; sections share one horizontal gutter.
+   - Icons: 16px line icons from the sprite in panel.html, 1.5px strokes,
+     always currentColor. */
+
+/* ---- Tokens ---------------------------------------------------------------- */
 
 :root {
   color-scheme: light dark;
 
-  /* Defaults mirror Firefox's built-in light theme; panel.js overrides
-     these from the live theme so the panel matches the browser chrome. */
+  /* Ground and ink mirror Firefox's light theme until panel.js overrides them. */
   --ground: #f9f9fb;
   --ink: #15141a;
+
+  /* Derived neutrals. */
   --ink-2: color-mix(in srgb, var(--ink) 62%, var(--ground));
+  --ink-3: color-mix(in srgb, var(--ink) 40%, var(--ground));
   --line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --line-strong: color-mix(in srgb, var(--ink) 22%, transparent);
+  --raised: color-mix(in srgb, var(--ink) 4%, transparent);
   --control: color-mix(in srgb, var(--ink) 7%, transparent);
   --control-hover: color-mix(in srgb, var(--ink) 12%, transparent);
-  --focus: #0060df;
+  --control-active: color-mix(in srgb, var(--ink) 18%, transparent);
 
+  /* Semantic colour. */
+  --accent: #0060df;
+  --accent-ink: #ffffff;
+  --focus: var(--accent);
   --green: #2ecc71;
   --yellow: #f1c40f;
   --red: #e74c3c;
+  --danger: var(--red);
+  --danger-wash: color-mix(in srgb, var(--red) 18%, transparent);
+  --warn-wash: color-mix(in srgb, var(--yellow) 22%, transparent);
 
+  /* Type scale. */
   --font: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, Menlo, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 20px;
+  --fs-display: 30px;
+
+  /* Space and shape. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --gutter: var(--sp-4);
+  --r-control: 6px;
+  --r-card: 8px;
+  --r-pill: 999px;
+  --control-h: 28px;
+  --icon: 16px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -26,15 +72,18 @@
     --ink: #fbfbfe;
     --control: color-mix(in srgb, var(--ink) 9%, transparent);
     --control-hover: color-mix(in srgb, var(--ink) 15%, transparent);
-    --focus: #00ddff;
+    --control-active: color-mix(in srgb, var(--ink) 22%, transparent);
+    --accent: #00ddff;
+    --accent-ink: #15141a;
   }
 }
+
+/* ---- Base --------------------------------------------------------------------- */
 
 * {
   box-sizing: border-box;
 }
 
-/* Keep the hidden attribute authoritative even where display is set. */
 [hidden] {
   display: none !important;
 }
@@ -44,7 +93,7 @@ body {
   margin: 0;
   background: var(--ground);
   color: var(--ink);
-  font: 13px/1.45 var(--font);
+  font: var(--fs-md) / 1.45 var(--font);
 }
 
 body[data-context="popup"] {
@@ -53,251 +102,13 @@ body[data-context="popup"] {
 
 body[data-context="options"] #app {
   max-width: 560px;
-  padding: 8px 4px 24px;
+  padding: var(--sp-2) var(--sp-1) var(--sp-6);
 }
 
-/* Full-page view: wider, centred, overview gets all the room it wants. */
 body[data-context="page"] #app {
   max-width: 760px;
   margin: 0 auto;
-  padding: 24px 16px 48px;
-}
-
-body[data-context="page"] .overview-list {
-  max-height: none;
-}
-
-/* Only the popup has a "this tab"; the page views have no page of their own. */
-body[data-context="options"] .tab,
-body[data-context="page"] .tab,
-body[data-context="page"] .topbar-link,
-body[data-context="options"] .topbar-link {
-  display: none;
-}
-
-/* ---- Pages: the full page and preferences pane show one page at a time. ---- */
-
-body:not([data-context="popup"]) [data-pages] {
-  display: none;
-}
-
-body[data-page="tabs"]:not([data-context="popup"]) [data-pages="tabs"],
-body[data-page="rules"]:not([data-context="popup"]) [data-pages="rules"],
-body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"] {
-  display: block;
-}
-
-body[data-page="settings"]:not([data-context="popup"]) #permission-warning:not([hidden]),
-body[data-page="settings"]:not([data-context="popup"]) .jump {
-  display: flex;
-}
-
-/* The mini UI only carries the current tab and the open-tabs list. */
-body[data-context="popup"] [data-page-only] {
-  display: none;
-}
-
-.pages {
-  display: none;
-  gap: 4px;
-}
-
-body:not([data-context="popup"]) .pages {
-  display: flex;
-}
-
-.pages a {
-  padding: 4px 10px;
-  border-radius: 6px;
-  color: var(--ink-2);
-  text-decoration: none;
-}
-
-.pages a:hover {
-  background: var(--control);
-  color: var(--ink);
-}
-
-.pages a[aria-current="page"] {
-  background: var(--control-hover);
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.mini-nav {
-  display: none;
-  gap: 4px;
-  padding: 8px 12px 10px;
-  border-top: 1px solid var(--line);
-}
-
-body[data-context="popup"] .mini-nav {
-  display: flex;
-}
-
-.mini-nav button {
-  flex: 1 1 auto;
-  padding: 6px 4px;
-  background: none;
-  color: var(--ink-2);
-  font-size: 12px;
-}
-
-.mini-nav button:hover {
-  background: var(--control);
-  color: var(--ink);
-}
-
-body:not([data-context="popup"]) #overview .overview-list {
-  max-height: none;
-}
-
-/* Window groups inside the open-tabs list fold independently. */
-.window-group {
-  margin-top: 8px;
-}
-
-.window-group > summary.window-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-start;
-  gap: 8px;
-  cursor: pointer;
-  list-style: none;
-  margin: 0 0 2px;
-  padding: 6px 0;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.window-group > summary .window-name {
-  flex: 1 1 auto;
-}
-
-.window-group > summary::-webkit-details-marker {
-  display: none;
-}
-
-.window-group > summary::before {
-  content: "▸";
-  display: inline-block;
-  width: 1em;
-}
-
-.window-group[open] > summary::before {
-  content: "▾";
-}
-
-/* Expired but still open: unmistakably faded. */
-.trow.is-expired .trow-title,
-.trow.is-expired .trow-time,
-.trow.is-expired .trow-icon,
-.trow.is-expired .trow-fuse,
-.trow.is-expired .trow-rules {
-  opacity: 0.3;
-}
-
-
-.recent-actions {
-  margin: 8px 0 4px;
-}
-
-.recent .trow {
-  grid-template-columns: 16px 1fr auto auto auto;
-  grid-template-areas:
-    "icon title when reopen remove"
-    "icon url   url  reopen remove";
-}
-
-.trow-remove {
-  grid-area: remove;
-}
-
-.trow-remove:hover {
-  color: var(--red);
-}
-
-.trow-when {
-  grid-area: when;
-  font-size: 12px;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
-.trow-url {
-  grid-area: url;
-  font-size: 11px;
-  color: var(--ink-2);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.trow-reopen {
-  grid-area: reopen;
-}
-
-.rules-filter {
-  display: flex;
-  gap: 8px;
-  margin: 0 0 12px;
-}
-
-.rules-filter input {
-  flex: 1 1 auto;
-  min-width: 0;
-  font: inherit;
-  font-size: 12px;
-  color: inherit;
-  background: var(--control);
-  border: 0;
-  border-radius: 6px;
-  padding: 7px 10px;
-}
-
-.rule.is-filtered-out {
-  display: none;
-}
-
-.topbar {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px 0;
-  color: var(--ink-2);
-}
-
-body:not([data-context="popup"]) .topbar {
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-body[data-context="page"] .topbar {
-  padding-bottom: 8px;
-}
-
-body[data-context="page"] .topbar-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.topbar-link {
-  padding: 2px 6px;
-  background: none;
-  color: var(--ink-2);
-  font-size: 12px;
-}
-
-.topbar-link:hover {
-  background: var(--control);
-  color: var(--ink);
-}
-
-/* The popup's own "Timed Tabs" title is carried by the topbar now. */
-body[data-context="popup"] .tab {
-  padding-top: 8px;
+  padding: var(--sp-6) var(--gutter) 48px;
 }
 
 #app {
@@ -307,148 +118,171 @@ body[data-context="popup"] .tab {
 
 section + section,
 .notice + section,
-section + details {
+section + details,
+details + details {
   border-top: 1px solid var(--line);
 }
 
-/* ---- This tab ---------------------------------------------------------- */
-
-.tab {
-  padding: 16px 16px 18px;
-}
-
-.tab-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 18px;
-  color: var(--ink-2);
-}
-
-.tab-icon {
-  width: 16px;
-  height: 16px;
+/* Icons: currentColor line art from the sprite. */
+.icon {
+  width: var(--icon);
+  height: var(--icon);
   flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -3px;
 }
 
-.tab-title {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+/* Chevron and check marks for CSS-only spots, tinted by currentColor. */
+.chev::before,
+.saved-mark::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  mask: center / contain no-repeat;
+  -webkit-mask: center / contain no-repeat;
 }
 
-.readout {
-  margin: 10px 0 8px;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
+.chev::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  transition: transform 0.15s;
 }
 
-.readout-time {
-  font-size: 30px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
+[open] > .chev::before,
+.chev.is-open::before {
+  transform: rotate(90deg);
 }
 
-.readout-note {
-  color: var(--ink-2);
+.saved-mark::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5 6.5 12 13 4.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5 6.5 12 13 4.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-/* The fuse: the full ramp is always visible, the marker shows where this
-   tab sits on it, and the burnt part behind the marker fades out. */
-.fuse {
-  position: relative;
-  height: 10px;
-  margin: 6px 0 14px;
-}
+/* ---- Controls ----------------------------------------------------------------- */
 
-.fuse-track {
-  position: absolute;
-  inset: 3px 0;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
-}
-
-.fuse-burnt {
-  position: absolute;
-  inset: 3px auto 3px 0;
-  width: 0;
-  border-radius: 2px 0 0 2px;
-  background: var(--ground);
-  opacity: 0.72;
-  transition: width 0.4s ease-out;
-}
-
-.fuse-marker {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  height: 10px;
-  margin-left: -2px;
-  border-radius: 2px;
-  background: var(--ink);
-  transition: left 0.4s ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fuse-burnt,
-  .fuse-marker {
-    transition: none;
-  }
-}
-
-.tab-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+button,
+.button-like {
+  display: inline-flex;
   align-items: center;
-}
-
-.tab-never {
-  width: 100%;
-  margin-top: 4px;
-}
-
-.tab-paused p {
-  margin: 0 0 10px;
-  color: var(--ink-2);
-}
-
-/* ---- Controls ---------------------------------------------------------- */
-
-button {
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-h);
+  padding: 0 var(--sp-3);
   font: inherit;
   color: inherit;
-  padding: 5px 11px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-control);
   background: var(--control);
   cursor: pointer;
+  white-space: nowrap;
 }
 
-button:hover {
+button:hover,
+.button-like:hover {
   background: var(--control-hover);
+}
+
+button:active {
+  background: var(--control-active);
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+button.primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--ink-2);
+}
+
+button.quiet:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+button.danger.is-armed,
+.qtoggle-close.is-armed,
+.rule-delete.is-armed {
+  color: var(--danger);
+  background: var(--danger-wash);
+}
+
+/* Icon-only buttons: square, quiet, label in title/aria-label. */
+.icon-btn,
+.qtoggle,
+.rule-toggle {
+  width: var(--control-h);
+  height: var(--control-h);
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.icon-btn:hover,
+.qtoggle:hover,
+.rule-toggle:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.qtoggle[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--control-hover);
+}
+
+.qtoggle.is-inherited[aria-pressed="true"] {
+  background: var(--control);
+}
+
+.qtoggle-close:hover,
+.trow-remove:hover {
+  color: var(--danger);
+}
+
+.qtoggle-close.is-armed {
+  width: auto;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
 }
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
 input[type="number"],
-select {
+input[type="url"],
+input[type="text"],
+select,
+textarea {
+  min-height: var(--control-h);
   font: inherit;
   color: inherit;
   background: var(--control);
   border: 0;
-  border-radius: 6px;
-  padding: 4px 8px;
+  border-radius: var(--r-control);
+  padding: 0 var(--sp-2);
 }
 
 input[type="number"] {
@@ -457,11 +291,15 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
-/* Switch built on a native checkbox so keyboard and screen readers work. */
+textarea {
+  padding: var(--sp-2) var(--sp-3);
+}
+
+/* Switch on a native checkbox, so keyboard and screen readers work. */
 .switch {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   cursor: pointer;
 }
 
@@ -477,7 +315,7 @@ input[type="number"] {
   flex: none;
   width: 30px;
   height: 18px;
-  border-radius: 9px;
+  border-radius: var(--r-pill);
   background: var(--control-hover);
   transition: background 0.15s;
 }
@@ -512,240 +350,461 @@ input[type="number"] {
   cursor: default;
 }
 
-/* ---- All tabs ---------------------------------------------------------- */
+/* ---- Header and navigation ---------------------------------------------------- */
 
-.settings {
-  padding: 16px 16px 12px;
-}
-
-.settings-title {
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 600;
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--gutter) 0;
   color: var(--ink-2);
 }
 
-body[data-context="page"] .settings-title,
-body[data-context="page"] .rules-head .settings-title {
-  font-size: 15px;
-  color: var(--ink);
-}
-
-.fields {
-  display: flex;
-  flex-direction: column;
-}
-
-.field {
-  display: flex;
-  flex-wrap: wrap;
+.topbar-title {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-}
-
-body[data-context="page"] .field {
-  padding: 14px 0;
-}
-
-.field:first-child,
-.field[hidden] + .field:not([hidden]):nth-child(2) {
-  border-top: 0;
-}
-
-.field-label {
-  flex: 1 1 14em;
+  gap: var(--sp-2);
+  flex: 1 1 auto;
   min-width: 0;
-}
-
-.field-help {
-  display: block;
-  margin-top: 2px;
-  color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.4;
-  max-width: 46em;
-}
-
-.field-control {
-  flex: none;
-  margin-left: auto;
-  max-width: 100%;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.field-group {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding-bottom: 0;
-}
-
-.field-group > .field-label {
-  flex: none;
-}
-
-.field-group-rows .field {
-  padding-left: 12px;
-}
-
-.status {
-  min-height: 1.4em;
-  margin: 4px 0 0;
-  color: var(--ink-2);
-  font-size: 12px;
-}
-
-.notice {
-  margin: 0;
-  padding: 10px 16px;
-  background: color-mix(in srgb, var(--yellow) 22%, transparent);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.notice p {
-  margin: 0;
-}
-
-/* ---- Diagnostics ------------------------------------------------------- */
-
-.diagnostics {
-  padding: 12px 16px 16px;
-  color: var(--ink-2);
-}
-
-.diagnostics summary {
-  cursor: pointer;
-}
-
-.diagnostics[open] summary {
-  margin-bottom: 8px;
-}
-
-.diag-actions {
-  margin: 0 0 8px;
-  display: flex;
-  gap: 8px;
-}
-
-#diag-summary {
-  margin: 0 0 8px;
-  white-space: pre-wrap;
-  font-size: 12px;
-  color: var(--ink);
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-#diag-tabs {
-  border-collapse: collapse;
-  font-size: 12px;
-  color: var(--ink);
-}
-
-#diag-tabs th,
-#diag-tabs td {
-  text-align: left;
-  padding: 2px 8px 2px 0;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ---- All open tabs ----------------------------------------------------- */
-
-.overview {
-  padding: 0 16px;
-  border-top: 1px solid var(--line);
-}
-
-.overview summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 14px 0;
-  cursor: pointer;
   font-weight: 600;
-  color: var(--ink-2);
-  list-style: none;
+  color: var(--ink);
 }
 
-.overview summary::-webkit-details-marker {
+.topbar-title .icon {
+  color: var(--ink-2);
+}
+
+body:not([data-context="popup"]) .topbar {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+}
+
+body[data-context="page"] .topbar-title {
+  font-size: var(--fs-xl);
+}
+
+body[data-context="page"] .topbar-title .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.topbar-link {
+  min-height: 24px;
+  padding: 0 var(--sp-2);
+  background: none;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.topbar-link:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+body[data-context="options"] .tab,
+body[data-context="page"] .tab,
+body[data-context="page"] .topbar-link,
+body[data-context="options"] .topbar-link {
   display: none;
 }
 
-.overview summary::before {
-  content: "▸";
-  display: inline-block;
-  width: 1em;
+/* Page nav: a segmented control with icons. */
+.pages {
+  display: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-control);
+  background: var(--raised);
+}
+
+body:not([data-context="popup"]) .pages {
+  display: flex;
+}
+
+.pages a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 var(--sp-3);
+  border-radius: 5px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.pages a:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.pages a[aria-current="page"] {
+  background: var(--ground);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Mini UI footer: icon-and-label buttons plus the version. */
+.mini-nav {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+
+body[data-context="popup"] .mini-nav {
+  display: flex;
+}
+
+.mini-nav button {
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 6px 4px;
+  background: none;
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+
+.mini-nav button:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+/* Pages: the page and preferences views show one page at a time. */
+body:not([data-context="popup"]) [data-pages] {
+  display: none;
+}
+
+body[data-page="tabs"]:not([data-context="popup"]) [data-pages="tabs"],
+body[data-page="rules"]:not([data-context="popup"]) [data-pages="rules"],
+body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"] {
+  display: block;
+}
+
+body[data-page="settings"]:not([data-context="popup"]) #permission-warning:not([hidden]),
+body[data-page="settings"]:not([data-context="popup"]) .jump {
+  display: flex;
+}
+
+body[data-context="popup"] [data-page-only] {
+  display: none;
+}
+
+/* ---- Section headers ---------------------------------------------------------- */
+
+.section-head,
+.rules-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+}
+
+.settings-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+body:not([data-context="popup"]) .settings-title {
+  font-size: var(--fs-lg);
+}
+
+.section-help,
+.rules-help,
+.group-help,
+.overview-legend {
+  margin: var(--sp-1) 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 60em;
+}
+
+.rules-help code {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--control);
+}
+
+.count {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- This tab (mini UI) ------------------------------------------------------- */
+
+.tab {
+  padding: var(--sp-2) var(--gutter) var(--sp-4);
+}
+
+.tab-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 18px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.tab-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.tab-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.readout {
+  margin: var(--sp-2) 0 var(--sp-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.readout-time {
+  font-size: var(--fs-display);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.readout-note {
   color: var(--ink-2);
 }
 
-.overview[open] summary::before {
-  content: "▾";
+/* The fuse: the whole ramp stays visible, the marker shows where the tab
+   sits, and the burnt part behind it fades. */
+.fuse {
+  position: relative;
+  height: 10px;
+  margin: var(--sp-1) 0 var(--sp-4);
 }
 
-.overview summary > span:first-of-type {
+.fuse-track {
+  position: absolute;
+  inset: 3px 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
+}
+
+.fuse-burnt {
+  position: absolute;
+  inset: 3px auto 3px 0;
+  width: 0;
+  border-radius: 2px 0 0 2px;
+  background: var(--ground);
+  opacity: 0.72;
+  transition: width 0.4s ease-out;
+}
+
+.fuse-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 10px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: left 0.4s ease-out;
+}
+
+.tab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.tab-never {
+  width: 100%;
+  margin-top: var(--sp-1);
+}
+
+.tab-paused p {
+  margin: 0 0 var(--sp-3);
+  color: var(--ink-2);
+}
+
+/* Rules for this page. */
+.tab-rules-section {
+  padding-top: var(--sp-3);
+}
+
+.tab-rules-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--sp-1);
+}
+
+.tab-rule {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--sp-3);
+  align-items: start;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.tab-rule:first-child {
+  border-top: 0;
+}
+
+.tab-rule .switch-track {
+  margin-top: 1px;
+}
+
+.tab-rule-name {
+  font-weight: 600;
+}
+
+.tab-rule-name small {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.tab-rule-sets {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.tab-rule.is-ignored .tab-rule-name,
+.tab-rule.is-ignored .tab-rule-sets {
+  color: var(--ink-2);
+  text-decoration: line-through;
+}
+
+.tab-rule.is-masked {
+  opacity: 0.55;
+}
+
+.tab-rules-empty,
+.tab-rules-note {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.tab-rules-section .tab-never {
+  margin-top: var(--sp-2);
+}
+
+/* ---- Lists: open tabs and recently expired ------------------------------------ */
+
+.overview {
+  padding: 0 var(--gutter);
+}
+
+.overview > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+body:not([data-context="popup"]) .overview > summary {
+  font-size: var(--fs-lg);
+}
+
+.overview > summary::-webkit-details-marker {
+  display: none;
+}
+
+.overview > summary > span:first-of-type {
   flex: 1;
 }
 
 .overview-count {
   font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
 .overview-legend {
-  margin: 0 0 6px;
   display: flex;
-  gap: 14px;
-  font-size: 12px;
-  color: var(--ink-2);
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+  margin: 0 0 var(--sp-2);
 }
 
-.legend-icon {
-  display: inline-block;
-  width: 1.2em;
-  text-align: center;
+.legend-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
 }
 
 .overview-list {
   max-height: 320px;
   overflow-y: auto;
-  margin: 0 -16px;
-  padding: 0 16px 12px;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0 var(--gutter) var(--sp-3);
 }
 
-.window-title {
-  margin: 8px 0 2px;
-  font-size: 12px;
-  color: var(--ink-2);
+body:not([data-context="popup"]) .overview-list {
+  max-height: none;
 }
 
+/* Window groups fold independently. */
+.window-group {
+  margin-top: var(--sp-2);
+}
+
+.window-group > summary.window-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 32px;
+  cursor: pointer;
+  list-style: none;
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.window-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.window-group > summary .window-name {
+  flex: 1 1 auto;
+}
+
+/* One row pattern for open tabs. */
 .trow {
   display: grid;
   grid-template-columns: 16px 1fr auto auto auto auto auto;
   grid-template-areas:
     "icon title rules time timer focus close"
     "icon fuse  fuse  fuse timer focus close";
-  column-gap: 10px;
-  row-gap: 4px;
+  column-gap: var(--sp-2);
+  row-gap: var(--sp-1);
   align-items: center;
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   border-top: 1px solid var(--line);
 }
 
-body[data-context="page"] .trow {
+body:not([data-context="popup"]) .trow {
   padding: 10px 0;
 }
 
@@ -762,6 +821,14 @@ body[data-context="page"] .trow {
   opacity: 0.4;
 }
 
+.trow.is-expired .trow-title,
+.trow.is-expired .trow-time,
+.trow.is-expired .trow-icon,
+.trow.is-expired .trow-fuse,
+.trow.is-expired .trow-rules {
+  opacity: 0.3;
+}
+
 .trow-icon {
   grid-area: icon;
   width: 16px;
@@ -775,9 +842,12 @@ body[data-context="page"] .trow {
 .trow-title {
   grid-area: title;
   min-width: 0;
+  min-height: 0;
+  justify-content: flex-start;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  display: block;
   background: none;
   border: 0;
   padding: 0;
@@ -792,7 +862,7 @@ body[data-context="page"] .trow {
 
 .trow-time {
   grid-area: time;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -816,28 +886,19 @@ body[data-context="page"] .trow {
   opacity: 0.72;
 }
 
-.qtoggle {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: 6px;
-  font-size: 13px;
-  line-height: 1;
+.trow-rules {
+  grid-area: rules;
+  justify-self: end;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
-  background: transparent;
-}
-
-.qtoggle:hover {
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-pill);
   background: var(--control);
+  cursor: default;
 }
 
-.qtoggle[aria-pressed="true"] {
-  color: var(--ink);
-  background: var(--control-hover);
-}
-
-.qtoggle.is-inherited[aria-pressed="true"] {
-  background: var(--control);
+.trow-rules.is-ignored {
+  text-decoration: line-through;
 }
 
 .qtoggle-timer {
@@ -848,131 +909,224 @@ body[data-context="page"] .trow {
   grid-area: focus;
 }
 
+.qtoggle-close {
+  grid-area: close;
+}
+
 .overview-empty {
-  margin: 4px 0 8px;
+  margin: var(--sp-1) 0 var(--sp-2);
   color: var(--ink-2);
 }
 
-/* ---- Rules ---------------------------------------------------------------- */
-
-.tab-rules-section {
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+/* Recently expired rows. */
+.recent .trow {
+  grid-template-columns: 16px 1fr auto auto auto;
+  grid-template-areas:
+    "icon title when reopen remove"
+    "icon url   url  reopen remove";
 }
 
-.tab-rules-section .settings-title {
-  margin-bottom: 2px;
+.trow-when {
+  grid-area: when;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  white-space: nowrap;
 }
 
-.tab-rules-list {
+.trow-url {
+  grid-area: url;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trow-reopen {
+  grid-area: reopen;
+}
+
+.trow-remove {
+  grid-area: remove;
+}
+
+.recent-actions {
+  margin: var(--sp-2) 0 var(--sp-1);
+}
+
+/* ---- Settings ----------------------------------------------------------------- */
+
+.settings {
+  padding: 0;
+}
+
+.fields {
   display: flex;
   flex-direction: column;
 }
 
-.tab-rule {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 10px;
-  align-items: start;
-  padding: 8px 0;
-  border-top: 1px solid var(--line);
-}
-
-.tab-rule:first-child {
-  border-top: 0;
-}
-
-.tab-rule .switch-track {
-  margin-top: 1px;
-}
-
-.tab-rule-name {
-  font-weight: 600;
-}
-
-.tab-rule-name small {
-  font-weight: 400;
-  color: var(--ink-2);
-}
-
-.tab-rule-sets {
-  display: block;
-  font-size: 12px;
-  color: var(--ink-2);
-}
-
-.tab-rule.is-ignored .tab-rule-name,
-.tab-rule.is-ignored .tab-rule-sets {
-  color: var(--ink-2);
-  text-decoration: line-through;
-}
-
-.tab-rule.is-masked {
-  opacity: 0.55;
-}
-
-.tab-rules-empty {
-  margin: 6px 0 8px;
-  font-size: 12px;
-  color: var(--ink-2);
-}
-
-.tab-rules-note {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--ink-2);
-}
-
-.tab-rules-section .tab-never {
-  margin-top: 8px;
-}
-
-.tab-add-rule {
-  margin-top: 4px;
-}
-
-.rules {
-  padding: 16px 16px 12px;
-}
-
-.rules-head {
+.jump {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--gutter) var(--sp-1);
 }
 
-.rules-help {
-  margin: 4px 0 12px;
-  font-size: 12px;
-  line-height: 1.5;
+.jump a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
   color: var(--ink-2);
-  max-width: 60em;
-}
-
-.rules-help code {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 11px;
-  padding: 0 3px;
-  border-radius: 3px;
+  text-decoration: none;
   background: var(--control);
 }
 
+.jump a:hover {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+.group {
+  padding: var(--sp-5) var(--gutter) var(--sp-2);
+  scroll-margin-top: var(--sp-3);
+}
+
+.group + .group,
+.settings + .backup,
+.backup + .diagnostics {
+  border-top: 1px solid var(--line);
+}
+
+.group-help {
+  margin: 2px 0 var(--sp-1);
+}
+
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+body:not([data-context="popup"]) .field {
+  padding: 14px 0;
+}
+
+.field:first-child,
+.group-rows .field:first-child,
+.field[hidden] + .field:not([hidden]):nth-child(2) {
+  border-top: 0;
+}
+
+.field-label {
+  flex: 1 1 14em;
+  min-width: 0;
+}
+
+.field-help {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  max-width: 46em;
+}
+
+.field-control {
+  flex: none;
+  margin-left: auto;
+  max-width: 100%;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.field-suffix {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.field-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding-bottom: 0;
+}
+
+.field-group > .field-label {
+  flex: none;
+}
+
+.field-group-rows .field {
+  padding-left: var(--sp-3);
+}
+
+.status {
+  min-height: 1.4em;
+  margin: var(--sp-1) 0 0;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.notice {
+  margin: 0;
+  padding: 10px var(--gutter);
+  background: var(--warn-wash);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.notice p {
+  margin: 0;
+}
+
+/* ---- Rules page --------------------------------------------------------------- */
+
+.rules {
+  padding: var(--sp-4) var(--gutter) var(--sp-3);
+}
+
+.rules-head-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.rules-filter {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+}
+
+.rules-filter input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  padding: 0 10px;
+}
+
 .rules-empty {
-  margin: 8px 0;
+  margin: var(--sp-2) 0;
   color: var(--ink-2);
 }
 
 .rules-list {
   display: grid;
-  gap: 20px;
+  gap: var(--sp-5);
 }
 
-/* Each rule is its own bordered group, so its rows read as one unit. */
 .rule {
-  padding: 4px 16px 6px;
+  padding: var(--sp-1) var(--gutter) 6px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-card);
 }
 
 .rule.is-target {
@@ -984,43 +1138,54 @@ body[data-context="page"] .trow {
   opacity: 0.6;
 }
 
+.rule.is-filtered-out {
+  display: none;
+}
+
 .rule-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
 }
 
 .rule-pattern {
   flex: 1 1 auto;
   min-width: 0;
-  font: inherit;
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 13px;
-  color: inherit;
-  background: var(--control);
-  border: 0;
-  border-radius: 6px;
-  padding: 7px 10px;
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  padding: 0 10px;
+}
+
+.rule-pattern::placeholder {
+  color: var(--ink-2);
+  opacity: 0.8;
+  font-family: var(--font);
+  font-style: italic;
 }
 
 .rule-delete {
-  color: var(--ink-2);
   flex: none;
+  color: var(--ink-2);
+}
+
+.rule-description-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: calc(var(--sp-1) * -1) 0 10px;
 }
 
 .rule-description {
-  display: block;
+  flex: 1 1 auto;
   width: 100%;
-  box-sizing: border-box;
-  margin: -4px 0 10px;
-  font: inherit;
-  color: inherit;
+  min-height: 0;
+  margin: 0;
   background: transparent;
   border: 0;
   border-bottom: 1px dashed var(--line);
   border-radius: 0;
-  padding: 4px 2px;
+  padding: var(--sp-1) 2px;
 }
 
 .rule-description::placeholder {
@@ -1033,7 +1198,7 @@ body[data-context="page"] .trow {
 }
 
 .rule .field {
-  padding: 12px 0;
+  padding: var(--sp-3) 0;
 }
 
 .rule-overrides {
@@ -1041,8 +1206,8 @@ body[data-context="page"] .trow {
 }
 
 .rule-overrides-title {
-  margin: 12px 0 0;
-  font-size: 12px;
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -1054,7 +1219,7 @@ body[data-context="page"] .trow {
 .override .field-label {
   display: grid;
   grid-template-columns: auto 1fr;
-  column-gap: 8px;
+  column-gap: var(--sp-2);
   align-items: start;
 }
 
@@ -1066,7 +1231,6 @@ body[data-context="page"] .trow {
   grid-column: 2;
 }
 
-/* Until an override is switched on, its control stays out of the way. */
 .override:not(.is-on) .override-control {
   display: none;
 }
@@ -1081,231 +1245,21 @@ body[data-context="page"] .trow {
   gap: 6px;
 }
 
-.trow-rules {
-  grid-area: rules;
-  justify-self: end;
-  font-size: 11px;
-  color: var(--ink-2);
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--control);
-  cursor: default;
-}
-
-/* ---- Backup --------------------------------------------------------------- */
-
-.backup {
-  padding: 16px 16px 12px;
-  border-top: 1px solid var(--line);
-}
-
-.backup-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.backup-file input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.button-like {
-  display: inline-block;
-  padding: 5px 11px;
-  border-radius: 6px;
-  background: var(--control);
-  cursor: pointer;
-}
-
-.button-like:hover {
-  background: var(--control-hover);
-}
-
-.backup-file input:focus-visible + .button-like {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
-}
-
-.backup-text {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font: 12px/1.45 ui-monospace, Menlo, monospace;
-  color: inherit;
-  background: var(--control);
-  border: 0;
-  border-radius: 6px;
-  padding: 8px 10px;
-  resize: vertical;
-}
-
-.trow-rules.is-ignored {
-  text-decoration: line-through;
-}
-
-.field-suffix {
-  color: var(--ink-2);
-  font-size: 12px;
-}
-
-/* ---- Settings page sections ---------------------------------------------- */
-
-.jump {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 12px 16px 4px;
-}
-
-.jump a {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--ink-2);
-  text-decoration: none;
-  background: var(--control);
-}
-
-.jump a:hover {
-  background: var(--control-hover);
-  color: var(--ink);
-}
-
-.group {
-  padding: 20px 16px 8px;
-  scroll-margin-top: 12px;
-}
-
-.group + .group,
-.settings + .backup,
-.backup + .diagnostics {
-  border-top: 1px solid var(--line);
-}
-
-.group .settings-title {
-  margin-bottom: 2px;
-}
-
-.group-help {
-  margin: 0 0 4px;
-  font-size: 12px;
-  color: var(--ink-2);
-}
-
-/* The rows container owns the dividers; the fields section only wraps groups. */
-.settings {
-  padding: 0;
-}
-
-.group-rows .field:first-child {
-  border-top: 0;
-}
-
-.diagnostics {
-  scroll-margin-top: 12px;
-}
-
-/* ---- Saved confirmation --------------------------------------------------- */
-
-.saved-mark {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--green);
-  opacity: 0;
-  transform: translateX(4px);
-  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-.saved-mark::before {
-  content: "✓";
-  font-weight: 700;
-}
-
-.saved-mark.is-shown {
-  opacity: 1;
-  transform: none;
-}
-
-/* Rule cards: the mark sits inline in whichever row changed. */
-.rule-head > .saved-mark {
-  flex: none;
-}
-
-.rule-description-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.rule-description-wrap .rule-description {
-  flex: 1 1 auto;
-  margin-bottom: 0;
-}
-
-.rule-description-wrap {
-  margin: -4px 0 10px;
-}
-
-.rule-delete.is-armed {
-  color: var(--red);
-  background: color-mix(in srgb, var(--red) 20%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .saved-mark {
-    transition: none;
-    transform: none;
-  }
-}
-
-button.danger {
-  color: var(--red);
-}
-
-button.danger.is-armed {
-  background: color-mix(in srgb, var(--red) 20%, transparent);
-}
-
-/* ---- Collapsible rule cards ----------------------------------------------- */
-
-.rule-toggle {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  background: transparent;
-  color: var(--ink-2);
-}
-
-.rule-toggle::before {
-  content: "▾";
-  display: inline-block;
-  transition: transform 0.15s;
-}
-
-.rule.is-collapsed .rule-toggle::before {
-  transform: rotate(-90deg);
-}
-
+/* Collapsed rule cards. */
 .rule-summary {
   display: none;
   width: 100%;
-  margin: -4px 0 8px;
-  padding: 4px 2px 8px;
+  min-height: 0;
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+  padding: var(--sp-1) 2px var(--sp-2);
+  justify-content: flex-start;
   text-align: left;
+  white-space: normal;
   background: none;
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.4;
-  border-radius: 4px;
+  border-radius: var(--r-control);
 }
 
 .rule-summary:hover {
@@ -1314,7 +1268,7 @@ button.danger.is-armed {
 }
 
 .rule.is-collapsed .rule-summary {
-  display: block;
+  display: flex;
 }
 
 .rule.is-collapsed .rule-body {
@@ -1325,42 +1279,116 @@ button.danger.is-armed {
   padding-bottom: 2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rule-toggle::before {
-    transition: none;
-  }
+/* ---- Backup and diagnostics --------------------------------------------------- */
+
+.backup {
+  padding: var(--sp-4) var(--gutter) var(--sp-3);
 }
 
-.rules-head-actions {
+.backup-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
 }
 
-.rule-pattern::placeholder {
+.backup-file input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.backup-file input:focus-visible + .button-like {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.backup-text {
+  display: block;
+  width: 100%;
+  font: var(--fs-sm) / 1.45 var(--mono);
+  resize: vertical;
+}
+
+.diagnostics {
+  padding: var(--sp-3) var(--gutter) var(--sp-4);
   color: var(--ink-2);
-  opacity: 0.8;
-  font-family: var(--font);
-  font-style: italic;
+  scroll-margin-top: var(--sp-3);
 }
 
-.qtoggle-close {
-  grid-area: close;
-  width: auto;
-  min-width: 24px;
-  padding: 0 4px;
-  font-size: 12px;
+.diagnostics > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
 }
 
-.qtoggle-close:hover {
-  color: var(--red);
+.diagnostics > summary::-webkit-details-marker {
+  display: none;
 }
 
-.qtoggle-close.is-armed {
-  color: var(--red);
-  background: color-mix(in srgb, var(--red) 20%, transparent);
+.diag-actions {
+  margin: var(--sp-2) 0;
+  display: flex;
+  gap: var(--sp-2);
 }
 
-/* Saved marks inside the mini UI's inline controls. */
+#diag-summary {
+  margin: 0 0 var(--sp-2);
+  white-space: pre-wrap;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+#diag-tabs {
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+#diag-tabs th,
+#diag-tabs td {
+  text-align: left;
+  padding: 2px var(--sp-2) 2px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Feedback ----------------------------------------------------------------- */
+
+.saved-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-sm);
+  color: var(--green);
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.saved-mark.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+.rule-head > .saved-mark {
+  flex: none;
+}
+
 .tab-actions button + .saved-mark,
 .tab-never > .saved-mark,
 .tab-rule > .saved-mark {
@@ -1371,29 +1399,42 @@ button.danger.is-armed {
   grid-column: 2;
 }
 
-/* ---- Version ---------------------------------------------------------------- */
+/* ---- Version ------------------------------------------------------------------ */
 
 .version {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 400;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
-  margin-left: 6px;
 }
 
 body[data-context="page"] .version {
-  font-size: 12px;
-  vertical-align: middle;
+  font-size: var(--fs-sm);
+  align-self: flex-end;
+  margin-bottom: 3px;
 }
 
 .version-mini {
   flex: none;
   align-self: center;
   margin-left: auto;
-  padding: 0 4px;
+  padding: 0 var(--sp-1);
 }
 
-/* The mini UI shows the version in its footer only. */
 body[data-context="popup"] .topbar .version {
   display: none;
+}
+
+/* ---- Motion ------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .fuse-burnt,
+  .fuse-marker,
+  .chev::before,
+  .saved-mark,
+  .switch-track,
+  .switch-track::after {
+    transition: none;
+    transform: none;
+  }
 }
