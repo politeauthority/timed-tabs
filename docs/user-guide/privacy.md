@@ -71,8 +71,9 @@ when access is off.
 
 ## 📦 Backups
 
-**Backup** on its own page exports every setting and every rule as one JSON file.
-What you have been reading is not in there — no addresses of closed tabs, no titles.
+**Backup** on its own page exports every setting and every rule as one JSON file,
+plus the version of Timed Tabs that wrote it. What you have been reading is not in
+there — no addresses of closed tabs, no titles.
 
 The rules are, though, and a rule is a site you cared enough to write a rule about.
 The file is plain text. Keep it somewhere you would keep a bookmarks export.

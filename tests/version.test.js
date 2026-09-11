@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 globalThis.browser ??= { runtime: { getManifest: () => ({ version: "0.0.0" }), getURL: (p) => p } };
-const { describeBuild, formatVersion } = await import("../src/shared/version.js");
+const { compareVersions, describeBuild, formatVersion } = await import("../src/shared/version.js");
 
 describe("formatVersion", () => {
   it("appends a build tag with a hyphen", () => {
@@ -48,6 +48,46 @@ describe("describeBuild", () => {
     // so the -dev only ever exists for display.
     for (const b of [undefined, null, { tag: "dev", channel: "dev" }]) {
       expect(describeBuild("0.8.0", b).version).toBe("0.8.0");
+    }
+  });
+});
+
+describe("compareVersions", () => {
+  it("orders by the dotted numbers first", () => {
+    expect(compareVersions("0.8.0", "0.9.0")).toBeLessThan(0);
+    expect(compareVersions("0.10.0", "0.9.0")).toBeGreaterThan(0);
+    expect(compareVersions("1.0.0", "1.0.0")).toBe(0);
+  });
+
+  it("treats a missing part as a zero, so 0.8 and 0.8.0 are the same build", () => {
+    expect(compareVersions("0.8", "0.8.0")).toBe(0);
+    expect(compareVersions("0.8", "0.8.1")).toBeLessThan(0);
+  });
+
+  it("puts a release after its own pre-releases", () => {
+    expect(compareVersions("0.8.0-beta.14", "0.8.0")).toBeLessThan(0);
+    expect(compareVersions("0.8.0", "0.8.0-dev")).toBeGreaterThan(0);
+    // A dev checkout of 0.8.0 is still ahead of the 0.7.9 that shipped.
+    expect(compareVersions("0.8.0-dev", "0.7.9")).toBeGreaterThan(0);
+  });
+
+  it("orders two pre-releases dot by dot, numbers before words", () => {
+    expect(compareVersions("0.8.0-beta.3", "0.8.0-beta.14")).toBeLessThan(0);
+    expect(compareVersions("0.8.0-beta.2", "0.8.0-beta.2")).toBe(0);
+    expect(compareVersions("0.8.0-beta", "0.8.0-beta.1")).toBeLessThan(0);
+    expect(compareVersions("0.8.0-1", "0.8.0-rc")).toBeLessThan(0);
+  });
+
+  it("ignores a leading v", () => {
+    expect(compareVersions("v0.8.0", "0.8.0")).toBe(0);
+  });
+
+  it("answers null rather than guessing at something that is not a version", () => {
+    // The caller has to be able to tell "older" from "no idea", or a bundle
+    // with a mangled stamp would be reported as if it were older.
+    for (const bad of ["", "   ", undefined, null, "next", "0.8.0.x", 8]) {
+      expect(compareVersions(bad, "0.8.0")).toBeNull();
+      expect(compareVersions("0.8.0", bad)).toBeNull();
     }
   });
 });

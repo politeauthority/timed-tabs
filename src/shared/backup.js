@@ -2,28 +2,44 @@
  * Export/import of every user setting as one JSON document.
  * Pure: storage is handled by the caller.
  *
- * { "timedTabs": 1, "settings": { ...DEFAULTS keys... }, "rules": [ ...rules ], "groups": [ ...site groups ] }
- * "groups" is optional: backups written before site groups existed load as before.
+ * { "timedTabs": 1, "version": "0.8.0", "settings": { ...DEFAULTS keys... },
+ *   "rules": [ ...rules ], "groups": [ ...site groups ] }
+ *
+ * The two numbers say different things. `timedTabs` is the shape of the file,
+ * which changes only when the shape does; `version` is the Timed Tabs that
+ * wrote it, which is there to be read by a person and to catch a bundle
+ * arriving from a build newer than the one loading it. Neither is required:
+ * "groups" is missing from backups written before site groups existed, and
+ * "version" from any written before this stamp, and both load as before.
+ *
+ * Nothing is ever loaded *from* `version` — it is a note about where the file
+ * came from, not a setting. A bundle exported again carries whichever build
+ * wrote it out that time, so importing one into this build and copying it back
+ * out restamps it with this build.
  */
 import { DEFAULTS, coerceSetting } from "./settings.js";
 import { RULE_FIELDS, clampPriority, newRule } from "./rules.js";
 import { newGroup } from "./groups.js";
+import { compareVersions } from "./version.js";
 
 export const FORMAT_VERSION = 1;
 
-export function exportBundle(settings, rules, groups = []) {
+/** `version` is the build writing the file; leave it out and the stamp is too. */
+export function exportBundle(settings, rules, groups = [], version = "") {
   const out = {};
   for (const key of Object.keys(DEFAULTS)) out[key] = settings[key] ?? DEFAULTS[key];
+  const stamp = typeof version === "string" ? version.trim() : "";
   return {
     timedTabs: FORMAT_VERSION,
+    ...(stamp ? { version: stamp } : {}),
     settings: out,
     rules: (rules ?? []).map(cleanRule),
     groups: (groups ?? []).map(cleanGroup),
   };
 }
 
-export function exportText(settings, rules, groups = []) {
-  return JSON.stringify(exportBundle(settings, rules, groups), null, 2) + "\n";
+export function exportText(settings, rules, groups = [], version = "") {
+  return JSON.stringify(exportBundle(settings, rules, groups, version), null, 2) + "\n";
 }
 
 function cleanGroup(g) {
@@ -32,11 +48,19 @@ function cleanGroup(g) {
 }
 
 /**
- * Parse and validate a backup. Returns { settings, rules, groups, warnings }.
+ * Parse and validate a backup. Returns
+ * { version, settings, rules, groups, warnings }, where `version` is the build
+ * that wrote the file, or "" for one written before the stamp existed.
+ *
  * Unknown settings are dropped with a warning; wrong types fall back to the
  * default with a warning. Throws only when the text is not a backup at all.
+ *
+ * `currentVersion` is the build doing the loading. Given one, a bundle from a
+ * later build is called out: that is exactly when the settings it carries are
+ * dropped one by one as unknown, and the reason is worth saying once rather
+ * than leaving to be inferred from the list.
  */
-export function parseBundle(text) {
+export function parseBundle(text, currentVersion = "") {
   let data;
   try {
     data = JSON.parse(text);
@@ -48,6 +72,12 @@ export function parseBundle(text) {
     throw new Error("This does not look like a Timed Tabs backup.");
   }
   const warnings = [];
+  const version = typeof data.version === "string" ? data.version.trim() : "";
+  // Only ever a note, never a comparison we act on: an unreadable version on
+  // either side answers null, and then nothing is said.
+  if (compareVersions(version, currentVersion) > 0) {
+    warnings.push(`Written by Timed Tabs ${version}, which is newer than this ${currentVersion}.`);
+  }
   const settings = {};
   const src = data.settings && typeof data.settings === "object" ? data.settings : {};
   for (const [key, value] of Object.entries(src)) {
@@ -105,7 +135,7 @@ export function parseBundle(text) {
       }
     }
   }
-  return { settings, rules, groups, warnings };
+  return { version, settings, rules, groups, warnings };
 }
 
 
