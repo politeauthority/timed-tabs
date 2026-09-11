@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  actions: read          # the step-times action reads this run's job timings
   pull-requests: read
 
 concurrency:
@@ -139,6 +140,12 @@ jobs:
           gh release create "$TAG" web-ext-artifacts/*.zip \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --prerelease --title "$TAG" --notes-file "$NOTES"
+
+      # From the sparse checkout of this ref, not the `main` tree it built.
+      - uses: ./.gh-cli/.github/actions/step-times
+        if: always()
+        with:
+          token: ${{ github.token }}
 
       - name: 📋 Summary
         if: always()

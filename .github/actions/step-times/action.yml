@@ -1,0 +1,78 @@
+name: Step times
+description: >
+  Append a breakdown of where this job spent its time to the run summary. Reads
+  the timings the API already records, so no step needs instrumenting. Never
+  fails a job: a summary is not worth a red run.
+
+inputs:
+  token:
+    description: A token with actions:read, for the jobs API.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        API_TOKEN: ${{ inputs.token }}
+      run: |
+        set -uo pipefail
+        # Best effort throughout. Anything missing means no table, not a failure.
+        command -v python3 >/dev/null 2>&1 || { echo "No python3; skipping the timing table."; exit 0; }
+        url="${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100"
+        if ! curl -fsSL -H "Authorization: Bearer ${API_TOKEN}" -H "Accept: application/vnd.github+json" \
+             "$url" -o "${RUNNER_TEMP}/jobs.json"; then
+          echo "Could not read the jobs API; skipping the timing table."
+          exit 0
+        fi
+        python3 - "${RUNNER_TEMP}/jobs.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+        import json, os, sys
+        from datetime import datetime
+
+        def when(s):
+            return datetime.fromisoformat(s.replace("Z", "+00:00")) if s else None
+
+        data = json.load(open(sys.argv[1]))
+        runner, job_name = os.environ.get("RUNNER_NAME"), os.environ.get("GITHUB_JOB")
+        jobs = data.get("jobs", [])
+        # The job this step is running in: the one on this runner still going.
+        mine = next((j for j in jobs if j.get("runner_name") == runner and j.get("status") == "in_progress"), None)
+        if mine is None:
+            mine = next((j for j in jobs if j.get("name") == job_name), None)
+        if mine is None:
+            sys.exit(0)
+
+        rows, total = [], 0.0
+        for st in mine.get("steps", []):
+            # Skipped first: a skipped step has no timestamps, and with steps
+            # now conditional it is the line most worth seeing.
+            if st.get("conclusion") == "skipped":
+                rows.append((st["name"], None, "skipped"))
+                continue
+            a, b = when(st.get("started_at")), when(st.get("completed_at"))
+            if not a or not b:
+                continue          # still running
+            secs = max(0.0, (b - a).total_seconds())
+            total += secs
+            rows.append((st["name"], secs, st.get("conclusion") or ""))
+
+        if not rows:
+            sys.exit(0)
+
+        def clock(s):
+            return f"{s:.0f}s" if s < 60 else f"{int(s // 60)}m {int(s % 60):02d}s"
+
+        print("<details><summary>⏱️ Where the time went</summary>\n")
+        print("| Step | Time | Share |")
+        print("|---|--:|--:|")
+        for name, secs, note in rows:
+            if secs is None:
+                print(f"| {name} | – | _{note}_ |")
+                continue
+            share = (secs / total * 100) if total else 0
+            bar = "█" * round(share / 10)
+            print(f"| {name} | {clock(secs)} | {bar} {share:.0f}% |")
+        print(f"| **Total** | **{clock(total)}** | |")
+        print("\nQueue time before the runner picked the job up is not counted here.")
+        print("</details>")
+        PY

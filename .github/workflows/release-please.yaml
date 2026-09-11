@@ -40,6 +40,7 @@ on:
 
 permissions:
   contents: write
+  actions: read          # the step-times action reads this run's job timings
   pull-requests: write
   issues: write
 
