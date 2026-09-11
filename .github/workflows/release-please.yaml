@@ -1,5 +1,9 @@
 name: Release Please
-run-name: "Release Please — ${{ github.event_name == 'pull_request_review' && format('PR #{0} review', github.event.pull_request.number) || github.ref_name }}"
+run-name: >-
+  Release Please —
+  ${{ (github.event_name == 'pull_request_review' && format('PR #{0} review', github.event.pull_request.number))
+  || (github.event_name == 'pull_request' && format('PR #{0} labelled {1}', github.event.pull_request.number, github.event.label.name))
+  || github.ref_name }}
 
 # Mirrors quigley-web: release-please maintains a release PR from Conventional
 # Commits; merging it tags the version and (package) builds the Firefox + Chrome
@@ -11,9 +15,18 @@ run-name: "Release Please — ${{ github.event_name == 'pull_request_review' && 
 #
 # 🔒 ADMIN GATE. Unlike quigley-web, the release PR is NOT merged automatically the
 # moment it appears. Nothing is tagged, released or packaged until someone with
-# **admin** permission on this repo leaves an APPROVED review on the release PR.
-# The approval must be on the PR's current head commit, so a stale approval left on
-# an earlier version cannot release a later one.
+# **admin** permission on this repo clears it, in one of two ways:
+#
+#   1. an APPROVED review on the release PR, or
+#   2. the `release-approved` label applied to it.
+#
+# The label exists because GitHub refuses to let anyone approve their own pull
+# request, and release-please opens this PR with the PAT — so while the PAT's owner
+# is the only admin, route 1 is impossible and route 2 is the only way through.
+#
+# Both are checked against the PR's CURRENT head commit: an approval must name that
+# commit, and the label must have been applied after it was committed. A stale
+# approval or a stale label left on an earlier version cannot release a later one.
 #
 # (GitHub Environments with required reviewers would be the native way to do this,
 # but required-reviewer protection rules need Pro/Team on a private repo — the API
@@ -36,6 +49,8 @@ on:
     branches: ["main"]
   pull_request_review:
     types: [submitted]
+  pull_request:
+    types: [labeled]      # the `release-approved` label is the other way through the gate
   workflow_dispatch:
 
 permissions:
@@ -51,9 +66,9 @@ concurrency:
 jobs:
   release-please:
     name: Release PR / tag
-    # A review submission never changes what should be released — it only unblocks
-    # the merge — so release-please itself sits out those runs.
-    if: github.event_name != 'pull_request_review'
+    # A review submission or a label never changes what should be released — they
+    # only unblock the merge — so release-please itself sits out those runs.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
@@ -110,11 +125,19 @@ jobs:
   gated-merge:
     name: Admin-gated merge
     needs: release-please
-    # Runs on pushes to main AND on review submissions, so the release goes out
-    # whichever happens last: the approval, or a later commit on an already-approved
-    # PR. Skipped on the post-merge run (a release was just cut — nothing to merge),
-    # and skipped entirely while stable releases are paused (see the header).
-    if: always() && vars.STABLE_RELEASES == 'true' && needs.release-please.result != 'failure' && needs.release-please.outputs.release_created != 'true'
+    # Runs on pushes to main AND on the two things that can clear the gate — a review
+    # submission, or the `release-approved` label — so the release goes out whichever
+    # happens last: the approval, or a later commit on an already-approved PR. Skipped
+    # on the post-merge run (a release was just cut — nothing to merge), and skipped
+    # entirely while stable releases are paused (see the header).
+    #
+    # A label event fires for every label on every PR, so runs for any other label are
+    # dropped here rather than doing a pointless lookup.
+    if: >-
+      always() && vars.STABLE_RELEASES == 'true'
+      && needs.release-please.result != 'failure'
+      && needs.release-please.outputs.release_created != 'true'
+      && (github.event_name != 'pull_request' || github.event.label.name == 'release-approved')
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
       # No checkout in this job otherwise; fetch only what the action needs.
@@ -124,7 +147,7 @@ jobs:
           sparse-checkout-cone-mode: false
       - uses: ./.github/actions/gh-cli
 
-      - name: Merge the release PR if an admin has approved it
+      - name: Merge the release PR if an admin has cleared it
         env:
           GH_TOKEN: ${{ secrets.PAT }}   # PAT so the merge push re-triggers this workflow
           REPO: ${{ github.repository }}
@@ -157,41 +180,81 @@ jobs:
             --jq "[.[] | select(.state == \"APPROVED\" and .commit_id == \"${HEAD_SHA}\") | .user.login] | unique | .[]")
 
           ADMIN=""
+          VIA=""
           for who in $APPROVERS; do
             PERM=$(gh api "repos/${REPO}/collaborators/${who}/permission" --jq '.permission' 2>/dev/null || echo "none")
             echo "approver ${who} → permission ${PERM}"
-            if [ "$PERM" = "admin" ]; then ADMIN="$who"; break; fi
+            if [ "$PERM" = "admin" ]; then ADMIN="$who"; VIA="an approving review"; break; fi
           done
 
+          # The other way through: the `release-approved` label, applied by an admin.
+          # GitHub refuses to let anyone approve their own pull request, and release-please
+          # opens this one with the PAT, so on a repo whose only admin is the PAT's owner
+          # the review path above can never be satisfied. A label from an admin says the
+          # same thing and is checked just as strictly.
+          STALE_LABEL=""
           if [ -z "$ADMIN" ]; then
-            echo "⏸️ Release PR #${PR} is not approved by an admin on its current head — not merging."
+            LABELLED=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '[.labels[].name] | index("release-approved") != null')
+            if [ "$LABELLED" = "true" ]; then
+              # Labels do not move when the branch does, so the label must be newer than
+              # the commit it is meant to release. release-please rewrites this branch
+              # whenever main moves, and a label left on an earlier version must not
+              # release a later one.
+              HEAD_AT=$(gh api "repos/${REPO}/commits/${HEAD_SHA}" --jq '.commit.committer.date')
+              EVENTS_JQ='[.[] | select(.event == "labeled" and .label.name == "release-approved")] | last'
+              WHO=$(gh api "repos/${REPO}/issues/${PR}/events" --paginate --jq "${EVENTS_JQ} | .actor.login // empty")
+              WHEN=$(gh api "repos/${REPO}/issues/${PR}/events" --paginate --jq "${EVENTS_JQ} | .created_at // empty")
+              PERM=$(gh api "repos/${REPO}/collaborators/${WHO}/permission" --jq '.permission' 2>/dev/null || echo "none")
+              echo "label applied by ${WHO:-?} (${PERM}) at ${WHEN:-?}; head committed at ${HEAD_AT}"
+              if [ "$PERM" = "admin" ] && [[ -n "$WHEN" && "$WHEN" > "$HEAD_AT" ]]; then
+                ADMIN="$WHO"
+                VIA="the \`release-approved\` label"
+              elif [ "$PERM" = "admin" ]; then
+                STALE_LABEL="${WHO} labelled this at ${WHEN}, before the current head commit (${HEAD_AT}). Remove the label and apply it again."
+              else
+                STALE_LABEL="${WHO:-whoever} applied the label but is not an admin (${PERM})."
+              fi
+            fi
+          fi
+
+          if [ -z "$ADMIN" ]; then
+            echo "⏸️ Release PR #${PR} has not been cleared by an admin on its current head — not merging."
             {
-              echo "## ⏸️ 🔒 Waiting for admin approval"
+              echo "## ⏸️ 🔒 Waiting for admin clearance"
               echo ""
               echo "> ▶️ **Why this ran:** ${{ github.event_name }} — checking whether the release PR is cleared to merge."
               echo ""
               echo "**[#${PR} — ${TITLE}](${{ github.server_url }}/${REPO}/pull/${PR})** is ready but **not released**."
               echo ""
-              echo "An **admin** must leave an \`APPROVED\` review on it (on commit \`$(echo "$HEAD_SHA" | cut -c1-7)\`)."
-              echo "Approving re-triggers this workflow, which then merges, tags and packages."
+              echo "An **admin** clears it either way, on commit \`$(echo "$HEAD_SHA" | cut -c1-7)\`:"
+              echo ""
+              echo "- leave an \`APPROVED\` review on the PR, or"
+              echo "- apply the \`release-approved\` label — the way through when the only admin is"
+              echo "  the PR's own author, since GitHub refuses to let anyone approve their own PR."
+              echo ""
+              echo "Either one re-triggers this workflow, which then merges, tags and packages."
               if [ -n "$APPROVERS" ]; then
                 echo ""
                 echo "Approved on this commit, but not admins: $(echo $APPROVERS | tr ' ' ',')"
+              fi
+              if [ -n "$STALE_LABEL" ]; then
+                echo ""
+                echo "⚠️ The \`release-approved\` label is on the PR but does not count: ${STALE_LABEL}"
               fi
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          echo "::notice::Release PR #${PR} approved by admin ${ADMIN} — merging."
+          echo "::notice::Release PR #${PR} cleared by admin ${ADMIN} via ${VIA} — merging."
           # A 403 here almost always means the PAT can write contents/PRs but isn't
           # allowed to merge — regenerate it as a classic PAT with `repo` (+`workflow`)
           # scope, or fine-grained with Contents + Pull requests R/W.
           gh pr merge "$PR" --repo "$REPO" --rebase \
             || { echo "::error::Failed to merge release PR #${PR}"; exit 1; }
           {
-            echo "## ✅ 🔒 Admin-approved — release PR merged"
+            echo "## ✅ 🔒 Admin-cleared — release PR merged"
             echo ""
-            echo "> ▶️ **Why this ran:** ${{ github.event_name }} — **${ADMIN}** (admin) approved the release PR, so it was merged."
+            echo "> ▶️ **Why this ran:** ${{ github.event_name }} — **${ADMIN}** (admin) cleared the release PR with ${VIA}, so it was merged."
             echo ""
             echo "Merged **[#${PR} — ${TITLE}](${{ github.server_url }}/${REPO}/pull/${PR})**."
             echo "➡️ That push to \`main\` re-triggers this workflow, whose next run cuts the tag and attaches the zips."
@@ -258,5 +321,108 @@ jobs:
             echo "| --- | --- | --- |"
             echo "| \`v${VERSION}\` | \`timed-tabs-firefox-${VERSION}.zip\` | \`timed-tabs-chrome-${VERSION}.zip\` |"
             echo ""
-            echo "📦 Attached to the [GitHub Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${TAG}). Unsigned — AMO submission is still manual."
+            echo "📦 Attached to the [GitHub Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${TAG}), unsigned. ➡️ The **Publish to AMO** job runs next; it uploads the version to the listing when the AMO credentials are set."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-amo:
+    name: Publish to AMO
+    needs: [release-please, package]
+    # Only after a release was cut and its zips were attached. The upload is the
+    # same artefact the package job built, rebuilt from the tag rather than passed
+    # between jobs, so what AMO gets is what `npm run package` produces at that tag.
+    #
+    # 💤 DORMANT UNTIL THE LISTING EXISTS. The AMO API can only add a version to an
+    # add-on that is already listed, and the first submission is manual (see
+    # docs/personal/amo-publishing.md). Without AMO_JWT_ISSUER and AMO_JWT_SECRET
+    # this job skips its work and says so, which is also what forks get.
+    #
+    # ⚠️ AMO refuses a version number it has already seen, even one whose upload
+    # failed validation. A failed publish is fixed by cutting the next patch
+    # release, never by re-running this job.
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
+    steps:
+      # `secrets` is not available in a job-level `if`, so the gate is a step.
+      - name: Are the AMO credentials present?
+        id: creds
+        env:
+          ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if [ -n "$ISSUER" ] && [ -n "$SECRET" ]; then
+            echo "have=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AMO credentials are not set — skipping the upload."
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.creds.outputs.have == 'true'
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      - uses: actions/setup-node@v7
+        if: steps.creds.outputs.have == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.creds.outputs.have == 'true'
+      - name: Build the Firefox target
+        if: steps.creds.outputs.have == 'true'
+        run: npm run build:firefox     # -> dist/firefox, the one whose id matches the listing
+
+      - name: Upload the version to AMO
+        id: sign
+        if: steps.creds.outputs.have == 'true'
+        env:
+          # web-ext reads the credentials from the environment, so they never
+          # appear in a command line or a log.
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          set -euo pipefail
+          # --channel listed adds a version to the public listing; unlisted would
+          # sign a self-hosted build instead. --approval-timeout 0 returns as soon
+          # as AMO accepts the upload rather than waiting out the review.
+          npx web-ext sign \
+            --source-dir dist/firefox \
+            --channel listed \
+            --approval-timeout 0 \
+            --artifacts-dir web-ext-artifacts/amo
+
+      - name: 📋 AMO summary
+        if: always()
+        run: |
+          VERSION="${{ needs.release-please.outputs.version }}"
+          if [ "${{ steps.creds.outputs.have }}" != "true" ]; then
+            {
+              echo "## 💤 AMO publish skipped"
+              echo ""
+              echo "> ▶️ **Why this ran:** v${VERSION} was released, so this job offers to push it to AMO."
+              echo ""
+              echo "\`AMO_JWT_ISSUER\` and \`AMO_JWT_SECRET\` are not set, so nothing was uploaded."
+              echo "The listing has to exist before the API can add versions to it — the first"
+              echo "submission is manual."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.sign.outcome }}" = "success" ]; then
+            {
+              echo "## 🦊 Published v${VERSION} to AMO"
+              echo ""
+              echo "> ▶️ **Why this ran:** v${VERSION} was released, so the Firefox build was uploaded to the listing."
+              echo ""
+              echo "AMO has accepted the upload. Review happens on their side; the version appears"
+              echo "on the listing once it passes."
+              echo ""
+              echo "🔗 [Developer hub](https://addons.mozilla.org/developers/addons)"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## ❌ AMO publish failed"
+              echo ""
+              echo "> ▶️ **Why this ran:** v${VERSION} was released, so the Firefox build was to be uploaded to AMO."
+              echo ""
+              echo "**Do not re-run this job.** AMO remembers a version number even when its upload"
+              echo "failed, so v${VERSION} can never be uploaded again. Fix the cause and cut the"
+              echo "next patch release."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

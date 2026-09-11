@@ -2,7 +2,8 @@
 
 A stable release is cut by release-please from `main` once an admin approves it. A
 beta is a snapshot of `main` taken between stables. Both attach unsigned Firefox and
-Chrome zips to a GitHub Release, and AMO submission is still manual.
+Chrome zips to a GitHub Release; a stable also uploads the Firefox build to the AMO
+listing.
 
 ## ⏸️ Stable releases are paused
 
@@ -29,7 +30,28 @@ deliberately exempt from the check (`enforce_admins` is off) so release-please a
 **Force Release** can still push to `main` directly.
 
 The release PR is not part of this. It stays admin-gated, it carries no `automerge`
-label, and it should not be given one.
+label, and it should not be given one — its label is `release-approved`, which is a
+different thing entirely.
+
+## 🔐 The admin gate
+
+The release PR is merged by the **Admin-gated merge** job, and only once an admin has
+cleared it in one of two ways:
+
+- **An `APPROVED` review**, naming the PR's current head commit.
+- **The `release-approved` label.** GitHub refuses to let anyone approve their own
+  pull request, and release-please opens this PR with the `PAT` — so while the
+  token's owner is the only admin on the repo, a review is impossible and the label
+  is the only way through. The job checks that an admin applied it and that it was
+  applied *after* the current head was committed.
+
+Both checks are tied to the current head on purpose. release-please rewrites the PR
+branch whenever `main` moves, and neither a stale approval nor a stale label may
+release a version nobody looked at. When the branch moves under a label, remove the
+label and apply it again; the run summary says so when that happens.
+
+Approving, or labelling, re-triggers the workflow, which merges, tags and packages.
+Nothing else needs pressing.
 
 ## 🔢 Versions
 
@@ -72,9 +94,10 @@ even when its `tag` is empty, so a real release is never mistaken for a source l
    `initial-version` from its config, which is 0.0.1.
 2. `.github/workflows/release-please.yaml` keeps a release PR open with the next
    version and the changelog.
-3. Nothing is released until someone with admin permission approves that PR on its
-   current head commit. The workflow then merges it, tags `vX.Y.Z`, creates the
-   GitHub Release and attaches the zips.
+3. Nothing is released until someone with admin permission clears that PR, either
+   by approving it or by applying the `release-approved` label. The workflow then
+   merges it, tags `vX.Y.Z`, creates the GitHub Release and attaches the zips.
+   See [The admin gate](#-the-admin-gate).
 4. release-please writes the version to `.release-please-manifest.json`,
    `package.json`, `package-lock.json` and `src/manifest.json`. Never bump a version
    by hand.
@@ -82,6 +105,33 @@ even when its `tag` is empty, so a real release is never mistaken for a source l
 If nothing releasable has landed but you still need a release, run the **Force
 Release** workflow. It pushes an empty `Release-As: X.Y.Z` commit, which the release
 pipeline picks up as usual.
+
+## 🦊 Publishing to AMO
+
+The **Publish to AMO** job in `release-please.yaml` runs after **Package extension**,
+rebuilds `dist/firefox` from the tag and uploads it to the listing with
+`web-ext sign --channel listed`. The zips on the GitHub Release stay unsigned; the
+signed copy is the one AMO serves.
+
+The job is dormant until two repository secrets exist, `AMO_JWT_ISSUER` and
+`AMO_JWT_SECRET`, the JWT credentials from the API keys page on AMO. Without them it
+skips the upload and says so in the run summary, which is also what a fork gets. They
+are unrelated to `PAT`.
+
+Two rules that the API does not forgive:
+
+- **A version number is spent the moment AMO sees it**, even if the upload then fails
+  validation. There is no re-running a failed publish; the fix is the next patch
+  release.
+- **Only `dist/firefox` may be uploaded.** The dev target stamps a different extension
+  id (`timed-tabs-dev@alixfullerton`), and the id is what ties an upload to the
+  listing.
+
+The first submission is not this job's work. A listing has to exist before the API can
+add versions to it, so the first upload is done by hand on the developer hub, along
+with the description, categories and screenshots. That copy lives outside the repo, in
+`docs/personal/amo-listing.md`; the reviewer notes are tracked, in
+[amo-review-notes.md](amo-review-notes.md).
 
 ## 🚧 How a beta happens
 
