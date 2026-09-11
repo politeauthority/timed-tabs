@@ -18,12 +18,38 @@
   let iconImage = null; // HTMLImageElement | null | "failed"
   let ourLink = null;
 
+  let blinkTimer = null;
+  let blinkOn = true;
+
   api.runtime.onMessage.addListener((msg) => {
     if (!msg || typeof msg !== "object") return;
-    if (msg.type === "timed-tabs:favicon") return Promise.resolve(render(msg));
-    if (msg.type === "timed-tabs:reset") restore();
+    if (msg.type === "timed-tabs:favicon") {
+      const r = render(msg);
+      setBlink(Boolean(msg.flash), msg);
+      return Promise.resolve(r);
+    }
+    if (msg.type === "timed-tabs:reset") {
+      setBlink(false);
+      restore();
+    }
     return Promise.resolve("ok");
   });
+
+  // About to expire: alternate the painted icon with the site's plain one.
+  function setBlink(on, msg) {
+    if (!on) {
+      if (blinkTimer) clearInterval(blinkTimer);
+      blinkTimer = null;
+      blinkOn = true;
+      return;
+    }
+    if (blinkTimer) return;
+    blinkTimer = setInterval(() => {
+      blinkOn = !blinkOn;
+      if (blinkOn) render(lastMsg ?? msg);
+      else if (originalHref) setFavicon(originalHref);
+    }, 700);
+  }
 
   function captureOriginal() {
     if (originalLinks) return;

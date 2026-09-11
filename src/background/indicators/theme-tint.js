@@ -40,14 +40,35 @@ export async function start(_ctx) {
   baseColors = current?.colors && Object.keys(current.colors).length ? current.colors : null;
 }
 
+let pulseTimer = null;
+let pulseOn = true;
+
 export async function update(tabs) {
   lastTabs = tabs;
   const byWindow = new Map();
   for (const t of tabs) if (t.active) byWindow.set(t.windowId, t);
+  // Pulse while any window's active tab is about to expire.
+  const anyFlashing = [...byWindow.values()].some((t) => t.flashing);
+  if (anyFlashing && !pulseTimer) {
+    pulseTimer = setInterval(() => {
+      pulseOn = !pulseOn;
+      paint(lastTabs);
+    }, 700);
+  } else if (!anyFlashing && pulseTimer) {
+    clearInterval(pulseTimer);
+    pulseTimer = null;
+    pulseOn = true;
+  }
+  await paint(tabs);
+}
+
+async function paint(tabs) {
+  const byWindow = new Map();
+  for (const t of tabs) if (t.active) byWindow.set(t.windowId, t);
 
   await Promise.all(
-    [...byWindow.values()].map(async ({ windowId, progress, quiet }) => {
-      if (quiet) {
+    [...byWindow.values()].map(async ({ windowId, progress, quiet, flashing }) => {
+      if (quiet || (flashing && !pulseOn)) {
         // Hand the window back to the browser's own theme.
         if (touchedWindows.delete(windowId)) await api.theme.reset(windowId).catch(() => {});
         return;
@@ -64,6 +85,9 @@ export async function update(tabs) {
 }
 
 export async function stop() {
+  if (pulseTimer) clearInterval(pulseTimer);
+  pulseTimer = null;
+  pulseOn = true;
   mediaQuery?.removeEventListener("change", onSchemeChange);
   mediaQuery = null;
   await Promise.all([...touchedWindows].map((w) => api.theme.reset(w).catch(() => {})));
