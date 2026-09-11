@@ -116,6 +116,13 @@ jobs:
     if: always() && vars.STABLE_RELEASES == 'true' && needs.release-please.result != 'failure' && needs.release-please.outputs.release_created != 'true'
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
+      # No checkout in this job otherwise; fetch only what the action needs.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions/gh-cli
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/gh-cli
+
       - name: Merge the release PR if an admin has approved it
         env:
           GH_TOKEN: ${{ secrets.PAT }}   # PAT so the merge push re-triggers this workflow
@@ -204,6 +211,7 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
           fetch-depth: 0
+      - uses: ./.github/actions/gh-cli
       - uses: actions/setup-node@v7
         with:
           node-version: 22
