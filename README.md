@@ -6,8 +6,6 @@
 [![Chrome](https://img.shields.io/badge/Chrome-supported-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![Data collected: none](https://img.shields.io/badge/data%20collected-none-success)](src/manifest.json)
 
---
-
 > 🚧 **Timed Tabs is in beta.** Every release is a snapshot of `main`, published as a
 > [pre-release](https://github.com/politeauthority/timed-tabs/releases). There is no
 > store listing yet, so installing means loading the extension yourself — see
