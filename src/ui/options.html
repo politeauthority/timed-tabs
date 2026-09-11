@@ -174,7 +174,7 @@
         </header>
         <p class="rules-help">
           Rules change settings for tabs whose address matches. Use <code>*</code> as a wildcard;
-          a pattern without <code>https://</code> matches any scheme. Higher priority wins, 0 disables a rule.
+          a pattern without <code>https://</code> matches any scheme. The number beside each rule is its priority: when two rules disagree the higher one wins. The switch parks a rule without deleting it.
         </p>
         <div class="rules-filter">
           <input type="url" id="rules-filter" placeholder="Show rules matching an address, e.g. https://github.com/foo" aria-label="Show rules matching an address" />
