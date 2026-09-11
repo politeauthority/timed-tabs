@@ -124,28 +124,38 @@ Both legs resolve an exact version from that one feed rather than handing
 version actually under test, and puts the number in the log and the job summary.
 
 To test a different pair, change the `firefox` matrix in the workflow and teach the
-resolve step the new label. Nothing in branch protection needs to change — see below.
+resolve step the new label — and update branch protection in the same change, because
+the legs are the required checks. See below.
 
-## The status check
+## The status checks
 
-The check required on `main` is **E2E / headless Firefox**, and it is the `report`
-job, not a matrix leg. `report` `needs` the matrix and fails unless every leg
-succeeded.
+Each leg reports its own check, and both are required on `main`:
 
-The indirection earns its keep: a matrix job's name carries its matrix values, so if
-the legs were the required check, `E2E / headless Firefox (latest)` would be the
-protected context and adding or renaming a version would silently stop the check
-being required. Behind `report`, the matrix can change freely.
+- **E2E / Firefox latest**
+- **E2E / Firefox previous**
 
-Both halves of the name are load-bearing — GitHub prefixes a called workflow's jobs
-with the calling job's name — so renaming `jobs.e2e` in `ci.yaml` or `jobs.report`
-here breaks the requirement without saying so.
+Both halves of each name are load-bearing. GitHub prefixes a called workflow's jobs
+with the calling job's name, so the context is `jobs.e2e` in `ci.yaml` (named `E2E`)
+plus the leg's own name — and a matrix job's name carries its matrix values, which is
+what puts `latest` and `previous` in there.
 
-A PR with the label **ci pause** skips both the matrix and `report`; GitHub counts a
-skipped required check as passed, so the label lets a PR merge without waiting for
-Firefox. `report` carries the same condition as the matrix on purpose: skipped is the
-honest answer on a paused PR, where a green `report` would claim a pass for tests that
-never ran. CI does not wake on
+That last part is the sharp edge: **changing the matrix renames a protected context.**
+Add a third version, rename a leg, drop one — each of those silently stops a required
+check from being required, because branch protection goes on matching a name nothing
+reports any more. Update the required checks on `main` in the same change:
+
+```
+gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/required_status_checks \
+  --input - <<'JSON'
+{"strict": false,
+ "checks": [{"context": "Lint, test & build", "app_id": 15368},
+            {"context": "E2E / Firefox latest", "app_id": 15368},
+            {"context": "E2E / Firefox previous", "app_id": 15368}]}
+JSON
+```
+
+A PR with the label **ci pause** skips the matrix; GitHub counts a skipped required
+check as passed, so the label lets a PR merge without waiting for Firefox. CI does not wake on
 label events, so applying the label does not retroactively skip a run that already
 happened — the next push picks it up, and in the meantime the `Not paused` check is
 red and holding the merge anyway.

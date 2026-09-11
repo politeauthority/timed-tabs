@@ -17,14 +17,13 @@ run-name: "E2E — ${{ github.ref_name }}"
 # pinned, so "previous" follows every release without anyone editing this file. Both
 # must pass.
 #
-# The scenarios run as a matrix, but the status check is the `report` job at the
-# bottom, which is the one branch protection matches. That indirection is the point:
-# a matrix leg's name carries its matrix values, so making the legs the required
-# check would rename it on every version change. Called, `report` shows as
-# `E2E / headless Firefox` -- GitHub prefixes a called workflow's jobs with the
-# calling job's name, and that whole string is the required context. Renaming either
-# half stops the check being required. Dispatched rather than called, it reports
-# under its bare name.
+# Each leg is its own status check: called from CI they report as
+# `E2E / Firefox latest` and `E2E / Firefox previous`, GitHub prefixing a called
+# workflow's jobs with the calling job's name. Both are required on main, so both
+# halves of each name are load-bearing -- and because a matrix leg's name carries its
+# matrix values, changing what the matrix covers renames a protected context.
+# Branch protection has to be updated in the same change. Dispatched rather than
+# called, the legs report under their bare names.
 #
 # A PR labelled "ci pause" skips the job. The job is a required status check, and
 # GitHub counts a skipped required check as passed, so the label lets a PR merge
@@ -288,39 +287,3 @@ jobs:
           # its limit is named as timed out rather than shown as a bare failure.
           timeouts: "Run ./.github/actions/node-toolcache=4, npm ci=4, Firefox libraries=6, Resolve the Firefox version=2, Run browser-actions/setup-firefox@v1=3, Run the scenarios=8"
           job-timeout: 20
-
-  # The status check. Branch protection matches `E2E / headless Firefox`, and this
-  # job is the only thing that carries that name, so the matrix above can grow a
-  # third version or rename a leg without touching a protected branch setting.
-  #
-  # `needs.scenarios.result` is the matrix as a whole: success only when every leg
-  # succeeded. The `ci pause` condition is repeated here so a paused PR skips this
-  # job too -- a skipped required check is what lets a paused PR merge, and a job
-  # that reported success without testing anything would be worse than a skip.
-  report:
-    name: headless Firefox
-    needs: scenarios
-    if: always() && (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci pause'))
-    runs-on: ubuntu-latest   # a verdict on other jobs; nothing here needs the big runner
-    timeout-minutes: 5
-    steps:
-      - name: Verdict
-        env:
-          RESULT: ${{ needs.scenarios.result }}
-        run: |
-          set -euo pipefail
-          case "$RESULT" in
-            success)
-              echo "Every Firefox passed."
-              echo "### ✅ 🦊 Every Firefox passed" >> "$GITHUB_STEP_SUMMARY" ;;
-            cancelled)
-              echo "::error::The scenarios were cancelled; see the matrix jobs."
-              echo "### ⏹️ 🦊 Cancelled before every Firefox reported" >> "$GITHUB_STEP_SUMMARY"
-              exit 1 ;;
-            *)
-              echo "::error::At least one Firefox failed; see the matrix jobs for which."
-              echo "### ❌ 🦊 At least one Firefox failed" >> "$GITHUB_STEP_SUMMARY"
-              echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "Which one, and why, is in the \`Firefox latest\` and \`Firefox previous\` jobs above." >> "$GITHUB_STEP_SUMMARY"
-              exit 1 ;;
-          esac
