@@ -179,9 +179,24 @@ if (IS_DEV_BUILD) {
       // module's own variables to show the seed, then drain the queue so the
       // handlers those changes started have finished too. Bounded: a seed that
       // never shows up is logged and the scenario goes on, rather than hanging.
-      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      // Key order must not count: Chrome hands an object back from storage
+      // with its keys sorted, so the rule that went in as {id, description,
+      // pattern, ...} comes out as {description, id, match, ...}, and a plain
+      // JSON.stringify comparison never matched -- every Chrome scenario sat
+      // out the full ten seconds and the navigation one ran out of window.
+      const canon = (v) =>
+        Array.isArray(v) ? v.map(canon)
+        : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])]))
+        : v;
+      const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
+      // A setting that is itself an object -- featureFlags -- comes back filled
+      // in with every flag the build knows, so the seed's {a: true} is absorbed
+      // once each key it names reads back, not when the whole object matches.
+      const plain = (v) => v && typeof v === "object" && !Array.isArray(v);
+      const holds = (have, want) =>
+        plain(want) && plain(have) ? Object.entries(want).every(([k, v]) => same(have[k], v)) : same(have, want);
       const absorbed = () =>
-        Object.entries(dev.settings ?? {}).every(([k, v]) => same(settings?.[k], v)) &&
+        Object.entries(dev.settings ?? {}).every(([k, v]) => holds(settings?.[k], v)) &&
         (!dev.rules || same(rules, dev.rules)) &&
         (!dev.groups || same(groups, dev.groups));
       const deadline = Date.now() + 10_000;
