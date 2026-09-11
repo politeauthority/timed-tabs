@@ -27,13 +27,20 @@ explaining why it is shaped the way it is; this section is the map over the top.
 
 ## What must be green
 
-Three contexts are required on `main`:
+Four contexts are required on `main`:
 
 ```
 Lint, test & build
+Not paused
 E2E / Firefox latest
 E2E / Firefox previous
 ```
+
+`Not paused` was missing from that list for a while, and the gap is worth
+remembering: the job ran on every PR, went red on every paused one, and held up
+nothing, because branch protection was never reading it — so `ci pause` skipped
+Firefox without blocking the merge, the opposite of what the label is for. A check
+nobody requires is decoration.
 
 Job names are the status-check contexts branch protection matches on, so **renaming a
 job silently stops its check being required** — branch protection goes on waiting for
@@ -49,6 +56,7 @@ gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/requir
   --input - <<'JSON'
 {"strict": false,
  "checks": [{"context": "Lint, test & build", "app_id": 15368},
+            {"context": "Not paused", "app_id": 15368},
             {"context": "E2E / Firefox latest", "app_id": 15368},
             {"context": "E2E / Firefox previous", "app_id": 15368}]}
 JSON
@@ -64,6 +72,14 @@ job reports a skip in its summary while still publishing a green check.
 
 It errs towards running. A kind of file it has not seen before counts as code.
 
+E2E skips one more case on its own: the **release PR**. release-please's branch only
+ever rewrites `CHANGELOG.md` and the four files carrying the version, which no
+scenario reads, so both Firefoxes spent four minutes each on every push to `main`
+saying nothing. Lint, the unit tests and the build still run there, which is what
+keeps `web-ext lint` on the bumped manifest version before the tag is cut, and the
+`package` job re-runs lint and the tests against the tag itself before anything is
+attached to a release.
+
 ## Pausing a pull request
 
 The **`ci pause`** label stops E2E spending Firefox minutes on a branch that is not
@@ -72,9 +88,8 @@ hand back the merge it is meant to hold — which is what the separate **Not pau
 check exists to prevent. It wakes on every label event, runs in seconds on a hosted
 runner, and goes red while the label is on.
 
-> ⚠️ **`Not paused` is not currently a required check on `main`.** `pause.yaml` says it
-> has to be, and until it is, a paused PR reports red but nothing stops it merging.
-> Adding it to the list above is the fix.
+It is a required check on `main`, so the red it reports is what actually holds the
+merge. It was not always — see [What must be green](#what-must-be-green).
 
 CI itself does not wake on label events, so applying the label does not retroactively
 skip a run already in flight; the next push picks it up.

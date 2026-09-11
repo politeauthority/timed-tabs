@@ -32,6 +32,10 @@ run-name: "E2E — ${{ github.ref_name }}"
 # skip a run that already happened; it does not need to, because the `Not paused`
 # check goes red the moment the label lands and no paused PR can merge anyway. The
 # next push picks the label up.
+#
+# The release PR skips it too, for a different reason: release-please's branch only
+# ever carries a CHANGELOG entry and the version, which no scenario reads. See the
+# job's own comment.
 on:
   workflow_call:
   workflow_dispatch:
@@ -51,7 +55,24 @@ jobs:
   scenarios:
     name: Firefox ${{ matrix.firefox }}
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci pause')
+    # Two ways a PR skips Firefox. Both skip the job rather than the caller, so
+    # the check still reports: a required check that never reports blocks the PR
+    # for ever, while a skipped one counts as passed.
+    #
+    # The release PR is the second. release-please only ever rewrites CHANGELOG.md
+    # and the four files carrying the version, and no scenario can read any of
+    # them, so the two Firefoxes have nothing to say about it -- they just spent
+    # four minutes each saying it, on every push to main. Lint, the unit tests and
+    # the build still run there, which is what keeps `web-ext lint` looking at the
+    # bumped manifest version before the tag is cut; and the `package` job in
+    # release-please.yaml re-runs lint and the tests against the tag itself before
+    # anything is attached to a release.
+    if: >-
+      github.event_name != 'pull_request'
+      || (
+        !contains(github.event.pull_request.labels.*.name, 'ci pause')
+        && !startsWith(github.event.pull_request.head.ref, 'release-please--')
+      )
     timeout-minutes: 20
     strategy:
       # Not fail-fast: when one version breaks, the first thing worth knowing is
@@ -233,7 +254,11 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         id: artifacts
-        if: always()
+        # always(), so a failed run still uploads its logs -- but not when the
+        # scenarios never ran: there is no e2e-artifacts/ on a docs-only change,
+        # and starting the upload only to find nothing costs a few seconds of
+        # what is otherwise a twenty-second job.
+        if: always() && steps.changed.outputs.code == 'true'
         with:
           # One name per leg. Two uploads under the same name in one run is an
           # error, and when a version fails you want its artifacts on their own.
