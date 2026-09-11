@@ -10,6 +10,13 @@ inputs:
     description: Node major version.
     required: false
     default: "22"
+  key-suffix:
+    description: >
+      Appended to the cache key. `github.job` alone separates one job from
+      another, but every leg of a matrix shares it, so a matrix must pass
+      something that tells its legs apart or they race to save the same key.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -31,7 +38,7 @@ runs:
         # may be creating this cache", which every run then ends on. A key per
         # job cannot collide; the prefix below still hands either job whatever
         # the other one already cached, so nothing is unpacked twice.
-        key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}-${{ github.job }}
+        key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}-${{ github.job }}${{ inputs.key-suffix }}
         restore-keys: |
           node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}-
     - uses: actions/setup-node@v7

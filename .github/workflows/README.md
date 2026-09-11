@@ -47,10 +47,16 @@ in the same change or leave the name alone.
 
 A called workflow's jobs are named `<calling job's name> / <called job's name>`.
 That is where `E2E / headless Firefox` comes from: `jobs.e2e` in `ci.yaml` is named
-`E2E`, and the job in `e2e.yaml` is named `headless Firefox`. Both halves are part of
-the required context, so either one renamed breaks it. The prefix is not optional — a
-called workflow cannot report under a bare name — which is the price of calling one,
-and worth knowing before moving a required check into one.
+`E2E`, and `jobs.report` in `e2e.yaml` is named `headless Firefox`. Both halves are
+part of the required context, so either one renamed breaks it. The prefix is not
+optional — a called workflow cannot report under a bare name — which is the price of
+calling one, and worth knowing before moving a required check into one.
+
+A matrix job's name carries its matrix values (`Firefox latest`, `Firefox
+previous`), so a matrix leg makes a poor required check: changing what the matrix
+covers renames it. `E2E` puts the legs behind one `report` job that `needs` them and
+reports the verdict, which is why its versions can change without anyone opening
+branch protection.
 
 ## Label triggers
 
