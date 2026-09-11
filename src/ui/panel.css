@@ -832,9 +832,39 @@ body:not([data-context="popup"]) .settings-title {
   transform: none;
 }
 
+/* Sits on the action row beside Restart and Snooze. */
 .tab-never {
-  width: 100%;
-  margin-top: var(--sp-1);
+  flex: none;
+  margin-left: var(--sp-1);
+}
+
+.tab-actions .act-flash {
+  margin-left: auto;
+}
+
+/* A small count beside a heading. Zero is shown, just quieter. */
+.count-badge {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-left: var(--sp-1);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: center;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-badge.is-zero {
+  opacity: 0.6;
+}
+
+.section-head .icon-btn {
+  margin-left: auto;
 }
 
 .tab-paused p {
@@ -928,7 +958,8 @@ body:not([data-context="popup"]) .settings-title {
 }
 
 .tab-rules-section .tab-never {
-  margin-top: var(--sp-2);
+  width: 100%;
+  margin: var(--sp-2) 0 0;
 }
 
 /* ---- Lists: open tabs and recently expired ------------------------------------ */
