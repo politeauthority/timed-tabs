@@ -31,7 +31,7 @@ To load a build by hand instead:
 ## Checking it
 
 ```sh
-npm run lint         # eslint and web-ext lint
+npm run lint         # eslint, web-ext lint, and the icons are in sync
 npm test             # vitest, watch with npm run test:watch
 npm run e2e          # headless Firefox, see e2e.md
 ```
@@ -48,6 +48,22 @@ npm run build:chrome    # -> dist/chrome
 npm run build:dev       # -> dist/dev, the seeded dev build
 npm run package         # both zips, into web-ext-artifacts/
 ```
+
+## The icons
+
+`src/icons/` is generated, not drawn by hand. The dial's geometry lives in
+`src/shared/icon-art.js` and `scripts/icons.mjs` rasterises it — no image library, so
+it works from a plain `npm ci`.
+
+```sh
+npm run icons         # rewrite src/icons/ from the geometry
+npm run icons:check   # fail if what is committed has drifted (part of npm run lint)
+```
+
+The same geometry paints the toolbar button at runtime in
+`src/background/indicators/action-icon.js`, which is what keeps the live ring and the
+shipped icon the same mark. Change the art in `icon-art.js`, run `npm run icons`, and
+commit what it writes.
 
 Each dist tree gets a `build.json` next to the manifest holding the version, semver,
 tag, channel, commit and build time. A plain `src/` load has no `build.json`, and that

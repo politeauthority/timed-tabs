@@ -58,9 +58,9 @@ export function createNotifier({ api = defaultApi, flushMs = FLUSH_MS } = {}) {
     try {
       await api.notifications.create(id, {
         type: "basic",
-        // Chrome requires an iconUrl and will not take an SVG; it gets no
-        // notification until the raster icons land. Firefox is happy without.
-        iconUrl: api.runtime?.getURL?.("icons/icon.svg"),
+        // Chrome requires an iconUrl and will not take an SVG, so this is the
+        // raster mark from scripts/icons.mjs rather than icons/icon.svg.
+        iconUrl: api.runtime?.getURL?.("icons/icon-96.png"),
         ...describe(batch),
       });
     } catch (e) {

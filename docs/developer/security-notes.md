@@ -74,17 +74,12 @@ and the grant button all handle being refused.
 Not done yet. Chrome's runtime permission flow needs testing first, and a wrong move
 here breaks the indicators for everyone on Chrome rather than degrading politely.
 
-### Chrome cannot render the icons
+### Chrome cannot render SVG icons
 
-`icons` and `action.default_icon` both point at `icons/icon.svg`, which is the only
-icon in the tree. Chrome does not support SVG icons; it needs raster.
-
-The same gap stops Chrome notifications working, because `notifications.create`
-requires a raster `iconUrl` there and falls into a `console.warn` instead. One set of
-PNGs at 16, 32, 48 and 128 fixes both.
-
-Not done yet, and it is the one that most obviously makes the Chrome build look
-unfinished.
+Done. `icons`, `action.default_icon` and the notification `iconUrl` all point at the
+PNG set, which `scripts/icons.mjs` regenerates from the geometry in
+`src/shared/icon-art.js`. `icons/icon.svg` comes out of the same source and is kept
+for anything that prefers vector.
 
 ## 🧰 Dependencies
 
