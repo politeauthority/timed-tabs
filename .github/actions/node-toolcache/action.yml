@@ -22,7 +22,7 @@ runs:
         . /etc/os-release 2>/dev/null || true
         echo "id=${ID:-unknown}-${VERSION_ID:-unknown}" >> "$GITHUB_OUTPUT"
     - id: restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ runner.tool_cache }}/node
         key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}
@@ -31,7 +31,7 @@ runs:
         node-version: ${{ inputs.node-version }}
         cache: npm
     - if: always() && steps.restore.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: ${{ runner.tool_cache }}/node
         key: ${{ steps.restore.outputs.cache-primary-key }}

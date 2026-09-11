@@ -82,7 +82,7 @@ jobs:
       - name: Restore the Firefox libraries
         if: steps.changed.outputs.code == 'true'
         id: libs
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/firefox-libs.tar
           key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}
@@ -126,7 +126,7 @@ jobs:
           echo "packed=true" >> "$GITHUB_OUTPUT"
       - name: Save the Firefox libraries
         if: always() && steps.firefox-libs.outputs.packed == 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ~/firefox-libs.tar
           key: ${{ steps.libs.outputs.cache-primary-key }}
