@@ -12,6 +12,7 @@
     "build:firefox": "node scripts/build.mjs firefox",
     "build:chrome": "node scripts/build.mjs chrome",
     "build:dev": "node scripts/build.mjs dev",
+    "e2e": "node scripts/e2e.mjs",
     "package": "npm run package:firefox && npm run package:chrome",
     "package:firefox": "npm run build:firefox && web-ext build --source-dir dist/firefox --artifacts-dir web-ext-artifacts --overwrite-dest --filename timed-tabs-firefox-${ZIP_VERSION:-$npm_package_version}.zip",
     "package:chrome": "npm run build:chrome && web-ext build --source-dir dist/chrome --artifacts-dir web-ext-artifacts --overwrite-dest --filename timed-tabs-chrome-${ZIP_VERSION:-$npm_package_version}.zip",

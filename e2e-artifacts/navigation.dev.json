@@ -1,0 +1,40 @@
+{
+  "openWindows": [
+    [
+      "about:blank",
+      "https://example.com/"
+    ]
+  ],
+  "settings": {
+    "tabLifetimeSeconds": 1800,
+    "tickSeconds": 2,
+    "indicators": [
+      "favicon"
+    ],
+    "faviconStyle": "square"
+  },
+  "rules": [
+    {
+      "id": "r1",
+      "description": "dot on .org",
+      "pattern": "example.org/*",
+      "match": "wildcard",
+      "priority": 5,
+      "set": {
+        "faviconStyle": "dot",
+        "tabLifetimeSeconds": 60
+      }
+    }
+  ],
+  "navigate": [
+    {
+      "at": 8000,
+      "from": "https://example.com/",
+      "to": "https://example.org/"
+    }
+  ],
+  "captureAfterMs": 12000,
+  "openUrls": [
+    "ui/panel.html?view=page#tabs"
+  ]
+}

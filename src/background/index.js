@@ -69,6 +69,7 @@ async function recordExpired(tab, action) {
   });
   list.splice(RECENT_MAX);
   await api.storage.local.set({ [RECENT_KEY]: list });
+  if (IS_DEV_BUILD) console.log(`[timed-tabs] recorded ${tab.url} icon=${list[0].favIconUrl ? "yes" : "no"}`);
 }
 
 const ready = tracker.seed();
@@ -89,6 +90,16 @@ if (IS_DEV_BUILD) {
       if (dev.groups) await api.storage.local.set({ siteGroups: dev.groups });
       for (const urls of dev.openWindows ?? []) await api.windows.create({ url: urls }).catch(() => {});
       await Promise.all((dev.openUrls ?? []).map((u) => api.tabs.create({ url: api.runtime.getURL(u) })));
+      // "navigate": [{ "at": ms, "from": url, "to": url }] sends the tab that is
+      // on `from` to `to`, so a scenario can check rules re-evaluate on navigation.
+      for (const n of dev.navigate ?? []) {
+        setTimeout(async () => {
+          const [tab] = await api.tabs.query({ url: n.from }).catch(() => []);
+          if (!tab) return console.log(`[timed-tabs] navigate: no tab on ${n.from}`);
+          await api.tabs.update(tab.id, { url: n.to }).catch(() => {});
+          console.log(`[timed-tabs] navigated ${tab.id} ${n.to}`);
+        }, n.at ?? 0);
+      }
       // "captureAfterMs": render the active tab via the browser (works even
       // when the window is not on screen) and log it as a data URL.
       if (dev.captureAfterMs) {
@@ -521,6 +532,7 @@ async function tick() {
 async function expire(tab, onExpire) {
   if (expired.has(tab.id)) return;
   expired.add(tab.id);
+  if (IS_DEV_BUILD) console.log(`[timed-tabs] expired ${tab.id} ${tab.url} action=${onExpire}`);
   try {
     if (onExpire === "close") {
       // Only tabs we actually close are worth listing. The favicon indicator

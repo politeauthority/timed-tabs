@@ -1,0 +1,74 @@
+name: E2E
+run-name: "E2E — ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.pull_request.number) || github.ref_name }}"
+
+# 🦊 Runs the extension in a real, headless Firefox on the self-hosted runner and
+# checks each scenario in tests/e2e/scenarios against the log it produces. See
+# docs/developer/e2e.md.
+#
+# When it runs: every push to main, and every open PR, including when a label is
+# added or removed. A PR labelled "ci pause" skips the job. The job is a required
+# status check, and GitHub counts a skipped required check as passed, so the label
+# lets a PR merge without waiting for Firefox while still leaving the check in
+# place for every other PR. Remove the label to run it again.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E (headless Firefox)
+    runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
+    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci pause')
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Firefox libraries
+        # Ubuntu 24.04 on the runner; ALSA is libasound2t64 there.
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 \
+            libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils > /dev/null
+      - uses: browser-actions/setup-firefox@v1
+        id: firefox
+        with:
+          firefox-version: latest
+      - run: "${{ steps.firefox.outputs.firefox-path }}" --version
+
+      - name: Run the scenarios
+        env:
+          FIREFOX: ${{ steps.firefox.outputs.firefox-path }}
+        run: npm run e2e
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-artifacts
+          path: e2e-artifacts/
+          if-no-files-found: ignore
+
+      - name: 📋 Summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then head="### ✅ 🦊 E2E passed"; else head="### ❌ 🦊 E2E failed"; fi
+          {
+            echo "$head"
+            echo ""
+            echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`. Scenarios in \`tests/e2e/scenarios\`; logs and screenshots in the **e2e-artifacts** artifact."
+          } >> "$GITHUB_STEP_SUMMARY"

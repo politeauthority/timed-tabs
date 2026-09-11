@@ -7,4 +7,4 @@ web-ext-artifacts/
 src/dev.json   # must never exist; test seeding lives in dist/dev
 backups/
 docs/personal
-worktrees/
+worktrees/e2e-artifacts/
