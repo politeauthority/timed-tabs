@@ -4,7 +4,23 @@ Timed Tabs gives every tab an expiry timer, shows how much of it is left, and do
 something about the tab when the time is up. Everything happens inside the browser;
 there is no account and no server.
 
-## The timer
+> 🚧 **Beta.** Every release is a snapshot of `main`, published as a pre-release, so
+> what is described here can still change between builds. See [🚧 Betas](#-betas).
+
+## Contents
+
+- [⏳ The timer](#-the-timer)
+- [🔔 What happens at zero](#-what-happens-at-zero)
+- [🎨 Seeing the time left](#-seeing-the-time-left)
+- [🪟 The popup](#-the-popup)
+- [📑 The Tabs page](#-the-tabs-page)
+- [📋 Rules](#-rules)
+- [⚙️ Settings](#-settings)
+- [🔒 Privacy and permissions](#-privacy-and-permissions)
+- [🦊 Firefox and Chrome](#-firefox-and-chrome)
+- [🚧 Betas](#-betas)
+
+## ⏳ The timer
 
 Every tab starts a clock the moment it appears. The default lifetime is 30 minutes,
 set under Settings, Timing. Two settings change when the clock runs:
@@ -17,7 +33,7 @@ set under Settings, Timing. Two settings change when the clock runs:
 Pinned tabs are left alone. So is the tab you are looking at: whatever the expiry
 action is, it never touches the active tab.
 
-## What happens at zero
+## 🔔 What happens at zero
 
 Settings, When a tab expires, has one action for every background tab that runs
 out of time:
@@ -33,7 +49,7 @@ reopens the tab when there was one, and opens the Tabs page when there were more
 This needs the browser's notification permission, which is asked for when the setting
 is switched on.
 
-## Seeing the time left
+## 🎨 Seeing the time left
 
 Settings, Appearance, offers four indicators. Use any combination. Colour runs
 green, yellow, red as time runs out.
@@ -52,7 +68,7 @@ indicator blink during the last stretch, by default the final minute. **Leave fr
 tabs alone** shows nothing until a tab has used part of its lifetime, 40% by default,
 so recently opened tabs look like ordinary tabs.
 
-## The popup
+## 🪟 The popup
 
 The toolbar button opens a small panel for the current tab.
 
@@ -70,7 +86,7 @@ The toolbar button opens a small panel for the current tab.
 - The footer opens the Tabs page, the rules that apply to this page, and Settings,
   and links to the source code.
 
-## The Tabs page
+## 📑 The Tabs page
 
 ![The Tabs page: every open tab with its bar, rule count and quick actions, and the recently expired list](../assets/screenshots/tabs.png)
 
@@ -87,7 +103,7 @@ keeps the site's icon and can be reopened. A page that keeps expiring shows once
 with a count and the time it was last closed. Rows can be removed one at a time, or
 the whole list cleared.
 
-## Rules
+## 📋 Rules
 
 ![The Rules page, with one rule expanded to show its pattern, match mode, priority and overrides](../assets/screenshots/rules.png)
 
@@ -110,7 +126,7 @@ The rules list is sorted by pattern. A filter box shows only the rules that matc
 address. **Make / edit rules for this page** in the popup opens the list filtered to
 the current site, and **Add rule** starts one for that site and scrolls to it.
 
-## Settings
+## ⚙️ Settings
 
 ![The Settings page](../assets/screenshots/settings.png)
 
@@ -126,20 +142,20 @@ through the browser's extension storage; rules are kept locally.
   when an indicator does not seem to paint.
 - **Refresh every** sets how often colours and badges update, 5 seconds by default.
 
-## Privacy and permissions
+## 🔒 Privacy and permissions
 
 The manifest declares no data collection. Timed Tabs asks for access to all sites
 because the favicon and title indicators run a small script in each page to change
 its icon or title; nothing is read from the page. Notifications are an optional
 permission, asked for only when the setting is turned on.
 
-## Firefox and Chrome
+## 🦊 Firefox and Chrome
 
 Firefox 140 or later is the primary target, including Firefox for Android 142 or
 later. Chrome builds are produced from the same source; the tab tint indicator is
 Firefox only because Chrome has no theme API for it.
 
-## Betas
+## 🚧 Betas
 
 While the project is in development, each release is a beta. A beta shows a yellow
 BETA badge beside the title and is listed as "Timed Tabs Beta" in the add-ons

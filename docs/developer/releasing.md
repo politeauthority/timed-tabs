@@ -4,7 +4,7 @@ A stable release is cut by release-please from `main` once an admin approves it.
 beta is a snapshot of `main` taken between stables. Both attach unsigned Firefox and
 Chrome zips to a GitHub Release, and AMO submission is still manual.
 
-## Stable releases are paused
+## ⏸️ Stable releases are paused
 
 While the project is in development, every release is a beta. release-please still
 keeps its release PR up to date, because the Beta Release workflow reads the next
@@ -16,7 +16,7 @@ Set it to `true` to resume stable releases; delete it to pause them again.
 Do not merge the release PR by hand while paused. The next workflow run would treat
 that merge as a stable release and tag it.
 
-## Versions
+## 🔢 Versions
 
 Stable releases use three-part semver, `0.8.0`. Betas use a prerelease suffix,
 `0.8.0-beta.14`. That is the git tag, the GitHub Release name, the zip file name and
@@ -42,7 +42,7 @@ are named `0.0.1-beta.N`.
 with `tag` appended. `channel` is `beta`, `dev` or empty. A checkout loaded straight
 from `src/` has no `build.json` and shows the manifest version alone.
 
-## How a stable release happens
+## 🚀 How a stable release happens
 
 1. Commits land on `main` through PRs. They must be Conventional Commits, because
    release-please derives the bump from them. Below 1.0.0 both `feat:` and `fix:` bump
@@ -63,7 +63,7 @@ If nothing releasable has landed but you still need a release, run the **Force
 Release** workflow. It pushes an empty `Release-As: X.Y.Z` commit, which the release
 pipeline picks up as usual.
 
-## How a beta happens
+## 🚧 How a beta happens
 
 Open the **Beta Release** workflow in the Actions tab and run it. It:
 
@@ -85,7 +85,7 @@ approved, the stable ships as normal and the beta tags stay where they are.
 The workflow is manual on purpose while the flow is new. To cut a beta on every push
 to `main`, add `push: branches: [main]` to its `on:` block.
 
-## What a beta looks like to the user
+## 👀 What a beta looks like to the user
 
 The build script renames the extension to "Timed Tabs Beta" in the manifest and the
 toolbar tooltip, so it reads as a beta in `about:addons` and on hover. The popup and
@@ -96,7 +96,7 @@ get the same treatment with a grey DEV badge.
 A beta uses the same extension id as stable, so installing one replaces the stable
 install. Both cannot run at once; they would paint the same tabs.
 
-## Building a beta locally
+## 🔧 Building a beta locally
 
 ```sh
 BUILD_CHANNEL=beta BUILD_SEMVER=0.8.0 BUILD_TAG=beta.14 MANIFEST_VERSION=0.7.0.14 \
@@ -106,7 +106,7 @@ BUILD_CHANNEL=beta BUILD_SEMVER=0.8.0 BUILD_TAG=beta.14 MANIFEST_VERSION=0.7.0.1
 `ZIP_VERSION` names the zips. Without it they take the version from `package.json`.
 Set `BUILD_TAG=rc1` on its own for a stable-versioned build that shows `0.8.0-rc1`.
 
-## Things that are easy to break
+## ⚠️ Things that are easy to break
 
 `npm run lint` runs `web-ext lint`, which rejects a manifest version with anything but
 digits and dots, so a bad `MANIFEST_VERSION` fails in CI before it can be tagged. The
