@@ -122,6 +122,13 @@ on:
         type: string
         required: false
         default: always
+      skip-when-full:
+        # Never true on a dispatch, which is not a pull request; declared so
+        # that every `inputs.*` the job reads exists for this trigger too.
+        description: Skip the legs on a PR to main that carries the `ci run full` label.
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -151,7 +158,8 @@ jobs:
       # Not fail-fast: when one version breaks, the first thing worth knowing is
       # whether the other one broke too. Cancelling it throws that away.
       fail-fast: false
-      max-parallel: ${{ inputs.max-parallel }}
+      # fromJSON, so a dispatch (whose inputs arrive as strings) gives a number too.
+      max-parallel: ${{ fromJSON(inputs.max-parallel) }}
       matrix:
         # Straight from the input. The job name above is the status check branch
         # protection matches on; `<browser>-<channel>` keys the caches and the
