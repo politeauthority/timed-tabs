@@ -39,8 +39,13 @@ are named `0.0.1-beta.N`.
 ```
 
 `src/shared/version.js` shows `semver` when present, otherwise the manifest version,
-with `tag` appended. `channel` is `beta`, `dev` or empty. A checkout loaded straight
-from `src/` has no `build.json` and shows the manifest version alone.
+with `tag` appended. `channel` is `beta`, `dev` or empty.
+
+A checkout loaded straight from `src/` has no `build.json`, and that absence is what
+marks it: it shows as `0.0.1-dev` and wears the dev badge. Nothing stamps it, because
+release-please owns the manifest version and Firefox will not accept a suffix there,
+so the `-dev` exists only for display. A built target always writes a `build.json`,
+even when its `tag` is empty, so a real release is never mistaken for a source load.
 
 ## 🚀 How a stable release happens
 
