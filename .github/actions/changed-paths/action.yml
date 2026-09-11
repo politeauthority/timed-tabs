@@ -31,9 +31,17 @@ runs:
 
         # Anything not listed here counts as code. A deny-list fails safe: add a
         # file type nobody thought about and the checks still run.
+        #
+        # `.github/` is the one place with a carve-out the other way. CI is
+        # ci.yaml, e2e.yaml and the actions they call, and a PR runs on its own
+        # copy of those, so editing them is exactly what the run verifies. The
+        # other workflows (auto-merge, pause, the releases) and dependabot.yaml
+        # are not what this run exercises: lint and a browser cannot tell them
+        # from a README.
         is_docs() {
           case "$1" in
-            docs/*|assets/*|*.md|LICENSE|.gitignore|.editorconfig) return 0 ;;
+            .github/workflows/ci.yaml|.github/workflows/e2e.yaml|.github/actions/*) return 1 ;;
+            docs/*|assets/*|.github/*|*.md|LICENSE|.gitignore|.editorconfig) return 0 ;;
             *) return 1 ;;
           esac
         }

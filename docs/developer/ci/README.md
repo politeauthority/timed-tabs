@@ -91,7 +91,12 @@ whether the work is worth doing: [`changed-paths`](../../../.github/actions/chan
 answers "false" only when every changed file is documentation or an asset, and the
 job reports a skip in its summary while still publishing a green check.
 
-It errs towards running. A kind of file it has not seen before counts as code.
+It errs towards running. A kind of file it has not seen before counts as code. The
+other workflows (auto-merge, pause, the releases) and `dependabot.yaml` count as
+documentation: they are not what lint or a browser exercises, so a change to them
+has nothing to learn from either. `ci.yaml`, `e2e.yaml` and `.github/actions/` stay
+code, because a PR runs on its own copy of those and the run is what verifies the
+edit.
 
 E2E skips one more case on its own: the **release PR**. release-please's branch only
 ever rewrites `CHANGELOG.md` and the four files carrying the version, which no
