@@ -145,9 +145,13 @@ timing alone. A later event on a commit that already passed — a review, anothe
 reuses that result instead of running again: "passed" meaning an earlier run's `Full /`
 legs all concluded green, not merely that the run finished, since an unlabelled run
 finishes green having tested nothing. A new push cancels the legs still running for the
-commit it replaced. A pull request against a branch other than `main` passes the gate
-without the label, and so does the release PR, whose branch never carries anything a
-scenario reads.
+commit it replaced: the workflow's concurrency group is the pull request, so GitHub drops
+the older run as it queues the newer one, without either waiting for a runner. The one
+thing that costs is a label added while the legs for that same commit are mid-flight —
+it restarts them rather than queueing behind and reusing the result.
+
+A pull request against a branch other than `main` passes the gate without the label, and
+so does the release PR, whose branch never carries anything a scenario reads.
 
 ## Keeping an armed PR current
 
