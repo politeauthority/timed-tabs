@@ -1224,29 +1224,47 @@ body:not([data-context="popup"]) .trow {
   padding: var(--sp-3) var(--gutter) var(--sp-1);
 }
 
-.jump a {
+.jump-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
+  gap: var(--sp-1);
+  min-height: 26px;
+  padding: 0 12px;
+  border: 0;
   border-radius: var(--r-pill);
+  font: inherit;
   font-size: var(--fs-sm);
   color: var(--ink-2);
-  text-decoration: none;
   background: var(--control);
+  cursor: pointer;
 }
 
-.jump a:hover {
+.jump-pill:hover {
   background: var(--control-hover);
   color: var(--ink);
 }
 
-.group {
-  padding: var(--sp-5) var(--gutter) var(--sp-2);
-  scroll-margin-top: var(--sp-3);
+/* The group on show. Weight as well as colour, so it still reads as chosen
+   when the accent is hard to see against a theme. */
+.jump-pill.is-selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
 }
 
-.group + .group,
+.jump-pill.is-selected:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.group {
+  /* One group at a time now, so it no longer needs the space that separated
+     it from the next one, nor a scroll margin to clear the pills. */
+  padding: var(--sp-3) var(--gutter) var(--sp-2);
+}
+
+/* Groups no longer need a rule between them: only one is ever on show, and a
+   hidden sibling still matches `+`, so this would draw a line above it. */
 .settings + .backup,
 .backup + .diagnostics {
   border-top: 1px solid var(--line);

@@ -54,13 +54,16 @@ export const DEFAULTS = Object.freeze({
 export const GROUPS = [
   {
     id: "master",
+    emoji: "🔌",
     title: "Timed Tabs",
+    // `short` names the pill, where there is no room for a sentence.
+    short: "On / off",
     help: "Whether Timed Tabs does anything to your tabs at all.",
   },
-  { id: "timing", title: "Timing", help: "How long tabs live and when the clock runs." },
-  { id: "expiry", title: "When a tab expires", help: "What happens to a background tab once its time is up." },
-  { id: "appearance", title: "Appearance", help: "How remaining time is shown in the browser." },
-  { id: "advanced", title: "Advanced", help: "Rarely needed." },
+  { id: "timing", emoji: "⏳", title: "Timing", short: "Timing", help: "How long tabs live and when the clock runs." },
+  { id: "expiry", emoji: "🔔", title: "When a tab expires", short: "Expiry", help: "What happens to a background tab once its time is up." },
+  { id: "appearance", emoji: "🎨", title: "Appearance", short: "Appearance", help: "How remaining time is shown in the browser." },
+  { id: "advanced", emoji: "🔧", title: "Advanced", short: "Advanced", help: "Rarely needed." },
 ];
 
 /**
