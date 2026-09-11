@@ -1,8 +1,10 @@
 # 🌐 Chrome
 
-Firefox is the primary target and the one with an end-to-end suite behind it. Chrome
-is built, packaged and attached to every release, and everything below was run against
-it — but it is not yet covered by CI, and it is not on the Chrome Web Store.
+Firefox is the supported browser. Chrome is planned and not yet supported. The Chrome
+build is packaged and attached to every release, everything below was run against it,
+and its end-to-end legs, nightly and stable, run in CI as advisory checks. It is not on
+the Chrome Web Store,
+and nothing gates a release on it. See the [road map](../road-map.md).
 
 This page is what differs, and what to watch for. [building.md](building.md) covers the
 build itself.
@@ -109,23 +111,24 @@ behind it first.
 
 ## Testing
 
-There is no Chrome end-to-end suite yet. The Firefox one cannot simply be pointed at
-Chrome: it reads the extension's console output from web-ext's stdout, and Chrome has no
-equivalent — its logs come over CDP or not at all.
+`npm run e2e:chrome` runs the same scenarios as the Firefox suite in a headless Chrome,
+and CI runs a Chrome leg beside the Firefox ones as an advisory check. The Firefox
+runner could not simply be pointed at Chrome: it reads the extension's console output
+from web-ext's stdout, and Chrome has no equivalent — its logs come over CDP or not at
+all. [ci/e2e.md](ci/e2e.md) covers the driver.
 
-What is in place for one:
+What the suite relies on:
 
 - `npm run build:dev:chrome` produces `dist/chrome-dev`: the dev hook and its `dev.json`
   seeding, with the Chrome manifest.
 - The dev hook recognises a dev build by its id *or* its manifest name. Chrome hands out
   an opaque id, so the name — `Timed Tabs (dev)`, written by `scripts/manifest.js` — is
   what it keys off there. Neither mark can fire in a profile that loads `src/` directly.
-- `tests/e2e/scenarios/*.json` are browser-agnostic apart from expectations that name
-  Firefox-only indicators, which is what a runner would need to account for.
+- `tests/e2e/scenarios/*.json` are browser-agnostic: they pin the indicators they use
+  rather than relying on a default, so the Firefox-only tint never enters.
 
-A Chrome runner needs no new dependency: Node's global `WebSocket` is enough for the
-handful of CDP calls involved.
+The runner needs no new dependency: Node's global `WebSocket` is enough for the handful
+of CDP calls involved.
 
-Until then, Chrome is checked by hand. The things worth walking through: a tab expiring
-and closing, the recently-expired list keeping the page's own favicon, the favicon mark
-in both colour schemes, the toolbar ring, and the popup and page views.
+What the scenarios do not cover is still checked by hand before a release: the favicon
+mark in both colour schemes, the toolbar ring, and the popup and page views.

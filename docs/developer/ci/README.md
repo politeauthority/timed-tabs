@@ -40,10 +40,12 @@ E2E / Firefox stable-1
 CI run full
 ```
 
-`E2E / Chrome stable` runs on every PR and push beside the two Firefoxes but is not
-among them: it is advisory until it has been reliably green for a while, at which
-point it becomes a sixth required context by adding it here and to the `gh api` call
-below. Nothing in the workflows needs to change for that.
+`E2E / Chrome nightly` and `E2E / Chrome stable` run on every PR and push beside the
+two Firefoxes but are not among them. Chrome is planned rather than supported (see the
+[road map](../../road-map.md)), so while that holds its legs are advisory and only
+those two channels run. When Chrome is supported, `Chrome stable` becomes a sixth
+required context: add it here and to the `gh api` call below. The older majors join
+the full run by adding them to `full.yaml`'s `chrome` list.
 
 CI's three E2E legs stand down on a PR to `main` that carries the `ci run full`
 label, because the full run below tests those same versions and more, and the
@@ -105,21 +107,22 @@ so it is enforced by a required status, **CI run full**, that `full.yaml` posts 
 head commit. The label is a merge requirement, not a test, so a missing one is not a
 failure: the status sits at *pending*, the merge box says "Waiting" and stays locked,
 and nothing on the PR is red for a label nobody has had a reason to add yet. With the
-label on, the E2E scenarios run on the standard set in both browsers — `nightly`,
-`stable`, `stable-1` and `stable-2`, each resolved from the browser's own feed the way
-`E2E` resolves its legs — and the status goes green once Firefox stable and the two
-before it have passed. Each browser is its own segment of the gate's summary with its
+label on, the E2E scenarios run on the standard set for Firefox — `nightly`, `stable`,
+`stable-1` and `stable-2`, each resolved from Mozilla's feed the way `E2E` resolves its
+legs — and on Chrome `nightly` and `stable`, which is all Chrome runs while it is planned
+rather than supported. The status goes green once Firefox stable and the two before it
+have passed. Each browser is its own segment of the gate's summary with its
 own table and verdict, and the status description names them: "Firefox: passed;
 Chrome (advisory): stable-2 did not pass". Two kinds of leg are advisory, shown and
 flagged but never counted: nightly in both browsers, Firefox Nightly and Chrome
-Canary being daily builds, and every Chrome leg while Chrome is being proven on the
-runner. An advisory leg that fails is a warning on its job, not a red — `e2e.yaml`
+Canary being daily builds, and every Chrome leg while Chrome is planned rather than
+supported. An advisory leg that fails is a warning on its job, not a red — `e2e.yaml`
 runs it with `continue-on-error` — and the gate's `--advisory nightly,chrome` keeps
 it out of the verdict; the two are kept in step by hand. Take the label off and the
 status goes back to pending. It is red only when a Firefox stable leg actually fails.
 
-The eight legs report as `Full / Firefox nightly` through `Full / Firefox stable-2`
-and `Full / Chrome nightly` through `Full / Chrome stable-2`. None of them is required
+The six legs report as `Full / Firefox nightly` through `Full / Firefox stable-2`,
+plus `Full / Chrome nightly` and `Full / Chrome stable`. None of them is required
 on its own, and neither is the `Full run gate` job that posts the status; only the
 status is, so adding or dropping a leg does not touch branch protection.
 
