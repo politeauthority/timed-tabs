@@ -10,3 +10,6 @@ docs/personal
 
 # Development
 worktrees/
+
+# End-to-end run output (npm run e2e)
+e2e-artifacts/
