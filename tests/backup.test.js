@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 globalThis.browser ??= { storage: { sync: {}, local: {}, onChanged: { addListener() {} } } };
 const { exportBundle, exportText, parseBundle } = await import("../src/shared/backup.js");
 const { DEFAULTS } = await import("../src/shared/settings.js");
+const { DEFAULT_FLAGS } = await import("../src/shared/flags.js");
 
 describe("backup round trip", () => {
   it("exports every setting and survives a parse", () => {
@@ -45,7 +46,7 @@ describe("feature flags in a backup", () => {
   it("round-trips a flag that is on", () => {
     const text = exportText({ ...DEFAULTS, featureFlags: { "beta-features": true } }, []);
     const { settings, warnings } = parseBundle(text);
-    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false, "mini-ui-page-settings": false });
+    expect(settings.featureFlags).toEqual({ ...DEFAULT_FLAGS, "beta-features": true });
     expect(warnings).toEqual([]);
   });
 
@@ -56,7 +57,7 @@ describe("feature flags in a backup", () => {
       rules: [],
     });
     const { settings, warnings } = parseBundle(text);
-    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false, "mini-ui-page-settings": false });
+    expect(settings.featureFlags).toEqual({ ...DEFAULT_FLAGS, "beta-features": true });
     expect(warnings).toEqual([]);
   });
 

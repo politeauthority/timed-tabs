@@ -121,22 +121,33 @@ picks up the other site's rules.
   Wildcards are shown in colour so they stand out. New rules start with `https://`.
 - **Match** is either the whole address against the pattern, or "starts with".
 - **Priority** runs from 0 to 10. When two rules disagree, the higher number wins,
-  and 0 switches a rule off. It is shown as a badge at the left of each rule, so the
-  list can be read for which rule wins without opening anything; clicking the badge
-  opens the rule at its priority field.
-- **The switch** at the right of a rule parks it without deleting it: switching off
-  sets its priority to 0, and switching on again restores the priority it had.
+  and 0 switches a rule off.
 - **Timer settings** a rule can change: lifetime, the expiry action, restart on
   focus, count background time only, and timer off.
 - **Appearance** a rule can change: which indicators are used, the favicon style,
   leave fresh tabs alone and its threshold, and flashing with its lead time. The
   global settings stay the default; a rule only replaces what it sets.
 
-A collapsed rule shows what it is for and how it matches, then one chip per setting
-it changes, so a whole page of rules can be read without expanding any of them.
-
 The rules list is sorted by pattern. A filter box shows only the rules that match an
 address, and **Add rule** starts one for the filtered site and scrolls to it.
+
+### New rules display
+
+The reworked Rules page is behind the **New rules display** feature flag under
+Settings, Feature flags. With it off the page is as described above. With it on,
+each rule becomes a row that can be read without opening it:
+
+- **Priority** moves to a badge at the left of the rule, so the list says which rule
+  wins at a glance. Clicking the badge opens that rule at its priority field.
+- **A switch** at the right parks a rule without deleting it. Switching it off sets
+  the priority to 0; switching it back on restores the priority the rule had.
+- **What the rule changes** is a chip per setting rather than a sentence, and the
+  description and match mode sit on the line above them.
+- **Delete** becomes an icon, and still takes two clicks.
+- A rule targeting a site group shows how many sites the group holds.
+
+The page is also wider and the cards are tighter, so a screen holds roughly twice as
+many rules.
 
 ## 🗂️ Site groups
 
