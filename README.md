@@ -1,16 +1,12 @@
 # Timed Tabs
-
+[![Release](https://img.shields.io/github/v/release/politeauthority/timed-tabs?label=release&color=44cc11)](https://github.com/politeauthority/timed-tabs/releases/latest)
 [![CI](https://github.com/politeauthority/timed-tabs/actions/workflows/ci.yaml/badge.svg)](https://github.com/politeauthority/timed-tabs/actions/workflows/ci.yaml)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue)](src/manifest.json)
 [![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)](https://www.mozilla.org/firefox/)
 [![Chrome](https://img.shields.io/badge/Chrome-supported-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![Data collected: none](https://img.shields.io/badge/data%20collected-none-success)](src/manifest.json)
 
-<!-- Restore once this repo is public. shields.io reads the GitHub API from its
-     own servers, so it renders "repo not found" for a private repo no matter
-     who is looking. Nothing to do with an AMO listing; the releases exist.
-[![Release](https://img.shields.io/github/v/release/politeauthority/timed-tabs?label=release&color=44cc11)](https://github.com/politeauthority/timed-tabs/releases/latest)
--->
+--
 
 **Tabs that expire.** Every tab gets a lifetime. Its icon goes green, then yellow,
 then red as the clock runs down, and at zero the tab can close itself.
