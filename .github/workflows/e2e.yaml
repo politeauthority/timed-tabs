@@ -81,9 +81,12 @@ jobs:
             echo "restored $(tar -tf ~/firefox-libs.tar | wc -l) files from the cache"
             exit 0
           fi
-          sudo apt-get update -qq
+          # The runner pod has no IPv6 route, but apt tries the mirror's AAAA
+          # record first and waits out a timeout per package. Force IPv4.
+          APT="-o Acquire::ForceIPv4=true"
+          sudo apt-get $APT update -qq
           # shellcheck disable=SC2086
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $PACKAGES > /dev/null
+          sudo DEBIAN_FRONTEND=noninteractive apt-get $APT install -y -qq $PACKAGES > /dev/null
           # Everything apt installed just now, dependencies included, from its history.
           NEW=$(awk '/^Install:/{line=$0} END{print line}' /var/log/apt/history.log | sed 's/^Install: //' | tr ',' '\n' | sed -E 's/^ *([^ :]+).*/\1/' | sort -u)
           echo "$NEW" | tr '\n' ' '; echo
