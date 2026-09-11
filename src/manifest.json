@@ -6,8 +6,11 @@
   "default_locale": "en",
   "homepage_url": "https://github.com/politeauthority/timed-tabs",
   "icons": {
-    "48": "icons/icon.svg",
-    "96": "icons/icon.svg"
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
   },
   "optional_permissions": [
     "notifications"
@@ -28,7 +31,11 @@
   },
   "action": {
     "default_title": "__MSG_extensionName__",
-    "default_icon": "icons/icon.svg",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    },
     "default_popup": "ui/panel.html"
   },
   "options_ui": {
@@ -44,9 +51,6 @@
           "none"
         ]
       }
-    },
-    "gecko_android": {
-      "strict_min_version": "142.0"
     }
   },
   "host_permissions": [

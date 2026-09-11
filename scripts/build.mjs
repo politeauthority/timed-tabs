@@ -39,6 +39,10 @@ for (const target of targets) {
   await mkdir(out, { recursive: true });
   await cp(SRC, out, { recursive: true });
   await rm(path.join(out, "dev.json"), { force: true });
+  // Release builds carry none of the dev hook: the blocks between the
+  // @dev-only markers only ever run under the dev id, but a reviewer should
+  // not have to read them to know that.
+  if (target !== "dev") await stripDevOnly(out, ["background/index.js", "ui/panel.js"]);
   if (target === "dev" && process.env.DEV_JSON) {
     await cp(process.env.DEV_JSON, path.join(out, "dev.json"));
   }
@@ -76,6 +80,18 @@ for (const target of targets) {
     ) + "\n",
   );
   console.log(`built ${target} -> ${path.relative(ROOT, out)}`);
+}
+
+async function stripDevOnly(out, files) {
+  const re = /^[ \t]*\/\/ @dev-only-start[^\n]*\n[\s\S]*?^[ \t]*\/\/ @dev-only-end[^\n]*\n/gm;
+  for (const f of files) {
+    const p = path.join(out, f);
+    const src = await readFile(p, "utf8");
+    const stripped = src.replace(re, "");
+    if (stripped === src) throw new Error(`${f}: no @dev-only block found to strip`);
+    if (/dev\.json/.test(stripped)) throw new Error(`${f}: still mentions dev.json after stripping`);
+    await writeFile(p, stripped);
+  }
 }
 
 function gitShortSha() {

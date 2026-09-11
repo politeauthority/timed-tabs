@@ -1,6 +1,7 @@
 {
   "name": "timed-tabs",
   "version": "0.0.0",
+  "license": "GPL-3.0-only",
   "description": "Browser extension that puts an expiry timer on tabs and visually signals how close each tab is to expiring.",
   "private": true,
   "type": "module",

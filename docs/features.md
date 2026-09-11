@@ -194,8 +194,8 @@ about private windows.
 
 ## 🦊 Firefox and Chrome
 
-Firefox 140 or later is the primary target, including Firefox for Android 142 or
-later. Chrome builds are produced from the same source; the tab tint indicator is
+Firefox 140 or later is the primary target. Firefox for Android is not declared yet;
+see the [road map](road-map.md). Chrome builds are produced from the same source; the tab tint indicator is
 Firefox only because Chrome has no theme API for it.
 
 ## 🚧 Betas

@@ -25,7 +25,7 @@ No store listing yet, and while the project is in development every release is a
 beta. Grab a zip from the newest pre-release under
 [Releases](https://github.com/politeauthority/timed-tabs/releases):
 
-- 🦊 **Firefox 140+** (Android 142+) — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
+- 🦊 **Firefox 140+** — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
 - 🌐 **Chrome** — unzip `timed-tabs-chrome-*.zip`, then `chrome://extensions` → Developer mode → Load unpacked
 
 ### 🚧 Betas
@@ -60,3 +60,9 @@ npm start            # Firefox, with the extension loaded
 npm test
 npm run package      # -> web-ext-artifacts/timed-tabs-{firefox,chrome}-<version>.zip
 ```
+
+## 📄 Licence
+
+Timed Tabs is free software under the [GNU General Public License v3.0](LICENSE).
+You may use, study, share and modify it; anything you distribute that is built from
+it must stay under the same licence, with its source available.

@@ -76,13 +76,14 @@ async function recordExpired(tab, action) {
 
 const ready = tracker.seed();
 
-// Development hook. The dev build (scripts/build.mjs dev) stamps a "-dev@"
-// extension id into the manifest; only that build reads dev.json, which can
-// open extension pages and seed settings/rules for a test profile:
+/** The dev build (scripts/build.mjs dev) stamps a "-dev@" extension id; a few log lines key off it. */
+const IS_DEV_BUILD = typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@");
+// @dev-only-start  (scripts/build.mjs removes everything down to @dev-only-end from release builds)
+// Development hook. Only the dev build reads dev.json, which can open extension
+// pages and seed settings/rules for a test profile:
 //   { "openUrls": ["ui/panel.html"], "settings": {...}, "rules": [...] }
 // The id check (not the file's presence) is the gate, so the user's own
 // profile, which loads src/, can never be seeded.
-const IS_DEV_BUILD = typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@");
 if (IS_DEV_BUILD) {
   fetch(api.runtime.getURL("dev.json"), { cache: "no-store" })
     .then((r) => r.json())
@@ -120,6 +121,7 @@ if (IS_DEV_BUILD) {
     })
     .catch(() => {});
 }
+// @dev-only-end
 
 watchSettings(async (next) => {
   const previous = settings;
