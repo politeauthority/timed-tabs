@@ -1271,9 +1271,9 @@ function onPageShown(page) {
 // ---- Rules editor ----------------------------------------------------------
 
 let rules = [];
-/** Site groups (shared/groups.js). Only in force while the "site-groups" flag is on. */
+/** Site groups (shared/groups.js). Needs its own flag and beta features both on. */
 let groups = [];
-const groupsOn = () => flagOn(settings, "site-groups");
+const groupsOn = () => featureOn(settings, "site-groups");
 const activeGroups = () => (groupsOn() ? groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
 const expandedRules = new Set();

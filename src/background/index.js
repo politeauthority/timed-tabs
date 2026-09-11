@@ -4,7 +4,7 @@
  */
 import { api, withTimeout } from "../shared/browser.js";
 import { watchGroups, watchRules, watchSettings } from "../shared/settings.js";
-import { flagOn } from "../shared/flags.js";
+import { featureOn } from "../shared/flags.js";
 import { RULE_FIELDS, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
 import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
@@ -33,7 +33,9 @@ let settings = null;
 let rules = [];
 let groups = [];
 /** Site groups only take part while their feature flag is on; off, group rules match nothing. */
-const activeGroups = () => (flagOn(settings, "site-groups") ? groups : []);
+// featureOn, not flagOn: site groups also needs the beta-features switch, and
+// the raw switch would have let it run with that master switch off.
+const activeGroups = () => (featureOn(settings, "site-groups") ? groups : []);
 let active = [];
 const expired = new Set();
 const diag = { ticks: 0, lastTick: null, lastError: null, lastSnapshot: [] };

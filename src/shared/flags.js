@@ -36,6 +36,7 @@ export const FLAGS = [
     label: "Site groups",
     help: "Name a list of sites once and point rules at it: a \"news\" group can hold every news site, and one rule covers them all. Adds a Site groups section to the Rules page. While this is off, rules that target a group match nothing.",
     default: false,
+    requires: "beta-features",
   },
 ];
 
