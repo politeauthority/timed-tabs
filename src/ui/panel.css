@@ -546,6 +546,11 @@ body:not([data-context="popup"]) .pages {
   padding: var(--sp-1) 0;
 }
 
+/* The badge leads the control column, so a row reads label - source - value. */
+.tab-settings-list .field-control {
+  gap: var(--sp-2);
+}
+
 .tab-rules-note {
   display: flex;
   align-items: center;
@@ -1506,6 +1511,13 @@ body:not([data-context="popup"]) .field {
 
 .override:not(.is-on) .override-control {
   display: none;
+}
+
+/* Page settings shows the value whatever its source; that is the point of the
+   section. Editing it is what makes the row an override. */
+.override.is-adopting:not(.is-on) .override-control {
+  display: inline-flex;
+  opacity: 0.75;
 }
 
 .override:not(.is-on) .field-label {
