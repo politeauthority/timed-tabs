@@ -71,6 +71,15 @@ The same geometry paints the toolbar button at runtime in
 shipped icon the same mark. Change the art in `icon-art.js`, run `npm run icons`, and
 commit what it writes.
 
+The mark rests on a full ring and ramps green to yellow to red as it drains. The live
+button still drains anticlockwise, the direction every user has; `clockwise: true` on
+`dialShapes` draws it the right way round and waits behind the `primary-icon-interactive`
+flag, which paints the clock face instead.
+
+`npm run icons:swatch` renders the ring at every position and colour into
+`design/icons/clock/`, at a size a human can judge. Nothing in there ships; what the files
+are and how to use them is in [design.md](design.md).
+
 Each dist tree gets a `build.json` next to the manifest holding the version, semver,
 tag, channel, commit and build time. A plain `src/` load has no `build.json`, and that
 absence is what marks it as a dev load in the UI. Set `BUILD_TAG=rc1` to stamp a tag.

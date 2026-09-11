@@ -81,7 +81,7 @@ describe("the interactive clock", () => {
 
   it("takes the mark off the active tab once it goes quiet", async () => {
     // "Leave fresh tabs alone", or a rule taking the toolbar off the page.
-    // The icon has to come off: a resting face is filled to 75% and would sit
+    // The icon has to come off: a resting face is full and would sit
     // there looking like a reading of a tab nothing is being said about.
     await icon.start({ settings: ON });
     await icon.update([tab(1, { active: true, progress: 0.9 })]);

@@ -22,11 +22,13 @@ export const GRID = 32;
 const TRACK_ALPHA = 0.2;
 
 /**
- * The resting mark: enough ring spent to read as a timer rather than a plain
- * clock. It is what the packaged icons draw and what the toolbar button falls
- * back to for a tab with no timer running, so both come from here.
+ * The resting mark: a full ring, all the time still to run. It is what the
+ * packaged icons draw and what the toolbar button falls back to for a tab
+ * with no timer running, so both come from here. It used to sit a quarter
+ * spent so the mark read as a timer rather than a clock; the full ring is the
+ * clearer identity, and a fresh tab and an untimed one now share it.
  */
-export const IDENTITY_PROGRESS = 0.25;
+export const IDENTITY_PROGRESS = 0;
 
 /**
  * Stroke weights and hand lengths by render size, hinted rather than scaled.
@@ -55,19 +57,36 @@ function handEnd(turn, len) {
  *
  * `state` is "running" (ring drains as `progress` goes 0 -> 1), "flash" (a
  * solid disc, the loud half of a blink) or "expired" (solid disc with an
- * exclamation knocked out of it).
+ * exclamation knocked out of it). `hands: false` leaves the running ring
+ * bare, for a mark that is no longer telling the time; `mutedHands: true`
+ * keeps them but paints them like the spent part of the ring, so an empty
+ * ring can still carry a faint clock.
  *
- * The arc still to run starts at twelve, so the part already spent opens to
- * the *left* of twelve and eats anticlockwise -- against the hands. That is
- * wrong, and `faceShapes` does it the other way round; the fix is held behind
- * `primary-icon-interactive` with the rest of the clock rather than changing
- * the mark every user already has. Lift them together.
+ * Every shape takes the one colour it is painted in, except that `trackColor`
+ * gives the spent part of the ring a colour of its own instead of the faint
+ * version of the same one, for callers that want the two halves to contrast.
+ *
+ * By default the arc still to run starts at twelve, so the part already spent
+ * opens to the *left* of twelve and eats anticlockwise -- against the hands.
+ * That is wrong, and `faceShapes` does it the other way round; `clockwise:
+ * true` draws the ring the right way (spent part opening at twelve and
+ * sweeping right), but the live button keeps the legacy direction until
+ * `primary-icon-interactive` is folded in, rather than changing the mark every
+ * user already has. The swatch set in design/icons/clock/ shows the clockwise ring.
  *
  * Every shape is the one colour or a hole punched out of it. Nothing is white
  * and nothing is dark, because the same image has to sit on a light and a
  * dark toolbar.
  */
-export function dialShapes({ progress = 0, size = GRID, state = "running" } = {}) {
+export function dialShapes({
+  progress = 0,
+  size = GRID,
+  state = "running",
+  hands = true,
+  mutedHands = false,
+  clockwise = false,
+  trackColor,
+} = {}) {
   const c = GRID / 2;
   const m = metrics(size);
 
@@ -76,20 +95,27 @@ export function dialShapes({ progress = 0, size = GRID, state = "running" } = {}
     return state === "flash" ? disc : [...disc, { kind: "erase", shapes: bangShapes() }];
   }
 
-  const remaining = 1 - Math.min(1, Math.max(0, progress));
-  const shapes = [
-    { kind: "arc", cx: c, cy: c, r: m.radius, width: m.ring, from: 0, to: 1, alpha: TRACK_ALPHA },
-  ];
+  const spent = Math.min(1, Math.max(0, progress));
+  const track = { kind: "arc", cx: c, cy: c, r: m.radius, width: m.ring, from: 0, to: 1 };
+  // A colour of its own is drawn solid; the same colour is drawn faint.
+  if (trackColor) track.color = trackColor;
+  else track.alpha = TRACK_ALPHA;
+  const shapes = [track];
   // A sliver of ring left is still worth drawing; none at all is not.
-  if (remaining > 0) {
-    shapes.push({ kind: "arc", cx: c, cy: c, r: m.radius, width: m.ring, from: 0, to: remaining });
+  if (spent < 1) {
+    const remaining = clockwise ? { from: spent, to: 1 } : { from: 0, to: 1 - spent };
+    shapes.push({ kind: "arc", cx: c, cy: c, r: m.radius, width: m.ring, ...remaining });
   }
+  if (!hands) return shapes;
 
   const [mx, my] = handEnd(0, m.minute);
   const [hx, hy] = handEnd(1 / 3, m.hour);
+  // Muted hands borrow the track's look: its own colour if it has one, the
+  // same faintness otherwise.
+  const tone = mutedHands ? (trackColor ? { color: trackColor } : { alpha: TRACK_ALPHA }) : {};
   shapes.push(
-    { kind: "capsule", x1: c, y1: c, x2: mx, y2: my, width: m.hand },
-    { kind: "capsule", x1: c, y1: c, x2: hx, y2: hy, width: m.hand },
+    { kind: "capsule", x1: c, y1: c, x2: mx, y2: my, width: m.hand, ...tone },
+    { kind: "capsule", x1: c, y1: c, x2: hx, y2: hy, width: m.hand, ...tone },
   );
   return shapes;
 }
@@ -176,7 +202,8 @@ function bangShapes() {
 
 /**
  * Paint `shapes` onto a Canvas2D context sized `size` x `size`, in `color`
- * (a CSS colour string). The context is left as it was found.
+ * (a CSS colour string), or in a shape's own `color` where it carries one.
+ * The context is left as it was found.
  *
  * Kept next to the geometry because the runtime indicator and the build
  * script must agree pixel for pixel; scripts/icons.mjs reimplements this
@@ -204,6 +231,10 @@ function paintShape(ctx, shape, color) {
 
   ctx.save();
   if (shape.alpha !== undefined) ctx.globalAlpha = shape.alpha;
+  if (shape.color) {
+    ctx.fillStyle = shape.color;
+    ctx.strokeStyle = shape.color;
+  }
   ctx.beginPath();
   if (shape.kind === "disc") {
     ctx.arc(shape.cx, shape.cy, shape.r, 0, Math.PI * 2);

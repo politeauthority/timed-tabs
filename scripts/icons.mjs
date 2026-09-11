@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import { GRID, IDENTITY_PROGRESS, dialShapes } from "../src/shared/icon-art.js";
-import { VIVID_RAMP, toHex } from "../src/shared/color.js";
+import { VIVID_RAMP, fromHex, toHex } from "../src/shared/color.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const iconsDir = join(root, "src", "icons");
@@ -65,43 +65,65 @@ function covers(shape, x, y) {
   return false;
 }
 
-/** Alpha at one sample point, compositing the shapes in paint order. */
-function alphaAt(shapes, x, y) {
+/**
+ * Premultiplied colour at one sample point, compositing the shapes in paint
+ * order: `[r, g, b]` already scaled by `a`, so samples can simply be summed.
+ * A shape paints in `base` unless it carries a `color` of its own.
+ */
+function sampleAt(shapes, x, y, base) {
+  let r = 0;
+  let g = 0;
+  let b = 0;
   let a = 0;
   for (const shape of shapes) {
     if (shape.kind === "erase") {
-      for (const inner of shape.shapes) if (covers(inner, x, y)) a = 0;
+      for (const inner of shape.shapes) if (covers(inner, x, y)) r = g = b = a = 0;
       continue;
     }
     if (!covers(shape, x, y)) continue;
     const s = shape.alpha ?? 1;
-    a = a + s * (1 - a);
+    const [cr, cg, cb] = shape.color ? fromHex(shape.color) : base;
+    r = cr * s + r * (1 - s);
+    g = cg * s + g * (1 - s);
+    b = cb * s + b * (1 - s);
+    a = s + a * (1 - s);
   }
-  return a;
+  return [r, g, b, a];
 }
 
 /**
  * Rasterise `shapes` into an RGBA buffer, `ss` x `ss` samples per pixel.
- * One colour throughout, so only the alpha channel varies and there is no
- * blending to get wrong.
+ * Normally one colour throughout, so only the alpha channel varies; a shape
+ * with a `color` of its own is blended in premultiplied space so the edge
+ * between two colours has no dark fringe.
  */
-export function rasterise(shapes, size, [r, g, b], ss = 8) {
+export function rasterise(shapes, size, rgb, ss = 8) {
   const data = Buffer.alloc(size * size * 4);
   const unit = GRID / size;
+  const n = ss * ss;
   for (let py = 0; py < size; py++) {
     for (let px = 0; px < size; px++) {
-      let total = 0;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
       for (let sy = 0; sy < ss; sy++) {
         const y = (py + (sy + 0.5) / ss) * unit;
         for (let sx = 0; sx < ss; sx++) {
-          total += alphaAt(shapes, (px + (sx + 0.5) / ss) * unit, y);
+          const [sr, sg, sb, sa] = sampleAt(shapes, (px + (sx + 0.5) / ss) * unit, y, rgb);
+          r += sr;
+          g += sg;
+          b += sb;
+          a += sa;
         }
       }
       const i = (py * size + px) * 4;
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      data[i + 3] = Math.round((total / (ss * ss)) * 255);
+      // Fully transparent pixels keep the base colour, as the old single-colour
+      // rasteriser wrote them, so the shipped PNGs compare equal.
+      data[i] = a > 0 ? Math.round(r / a) : rgb[0];
+      data[i + 1] = a > 0 ? Math.round(g / a) : rgb[1];
+      data[i + 2] = a > 0 ? Math.round(b / a) : rgb[2];
+      data[i + 3] = Math.round((a / n) * 255);
     }
   }
   return data;
@@ -236,9 +258,10 @@ function arcPath({ cx, cy, r, from, to }) {
   return `M${x1} ${y1}A${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
 }
 
-export function toSvg(shapes, color) {
+export function toSvg(shapes, base) {
   const body = [];
   const draw = (shape, extra = "") => {
+    const color = shape.color ?? base;
     const alpha = shape.alpha !== undefined ? ` opacity="${shape.alpha}"` : "";
     if (shape.kind === "disc") {
       body.push(`<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" fill="${color}"${alpha}${extra}/>`);
