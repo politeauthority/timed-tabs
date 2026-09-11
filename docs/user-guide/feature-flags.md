@@ -103,7 +103,7 @@ Two things follow from that, both worth knowing before you leave it off:
 ### Interactive toolbar clock
 
 Changes what the Timed Tabs button draws. Normally it is a ring that drains
-clockwise from twelve as the tab you are on runs out of time. With this on, the
+from twelve as the tab you are on runs out of time. With this on, the
 clock face itself empties: a full face is a tab with all its time ahead of it, a
 sliver is one about to go, and the hands are cut out of the face so it still
 reads as a clock rather than a pie chart.

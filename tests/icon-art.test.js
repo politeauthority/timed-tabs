@@ -14,6 +14,17 @@ describe("metrics", () => {
     expect(small.minute).toBeLessThan(large.minute);
   });
 
+  it("fills the grid edge to edge, like the icons beside it on a toolbar", () => {
+    for (const size of [16, 32, 48, 96, 128]) {
+      const m = metrics(size);
+      const outer = m.radius + m.ring / 2;
+      expect(outer).toBeLessThanOrEqual(GRID / 2);
+      expect(outer).toBeGreaterThan(GRID / 2 - 0.5);
+      const f = faceMetrics(size);
+      expect(f.rim + f.rimWidth / 2).toBeGreaterThan(GRID / 2 - 0.5);
+    }
+  });
+
   it("holds the hands clear of the inside of the ring at every size", () => {
     for (const size of [16, 32, 48, 96, 128]) {
       const m = metrics(size);

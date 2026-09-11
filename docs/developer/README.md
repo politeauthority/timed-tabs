@@ -9,7 +9,7 @@ how a release is cut, and what must not quietly break.
   the test commands and the Taskfile.
 - [chrome.md](chrome.md) — what the Chrome build does differently, what the service
   worker cannot do, and what is still checked by hand.
-- [design.md](design.md) — the rendered ring set under `src/icons/clock/`: what each
+- [design.md](design.md) — the rendered ring set under `design/icons/clock/`: what each
   file is, how to regenerate it and how to recolour it.
 - [security-notes.md](security-notes.md) — the guarantees the extension makes about
   remote code, data and permissions, and the gaps that are known.

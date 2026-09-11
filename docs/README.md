@@ -14,6 +14,6 @@ The full tour of the features, and what Timed Tabs keeps on your machine.
 ## 🔧 [developer/](developer/) — working on the extension
 
 Building it, testing it, and the security properties that must not quietly break.
-[design.md](developer/design.md) covers the rendered ring set under `src/icons/clock/`.
+[design.md](developer/design.md) covers the rendered ring set under `design/icons/clock/`.
 Its [ci/](developer/ci/) subdirectory covers everything that happens in GitHub
 Actions instead: the workflows, the runner, and how a release is cut.
