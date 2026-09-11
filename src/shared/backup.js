@@ -6,6 +6,7 @@
  */
 import { DEFAULTS } from "./settings.js";
 import { clampPriority, newRule } from "./rules.js";
+import { mergeFlags } from "./flags.js";
 
 export const FORMAT_VERSION = 1;
 
@@ -69,6 +70,12 @@ export function parseBundle(text) {
 function coerce(key, value) {
   const def = DEFAULTS[key];
   if (Array.isArray(def)) return Array.isArray(value) && value.every((x) => typeof x === "string") ? value : undefined;
+  // Feature flags: keep the ones this build still declares and drop the rest,
+  // so a backup written either side of a flag being added or retired loads
+  // without a warning and without turning anything unexpected on.
+  if (key === "featureFlags") {
+    return value && typeof value === "object" && !Array.isArray(value) ? mergeFlags(value) : undefined;
+  }
   if (typeof def === "boolean") return typeof value === "boolean" ? value : undefined;
   if (typeof def === "number") return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
   if (typeof def === "string") return typeof value === "string" ? value : undefined;

@@ -36,6 +36,7 @@ import {
   toUnit,
 } from "../shared/time.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
+import { FLAGS, flagOn } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
 
 // The same file serves three contexts: the toolbar popup (default), the
@@ -318,6 +319,23 @@ function renderField(field) {
       list.append(sub);
     }
     row.append(list);
+  } else if (field.type === "flags") {
+    // One row per flag, the same shape as the indicator list.
+    row.classList.add("field-group");
+    control.remove();
+    const list = document.createElement("div");
+    list.className = "field-group-rows";
+    for (const flag of FLAGS) {
+      const sw = makeSwitch(value?.[flag.id] === true, async (checked) => {
+        await save({ featureFlags: { ...settings.featureFlags, [flag.id]: checked } });
+        markSaved(sub);
+      });
+      sw.input.id = `f-flag-${flag.id}`;
+      const sub = settingRow(flag.label, flag.help, sw.el);
+      sub.querySelector(".field-label").htmlFor = sw.input.id;
+      list.append(sub);
+    }
+    row.append(list);
   }
   return row;
 }
@@ -542,7 +560,7 @@ function sourceBadge(entry) {
 
 function renderTabSettings() {
   const section = $("tab-settings");
-  if (!tabState || !settings) {
+  if (!tabState || !settings || !flagOn(settings, "beta-features")) {
     section.hidden = true;
     return;
   }

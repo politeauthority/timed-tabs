@@ -1,5 +1,6 @@
 import { api } from "./browser.js";
 import { DEFAULT_TAB_SORT } from "./tab-sort.js";
+import { DEFAULT_FLAGS, mergeFlags } from "./flags.js";
 
 /**
  * All user-configurable settings live here with their defaults.
@@ -43,6 +44,8 @@ export const DEFAULTS = Object.freeze({
    * The control lives with the list it orders, not on the settings page.
    */
   tabSort: DEFAULT_TAB_SORT,
+  /** Feature flags, keyed by id. See shared/flags.js for what each one does. */
+  featureFlags: DEFAULT_FLAGS,
   /** Seconds between indicator refreshes. */
   tickSeconds: 5,
 });
@@ -62,7 +65,8 @@ export const GROUPS = [
 
 /**
  * How each setting is presented. `type` is one of:
- * duration (seconds), toggle, choice ({ value, label }[]), percent, indicators.
+ * duration (seconds), toggle, choice ({ value, label }[]), percent, indicators,
+ * flags (the feature-flag switches from shared/flags.js).
  * A percent field with `slider` is dragged rather than typed.
  * `requires` names optional permissions the panel must obtain before the
  * setting can be switched on; it is turned back off if they are ever revoked.
@@ -189,6 +193,13 @@ export const FIELDS = [
     showWhen: (s) => s.indicators.includes("favicon"),
   },
   {
+    key: "featureFlags",
+    group: "advanced",
+    type: "flags",
+    label: "Feature flags",
+    help: "Work that is not finished enough to be on for everyone. Expect rough edges.",
+  },
+  {
     key: "tickSeconds",
     group: "advanced",
     type: "duration",
@@ -202,7 +213,9 @@ const STORAGE_AREA = "sync";
 
 export async function getSettings() {
   const stored = await api.storage[STORAGE_AREA].get(Object.keys(DEFAULTS));
-  return { ...DEFAULTS, ...stored };
+  // Flags merge key by key rather than replacing wholesale: a stored object
+  // from an older build would otherwise hide every flag added since.
+  return { ...DEFAULTS, ...stored, featureFlags: mergeFlags(stored.featureFlags) };
 }
 
 export async function saveSettings(partial) {
