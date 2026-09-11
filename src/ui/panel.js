@@ -18,6 +18,8 @@ import {
 import {
   MAX_PRIORITY,
   RULE_FIELDS,
+  RULE_TIMING_FIELDS,
+  RULE_VISUAL_FIELDS,
   clampPriority,
   matchesRule,
   newRule,
@@ -395,6 +397,7 @@ function renderTab() {
   // The rules section only appears when a rule matches this page, or rules are already ignored.
   $("tab-rules").hidden = !(tabState.rules?.length || tabState.ignoreRules);
   renderTabRules();
+  renderTabLook();
   if (hideTimer) return;
 
   const icon = $("tab-icon");
@@ -466,6 +469,34 @@ function renderTabRules() {
   }
 }
 
+/** Per-tab appearance overrides: the same rows a rule offers, saved on this tab only. */
+function renderTabLook() {
+  const host = $("tab-look-list");
+  if (!tabState || !host) return;
+  // Rebuild only when the set of overrides changed, so open controls keep focus.
+  const sig = JSON.stringify(tabState.overrides ?? {});
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+  const store = {
+    get set() {
+      return tabState?.overrides ?? {};
+    },
+    // Off rows show what the tab gets now: globals with any matching rules applied.
+    base: (key) => tabState?.effective?.[key] ?? settings[key],
+    commit: async (set) => {
+      const prev = tabState?.overrides ?? {};
+      for (const key of RULE_VISUAL_FIELDS) {
+        const next = key in set ? set[key] : null;
+        const before = key in prev ? prev[key] : null;
+        if (JSON.stringify(next) !== JSON.stringify(before)) await tabAction("override", { key, value: next });
+      }
+    },
+  };
+  const group = renderOverrideGroup("", defsFor(RULE_VISUAL_FIELDS, "tab"), store);
+  group.querySelector(".rule-overrides-title")?.remove();
+  host.replaceChildren(group);
+}
+
 function describeRule(r) {
   const parts = Object.entries(r.set ?? {}).map(
     ([k, v]) => `${ruleFieldLabel(k)}: ${formatRuleValue(k, v)}`,
@@ -482,6 +513,11 @@ function formatRuleValue(key, v) {
   if (def?.type === "duration") return formatDuration(v);
   if (def?.type === "choice")
     return def.options.find((o) => o.value === v)?.label ?? String(v);
+  if (def?.type === "percent") return `${v}%`;
+  if (def?.type === "indicators") {
+    const names = (Array.isArray(v) ? v : []).map((id) => indicators.find((i) => i.id === id)?.label ?? id);
+    return names.length ? names.join(", ") : "nothing";
+  }
   return v ? "on" : "off";
 }
 
@@ -1000,29 +1036,61 @@ const expandedRules = new Set();
 const RULE_FIELD_TEXT = {
   tabLifetimeSeconds: {
     label: "Lifetime",
-    help: "How long matching tabs may sit before they expire.",
+    help: "How long {tabs} may sit before {they} expire.",
   },
   onExpire: {
     label: "When a tab expires",
-    help: "What to do with a matching background tab once it runs out of time.",
+    help: "What to do with {tab} once it runs out of time in the background.",
   },
   resetOnActivate: {
     label: "Restart on focus",
-    help: "Switching to a matching tab gives it a full lifetime again.",
+    help: "Switching to {tab} gives it a full lifetime again.",
   },
   pauseWhileActive: {
     label: "Count background time only",
-    help: "The clock stops while you are looking at a matching tab.",
+    help: "The clock stops while you are looking at {tab}.",
   },
   neverExpire: {
     label: "Timer off",
-    help: "Matching tabs never expire and show no colour.",
+    help: "{Tabs} never {expire} and {show} no colour.",
+  },
+  indicators: {
+    label: "Show remaining time with",
+    help: "Only these indicators are used for {tabs}, whatever the global choice.",
+  },
+  faviconStyle: {
+    label: "Favicon colour style",
+    help: "Where the colour goes on the icon of {tab}.",
+  },
+  hideWhileGreen: {
+    label: "Leave fresh tabs alone",
+    help: "Show nothing on {tab} until part of its lifetime has passed.",
+  },
+  quietUntilPercent: {
+    label: "Show indicators after",
+    help: "The share of the lifetime of {tab} that must pass before anything is shown.",
+  },
+  flashBeforeExpiry: {
+    label: "Flash before expiry",
+    help: "{Tabs} {blink} during the last stretch before {they} run out of time.",
+  },
+  flashLeadSeconds: {
+    label: "Start flashing",
+    help: "How long before expiry {tab} starts flashing.",
   },
 };
+/** Help text placeholders, worded for a rule (many tabs) or for the popup (one tab). */
+const SUBJECTS = {
+  rule: { tabs: "matching tabs", Tabs: "Matching tabs", tab: "a matching tab", they: "they", expire: "expire", show: "show", blink: "blink" },
+  tab: { tabs: "this tab", Tabs: "This tab", tab: "this tab", they: "it", expire: "expires", show: "shows", blink: "blinks" },
+};
+const wordFor = (text, subject) => text.replace(/\{(\w+)\}/g, (_, k) => SUBJECTS[subject][k] ?? k);
 const RULE_FIELD_DEFS = RULE_FIELDS.map((key) => {
   const base = FIELDS.find((f) => f.key === key) ?? { key, type: "toggle" };
   return { ...base, ...RULE_FIELD_TEXT[key] };
 });
+const defsFor = (keys, subject = "rule") =>
+  keys.map((k) => RULE_FIELD_DEFS.find((d) => d.key === k)).map((d) => ({ ...d, help: wordFor(d.help ?? "", subject) }));
 
 /** A rule with no usable pattern: blank, or a host-less "/*" left over from a bad add. */
 function isEmptyRule(r) {
@@ -1216,16 +1284,42 @@ function renderRule(rule) {
     ),
   );
 
-  const overrides = document.createElement("div");
-  overrides.className = "rule-overrides";
+  const store = {
+    get set() {
+      return rules.find((r) => r.id === rule.id)?.set ?? {};
+    },
+    base: (key) => settings[key],
+    commit: (set) => updateRule(rule.id, { set }, false),
+  };
+  body.append(
+    renderOverrideGroup("Timer settings this rule changes", defsFor(RULE_TIMING_FIELDS), store),
+    renderOverrideGroup("How matching tabs look", defsFor(RULE_VISUAL_FIELDS), store),
+  );
+  return el;
+}
+
+/**
+ * A titled block of override rows. `store` is { set, base(key), commit(set) }:
+ * the current overrides, the value shown while a row is off, and how to save.
+ * Rows whose `showWhen` fails against the layered settings are hidden, so a
+ * dependent option (flash lead, favicon style) only appears once its parent is on.
+ */
+function renderOverrideGroup(title, defs, store) {
+  const group = document.createElement("div");
+  group.className = "rule-overrides";
   const heading = document.createElement("p");
   heading.className = "rule-overrides-title";
-  heading.textContent = "Settings this rule changes";
-  overrides.append(heading);
-  for (const def of RULE_FIELD_DEFS)
-    overrides.append(renderOverride(rule, def));
-  body.append(overrides);
-  return el;
+  heading.textContent = title;
+  group.append(heading);
+  const rows = defs.map((def) => [def, renderOverride(def, store, () => applyVisibility())]);
+  const applyVisibility = () => {
+    const layered = { ...settings, ...store.set };
+    for (const key of RULE_VISUAL_FIELDS) if (key in store.set) layered[key] = store.set[key];
+    for (const [def, row] of rows) row.hidden = Boolean(def.showWhen && !def.showWhen(layered));
+  };
+  for (const [, row] of rows) group.append(row);
+  applyVisibility();
+  return group;
 }
 
 function setRuleExpanded(id, open) {
@@ -1269,21 +1363,20 @@ function settingRow(labelText, helpText, control, { checkbox } = {}) {
   return row;
 }
 
-function renderOverride(rule, def) {
-  const isOn = def.key in (rule.set ?? {});
+function renderOverride(def, store, onChanged = () => {}) {
+  const isOn = def.key in store.set;
 
   const on = document.createElement("input");
   on.type = "checkbox";
   on.checked = isOn;
-  on.setAttribute("aria-label", `Change ${def.label} for matching tabs`);
+  on.setAttribute("aria-label", `Change ${def.label}`);
 
   const control = document.createElement("span");
   control.className = "override-control";
-  const current = isOn
-    ? rule.set[def.key]
-    : (settings[def.key] ?? (def.type === "toggle" ? false : undefined));
+  const current = isOn ? store.set[def.key] : (store.base(def.key) ?? (def.type === "toggle" ? false : undefined));
 
   let read;
+  let stacked = false;
   if (def.type === "toggle") {
     const sw = makeSwitch(Boolean(current), () => commit());
     control.append(sw.el);
@@ -1295,6 +1388,41 @@ function renderOverride(rule, def) {
     select.addEventListener("change", () => commit());
     control.append(select);
     read = () => select.value;
+  } else if (def.type === "percent") {
+    const num = document.createElement("input");
+    num.type = "number";
+    num.min = String(def.min ?? 0);
+    num.max = String(def.max ?? 100);
+    num.step = "1";
+    num.value = String(current ?? 40);
+    num.addEventListener("change", () => commit());
+    const suffix = document.createElement("span");
+    suffix.className = "field-suffix";
+    suffix.textContent = "%";
+    control.append(num, suffix);
+    read = () => {
+      const n = Math.round(Number(num.value));
+      const clamped = Number.isFinite(n) ? Math.min(def.max ?? 100, Math.max(def.min ?? 0, n)) : 40;
+      num.value = String(clamped);
+      return clamped;
+    };
+  } else if (def.type === "indicators") {
+    const chosen = new Set(Array.isArray(current) ? current : []);
+    control.classList.add("override-indicators");
+    stacked = true;
+    for (const ind of indicators) {
+      const sw = makeSwitch(chosen.has(ind.id), () => commit());
+      sw.input.value = ind.id;
+      sw.input.disabled = !ind.supported();
+      const item = document.createElement("label");
+      item.className = "override-indicator";
+      item.title = ind.description + (ind.supported() ? "" : " Not available in this browser.");
+      const name = document.createElement("span");
+      name.textContent = ind.label;
+      item.append(sw.el, name);
+      control.append(item);
+    }
+    read = () => [...control.querySelectorAll("input:checked")].map((i) => i.value);
   } else {
     const { value: n, unit } = toUnit(current ?? 1800);
     const num = document.createElement("input");
@@ -1314,19 +1442,22 @@ function renderOverride(rule, def) {
     units.addEventListener("change", () => commit());
     control.append(num, units);
     read = () =>
-      Math.max(1, Math.round(Number(num.value) * Number(units.value)));
+      Math.max(def.min ?? 1, Math.round(Number(num.value) * Number(units.value)));
   }
 
   const wrap = settingRow(def.label, def.help, control, { checkbox: on });
   wrap.classList.add("override");
   wrap.classList.toggle("is-on", isOn);
+  wrap.classList.toggle("is-stacked", stacked);
+  wrap.dataset.key = def.key;
 
   const commit = async () => {
-    const set = { ...(rule.set ?? {}) };
+    const set = { ...store.set };
     if (on.checked) set[def.key] = read();
     else delete set[def.key];
     wrap.classList.toggle("is-on", on.checked);
-    await updateRule(rule.id, { set }, false);
+    await store.commit(set);
+    onChanged();
     markSaved(wrap);
   };
   on.addEventListener("change", commit);

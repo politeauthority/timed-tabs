@@ -15,8 +15,44 @@
  * Wildcard "*" matches any run of characters; matching is case-insensitive.
  */
 
-/** Settings a rule may override, in display order. */
-export const RULE_FIELDS = ["tabLifetimeSeconds", "onExpire", "resetOnActivate", "pauseWhileActive", "neverExpire"];
+/** Timer settings a rule may override, in display order. */
+export const RULE_TIMING_FIELDS = ["tabLifetimeSeconds", "onExpire", "resetOnActivate", "pauseWhileActive", "neverExpire"];
+
+/** Appearance settings a rule (or a single tab) may override, in display order. */
+export const RULE_VISUAL_FIELDS = [
+  "indicators",
+  "faviconStyle",
+  "hideWhileGreen",
+  "quietUntilPercent",
+  "flashBeforeExpiry",
+  "flashLeadSeconds",
+];
+
+/** Everything a rule may override. */
+export const RULE_FIELDS = [...RULE_TIMING_FIELDS, ...RULE_VISUAL_FIELDS];
+
+/**
+ * How one overriding value combines with the value underneath it.
+ * Every field replaces outright, including `indicators`: a rule's list is the
+ * whole list for matching tabs, not a subtraction from the global one. This
+ * is the single place to change if `indicators` should ever narrow instead.
+ */
+export function overrideValue(_key, _base, value) {
+  return value;
+}
+
+function isSet(v) {
+  return v !== undefined && v !== null;
+}
+
+/** `eff` with the defined entries of `overrides` layered on top, restricted to RULE_FIELDS. */
+export function applyOverrides(eff, overrides) {
+  if (!overrides) return eff;
+  for (const key of RULE_FIELDS) {
+    if (key in overrides && isSet(overrides[key])) eff[key] = overrideValue(key, eff[key], overrides[key]);
+  }
+  return eff;
+}
 
 export const MAX_PRIORITY = 10;
 
@@ -72,6 +108,20 @@ export function applicableRules(rules, url) {
 }
 
 /**
+ * Indicator ids any tab could need: the global list plus every enabled rule's
+ * and every per-tab override's. Indicators are started from this union so a
+ * rule can turn one on for a single site.
+ */
+export function wantedIndicatorIds(settings, rules, tabOverrides = []) {
+  const ids = new Set(settings?.indicators ?? []);
+  for (const rule of rules ?? []) {
+    if (rule.priority > 0) for (const id of rule.set?.indicators ?? []) ids.add(id);
+  }
+  for (const o of tabOverrides) for (const id of o?.indicators ?? []) ids.add(id);
+  return [...ids];
+}
+
+/**
  * Global settings with matching rules layered on top, per field.
  * Returns { ...values, matched: [rule, ...] } where matched is highest priority last.
  */
@@ -79,11 +129,7 @@ export function effectiveSettings(settings, rules, url) {
   const matched = applicableRules(rules, url);
   const out = {};
   for (const key of RULE_FIELDS) out[key] = settings[key] ?? (key === "neverExpire" ? false : undefined);
-  for (const rule of matched) {
-    for (const key of RULE_FIELDS) {
-      if (rule.set && key in rule.set && rule.set[key] !== undefined && rule.set[key] !== null) out[key] = rule.set[key];
-    }
-  }
+  for (const rule of matched) applyOverrides(out, rule.set);
   out.matched = matched;
   return out;
 }

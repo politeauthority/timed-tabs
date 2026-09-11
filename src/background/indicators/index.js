@@ -12,11 +12,13 @@
  *     start(ctx): Promise<void>,       // ctx: { api, tracker, settings }
  *     configure?(settings): void,      // optional: settings changed while running
  *     update(tabs): Promise<void>,     // tabs: [{ tabId, windowId, url, status, discarded,
- *                                      //          active, exempt, quiet, flashing, progress,
- *                                      //          remainingSeconds }]
+ *                                      //          active, exempt, quiet, hidden, flashing,
+ *                                      //          progress, remainingSeconds, faviconStyle }]
  *                                      // flashing: about to expire; blink if you can
  *                                      // quiet: show nothing for this tab (timer off, pinned,
- *                                      //        or still green with hideWhileGreen)
+ *                                      //        still green with hideWhileGreen, or this
+ *                                      //        indicator is not used for the tab: hidden)
+ *                                      // faviconStyle: the tab's effective favicon style
  *     stop(): Promise<void>,           // must undo any visible changes
  *   }
  */
