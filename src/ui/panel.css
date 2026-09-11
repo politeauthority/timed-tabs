@@ -1974,6 +1974,43 @@ body[data-rules-display="new"] .rule-description-wrap {
   margin-top: 0;
 }
 
+/* Cards sit on the same ground as the Settings page's rows: a soft fill, a
+   quiet line, and the head as the strong row. Chips are the same pill as the
+   page's badges. */
+body[data-rules-display="new"] .rule {
+  background: color-mix(in srgb, var(--control) 35%, transparent);
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--r-card);
+  transition: border-color 0.15s ease-out, background 0.15s ease-out;
+}
+
+body[data-rules-display="new"] .rule:not(.is-collapsed) {
+  background: color-mix(in srgb, var(--control) 55%, transparent);
+}
+
+body[data-rules-display="new"] .rule-chip {
+  background: var(--control);
+  border-color: transparent;
+  color: var(--ink);
+  line-height: 1.7;
+}
+
+body[data-rules-display="new"] .rule-chip.is-empty {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink-2);
+}
+
+body[data-rules-display="new"] .rule-overrides-title {
+  font-size: var(--fs-md);
+  color: var(--ink);
+}
+
+body[data-rules-display="new"] .rules-filter input {
+  border-radius: var(--r-pill);
+  padding-left: var(--sp-3);
+}
+
 /* Everything the card holds hangs under the pattern, so a card reads as one
    column rather than two things stacked. */
 body[data-rules-display="new"] .rule-body {
