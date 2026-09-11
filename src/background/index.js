@@ -5,6 +5,7 @@
 import { api, withTimeout } from "../shared/browser.js";
 import { watchRules, watchSettings } from "../shared/settings.js";
 import { effectiveSettings } from "../shared/rules.js";
+import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
 import { createNotifier } from "./notify.js";
@@ -308,10 +309,27 @@ async function tabAction({ tabId, action, value }) {
       expired.delete(tabId);
       break;
     case "snooze": {
+      // No value means "the usual amount", which is a share of this tab's own
+      // lifetime -- the one its rules give it, not the global default.
       const tab = await api.tabs.get(tabId).catch(() => ({ id: tabId }));
       const eff = settingsFor(tab, await tracker.track(tabId));
-      await tracker.snooze(tabId, Number(value) || eff.tabLifetimeSeconds);
+      await tracker.snooze(
+        tabId,
+        Number(value) || snoozeSeconds(eff.tabLifetimeSeconds, settings.snoozePercent),
+      );
       expired.delete(tabId);
+      break;
+    }
+    // Dragging the fuse in the mini UI: `value` is the share of its life the
+    // tab should have used, so the clock lands wherever it was let go.
+    case "progress": {
+      const tab = await api.tabs.get(tabId).catch(() => ({ id: tabId }));
+      const eff = settingsFor(tab, await tracker.track(tabId));
+      const pct = Math.min(100, Math.max(0, Number(value) || 0));
+      const lifetime = tracker.lifetimeFor(tabId, eff.tabLifetimeSeconds);
+      await tracker.setElapsed(tabId, (lifetime * pct) / 100);
+      // Anything short of the far end puts the tab back in the running.
+      if (pct < 100) expired.delete(tabId);
       break;
     }
     case "neverExpire":

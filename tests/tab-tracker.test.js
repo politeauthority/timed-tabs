@@ -42,6 +42,39 @@ describe("tab tracker", () => {
     expect(tracker.elapsedSeconds(1, 65_000)).toBe(15);
   });
 
+  it("setElapsed moves the clock to a given age", async () => {
+    await tracker.track(1, 0);
+    await tracker.setElapsed(1, 90, 100_000);
+    expect(tracker.elapsedSeconds(1, 100_000)).toBe(90);
+    // From there it keeps running normally.
+    expect(tracker.elapsedSeconds(1, 110_000)).toBe(100);
+  });
+
+  it("setElapsed holds while paused instead of jumping on resume", async () => {
+    await tracker.track(1, 0);
+    await tracker.pause(1, 10_000);
+    await tracker.setElapsed(1, 300, 50_000);
+    expect(tracker.elapsedSeconds(1, 50_000)).toBe(300);
+    expect(tracker.elapsedSeconds(1, 999_000)).toBe(300);
+    await tracker.resume(1, 50_000);
+    expect(tracker.elapsedSeconds(1, 55_000)).toBe(305);
+  });
+
+  it("setElapsed leaves a snooze in place", async () => {
+    await tracker.track(1, 0);
+    await tracker.snooze(1, 60, 1000);
+    await tracker.setElapsed(1, 10, 20_000);
+    expect(tracker.get(1).extraSeconds).toBe(60);
+    expect(tracker.lifetimeFor(1, 100)).toBe(160);
+    expect(tracker.progressFor(1, 100, 20_000)).toBeCloseTo(10 / 160);
+  });
+
+  it("setElapsed never puts the clock before the tab existed", async () => {
+    await tracker.track(1, 0);
+    await tracker.setElapsed(1, -50, 10_000);
+    expect(tracker.elapsedSeconds(1, 10_000)).toBe(0);
+  });
+
   it("reset restarts the clock and clears snooze, keeping pause state", async () => {
     await tracker.track(1, 0);
     await tracker.snooze(1, 60, 5000);

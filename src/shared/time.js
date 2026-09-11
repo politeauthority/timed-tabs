@@ -25,3 +25,14 @@ export function toUnit(seconds) {
   if (seconds % 60 === 0) return { value: seconds / 60, unit: 60 };
   return { value: seconds, unit: 1 };
 }
+
+/**
+ * How much time one press of Snooze grants: a share of the tab's own
+ * lifetime, so a tab that lives five minutes gets a short reprieve and one
+ * that lives all day gets a long one. Never less than a second.
+ */
+export function snoozeSeconds(lifetimeSeconds, percent) {
+  const pct = Math.min(100, Math.max(1, Math.round(Number(percent) || 0) || 1));
+  const lifetime = Math.max(0, Number(lifetimeSeconds) || 0);
+  return Math.max(1, Math.round((lifetime * pct) / 100));
+}
