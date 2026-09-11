@@ -42,6 +42,10 @@ jobs:
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ github.token }}
+          # There is no checkout in this job, so gh cannot work out the repo from
+          # a git remote. GH_REPO tells it directly, which is cheaper than
+          # cloning the tree just to run two API calls.
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           URL: ${{ github.event.pull_request.html_url }}
         run: |
