@@ -82,6 +82,17 @@ if (typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@")) {
 }
 const $ = (id) => document.getElementById(id);
 
+/** An <svg class="icon"> referencing the sprite in panel.html. */
+function svgIcon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "icon");
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", `#i-${name}`);
+  svg.append(use);
+  return svg;
+}
+
 let settings = { ...DEFAULTS };
 
 // ---- All tabs -------------------------------------------------------------
@@ -444,7 +455,7 @@ function updateReadout() {
   const time = $("remaining");
   const note = $("remaining-note");
   if (exempt) {
-    time.textContent = "∞";
+    time.replaceChildren(svgIcon("infinity"));
     note.textContent = currentTab?.pinned
       ? "pinned tabs never expire"
       : tabState.neverExpire
@@ -560,7 +571,7 @@ async function refreshOverview() {
     const group = document.createElement("details");
     group.className = "window-group";
     const sum = document.createElement("summary");
-    sum.className = "window-title";
+    sum.className = "window-title chev";
     const name = document.createElement("span");
     name.className = "window-name";
     name.textContent = g.focused ? "Active window" : `Window ${i + 1}`;
@@ -647,7 +658,7 @@ function renderTabRow(t) {
   row.append(fuse);
 
   const timer = quickToggle(
-    "⏱",
+    "timer",
     !t.neverExpire,
     false,
     t.neverExpire ? "Timer is off. Turn on" : "Timer is on. Turn off",
@@ -672,7 +683,7 @@ function renderTabRow(t) {
   const inherited =
     t.resetOnActivate === null || t.resetOnActivate === undefined;
   const focus = quickToggle(
-    "↻",
+    "restart",
     effective,
     inherited,
     (effective ? "Restarts on focus" : "Keeps counting on focus") +
@@ -695,7 +706,7 @@ function renderTabRow(t) {
 
   // Close the tab: two clicks within a few seconds, the first only arms it.
   const close = quickToggle(
-    "✕",
+    "close",
     false,
     false,
     "Close this tab",
@@ -706,14 +717,17 @@ function renderTabRow(t) {
     clearTimeout(armed);
     armed = null;
     close.classList.remove("is-armed");
-    close.textContent = "✕";
+    close.replaceChildren(svgIcon("close"));
     close.title = "Close this tab";
     close.setAttribute("aria-label", "Close this tab");
   };
   close.addEventListener("click", async () => {
     if (!armed) {
       close.classList.add("is-armed");
-      close.textContent = "Close?";
+      close.replaceChildren(
+        svgIcon("close"),
+        document.createTextNode("Close?"),
+      );
       close.title = "Click again to close this tab";
       close.setAttribute("aria-label", "Click again to close this tab");
       armed = setTimeout(disarm, 4000);
@@ -737,12 +751,12 @@ function renderTabRow(t) {
   return row;
 }
 
-function quickToggle(glyph, pressed, inherited, label, cls) {
+function quickToggle(iconName, pressed, inherited, label, cls) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = `qtoggle ${cls}`;
   if (inherited) b.classList.add("is-inherited");
-  b.textContent = glyph;
+  b.replaceChildren(svgIcon(iconName));
   b.setAttribute("aria-pressed", String(Boolean(pressed)));
   b.setAttribute("aria-label", label);
   b.title = label;
@@ -796,7 +810,7 @@ function renderRecentRow(item) {
   const reopen = document.createElement("button");
   reopen.type = "button";
   reopen.className = "trow-reopen";
-  reopen.textContent = "Reopen";
+  reopen.append(svgIcon("reopen"), document.createTextNode("Reopen"));
   reopen.addEventListener("click", async () => {
     await api.runtime
       .sendMessage({ type: "timed-tabs:recent-reopen", url: item.url })
@@ -806,7 +820,7 @@ function renderRecentRow(item) {
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "qtoggle trow-remove";
-  remove.textContent = "✕";
+  remove.replaceChildren(svgIcon("close"));
   remove.title = "Remove from this list";
   remove.setAttribute("aria-label", "Remove from this list");
   remove.addEventListener("click", async () => {
@@ -948,7 +962,8 @@ function renderRule(rule) {
   head.className = "rule-head";
   const toggle = document.createElement("button");
   toggle.type = "button";
-  toggle.className = "rule-toggle";
+  toggle.className = "rule-toggle chev";
+  toggle.classList.toggle("is-open", open);
   toggle.setAttribute("aria-expanded", String(open));
   toggle.setAttribute("aria-label", open ? "Collapse rule" : "Expand rule");
   toggle.title = open ? "Collapse" : "Expand";
@@ -965,19 +980,25 @@ function renderRule(rule) {
   );
   const del = document.createElement("button");
   del.type = "button";
-  del.className = "rule-delete";
-  del.textContent = "Delete rule";
+  del.className = "rule-delete quiet";
+  del.replaceChildren(svgIcon("trash"), document.createTextNode("Delete rule"));
   // Two clicks within a few seconds; the first only arms the button.
   let armed = null;
   const disarm = () => {
     clearTimeout(armed);
     armed = null;
-    del.textContent = "Delete rule";
+    del.replaceChildren(
+      svgIcon("trash"),
+      document.createTextNode("Delete rule"),
+    );
     del.classList.remove("is-armed");
   };
   del.addEventListener("click", () => {
     if (!armed) {
-      del.textContent = "Click again to delete";
+      del.replaceChildren(
+        svgIcon("trash"),
+        document.createTextNode("Click again to delete"),
+      );
       del.classList.add("is-armed");
       armed = setTimeout(disarm, 4000);
       return;
@@ -1099,6 +1120,7 @@ function setRuleExpanded(id, open) {
   if (!card) return;
   card.classList.toggle("is-collapsed", !open);
   const t = card.querySelector(".rule-toggle");
+  t.classList.toggle("is-open", open);
   t.setAttribute("aria-expanded", String(open));
   t.setAttribute("aria-label", open ? "Collapse rule" : "Expand rule");
   t.title = open ? "Collapse" : "Expand";
@@ -1224,7 +1246,10 @@ let removeEmptyArmed = null;
 $("rules-remove-empty").addEventListener("click", async () => {
   const b = $("rules-remove-empty");
   if (!removeEmptyArmed) {
-    b.textContent = "Click again to remove them";
+    b.replaceChildren(
+      svgIcon("trash"),
+      document.createTextNode("Click again to remove them"),
+    );
     b.classList.add("is-armed");
     removeEmptyArmed = setTimeout(() => {
       removeEmptyArmed = null;
