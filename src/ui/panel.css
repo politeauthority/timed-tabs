@@ -1114,6 +1114,17 @@ body:not([data-context="popup"]) .trow {
     "icon url   url  reopen remove";
 }
 
+.trow-count {
+  display: inline-block;
+  margin-right: var(--sp-1);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
 .trow-when {
   grid-area: when;
   font-size: var(--fs-sm);

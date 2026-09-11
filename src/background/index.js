@@ -9,6 +9,7 @@ import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
 import { createNotifier } from "./notify.js";
+import { iconForRecord } from "../shared/recent.js";
 import { findIndicators } from "./indicators/index.js";
 import { lastOutcome as faviconOutcome } from "./indicators/favicon.js";
 
@@ -58,7 +59,7 @@ async function recordExpired(tab, action) {
     tabId: tab.id,
     title: tab.title || tab.url || "",
     url: tab.url ?? "",
-    favIconUrl: typeof tab.favIconUrl === "string" && !tab.favIconUrl.startsWith("data:") ? tab.favIconUrl : "",
+    favIconUrl: iconForRecord({ url: tab.url, favIconUrl: tab.favIconUrl, originalIcon: tab.originalIcon }),
     expiredAt: Date.now(),
     action,
   });
@@ -264,12 +265,15 @@ api.runtime.onMessage.addListener((msg) => {
       return allTabs();
     case "timed-tabs:recent":
       return loadRecent().then((list) => list.slice());
-    case "timed-tabs:recent-remove":
+    case "timed-tabs:recent-remove": {
+      // One entry by id, or every entry in a grouped row by its ids.
+      const ids = new Set(Array.isArray(msg.ids) ? msg.ids : [msg.id]);
       return loadRecent().then(async (list) => {
-        recent = list.filter((r) => r.id !== msg.id);
+        recent = list.filter((r) => !ids.has(r.id));
         await api.storage.local.set({ [RECENT_KEY]: recent });
         return "ok";
       });
+    }
     case "timed-tabs:recent-clear":
       recent = [];
       return api.storage.local.set({ [RECENT_KEY]: [] }).then(() => "ok");
@@ -488,9 +492,15 @@ async function expire(tab, onExpire) {
   expired.add(tab.id);
   try {
     if (onExpire === "close") {
-      // Only tabs we actually close are worth listing; the site's own icon, not our painted one.
-      const icon = tab.favIconUrl && !tab.favIconUrl.startsWith("data:") ? tab.favIconUrl : "";
-      await recordExpired({ ...tab, favIconUrl: icon }, "close").catch(() => {});
+      // Only tabs we actually close are worth listing. The favicon indicator
+      // may have replaced the icon with its own painting, so ask the page's
+      // content script for the original; unreachable pages get a fallback.
+      const originalIcon = await withTimeout(
+        api.tabs.sendMessage(tab.id, { type: "timed-tabs:original-icon" }),
+        1500,
+        "original-icon",
+      ).catch(() => "");
+      await recordExpired({ ...tab, originalIcon }, "close").catch(() => {});
       await api.tabs.remove(tab.id);
       // Only once the tab is actually gone, and only for close: unloading and
       // reloading leave the tab where it was.
