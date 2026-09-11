@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.1](https://github.com/politeauthority/timed-tabs/compare/v0.1.0...v0.1.1) (2026-09-11)
+
+
+### Features
+
+* a rules list that can be read at a glance ([1294d0d](https://github.com/politeauthority/timed-tabs/commit/1294d0d04cc684662463c13a8ce351671c78aad1))
+* draw the remaining time on the toolbar button ([b69c86c](https://github.com/politeauthority/timed-tabs/commit/b69c86ccce00fab6da66823fa40bca826352e36f))
+* page settings lists only what changed on this page ([ff16d1b](https://github.com/politeauthority/timed-tabs/commit/ff16d1b64d2a4a03c0c1a1b501f33067473e3671))
+* put the new rules display behind a flag ([63d96d8](https://github.com/politeauthority/timed-tabs/commit/63d96d87bf514f7e0018bdd6d60bd4da05e68050))
+* redraw the toolbar mark as a dial, generated from one source ([da9f4ee](https://github.com/politeauthority/timed-tabs/commit/da9f4ee79b62cf7650da7c7c45ad5c848512715e))
+
+
+### Bug Fixes
+
+* background correctness: linear wildcard matching, working per-tab indicator overrides, and expiry that recovers ([e81db36](https://github.com/politeauthority/timed-tabs/commit/e81db36b95d96396011e96c4fc3ed6972b9fb69b))
+* compare icon pixels, not the bytes a particular zlib produced ([97eec1e](https://github.com/politeauthority/timed-tabs/commit/97eec1eecdd6a8bc2984b5780195c530f3198390))
+* popup reads the tab's effective settings, and the UI stops rebuilding under the cursor ([ac59efb](https://github.com/politeauthority/timed-tabs/commit/ac59efbc022463d76465a920f009964e971dcc7c))
+* require Firefox 142, where data collection permissions landed ([ca20cb5](https://github.com/politeauthority/timed-tabs/commit/ca20cb53929591af0af30751c36d6d239966701e))
+* the "this tab" marker should not outshout the panel ([cd25f9c](https://github.com/politeauthority/timed-tabs/commit/cd25f9c36a55097dfd13abed91bb046766d85897))
+
 ## 0.1.0 (2026-09-11)
 
 
