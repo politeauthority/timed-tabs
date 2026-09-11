@@ -107,13 +107,16 @@ failure: the status sits at *pending*, the merge box says "Waiting" and stays lo
 and nothing on the PR is red for a label nobody has had a reason to add yet. With the
 label on, the E2E scenarios run on the standard set in both browsers — `nightly`,
 `stable`, `stable-1` and `stable-2`, each resolved from the browser's own feed the way
-`E2E` resolves its legs — and the status goes green once stable and the two before it
-have passed in both. Each browser is its own segment of the gate's summary with its
+`E2E` resolves its legs — and the status goes green once Firefox stable and the two
+before it have passed. Each browser is its own segment of the gate's summary with its
 own table and verdict, and the status description names them: "Firefox: passed;
-Chrome: stable-2 failed". Nightly is Firefox Nightly and Chrome Canary, the daily
-builds: they run and are shown in their segment, and a nightly failure is flagged
-there, but it never holds the merge in either browser. Take the label off and the
-status goes back to pending. It is red only when a leg that counts actually fails.
+Chrome (advisory): stable-2 did not pass". Two kinds of leg are advisory, shown and
+flagged but never counted: nightly in both browsers, Firefox Nightly and Chrome
+Canary being daily builds, and every Chrome leg while Chrome is being proven on the
+runner. An advisory leg that fails is a warning on its job, not a red — `e2e.yaml`
+runs it with `continue-on-error` — and the gate's `--advisory nightly,chrome` keeps
+it out of the verdict; the two are kept in step by hand. Take the label off and the
+status goes back to pending. It is red only when a Firefox stable leg actually fails.
 
 The eight legs report as `Full / Firefox nightly` through `Full / Firefox stable-2`
 and `Full / Chrome nightly` through `Full / Chrome stable-2`. None of them is required
