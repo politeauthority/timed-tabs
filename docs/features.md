@@ -83,8 +83,8 @@ The toolbar button opens a small panel for the current tab.
 - When rules match the page, they are listed with a switch to ignore each one for
   this tab, and a switch to ignore all of them. These choices last until the tab is
   closed.
-- The footer opens the Tabs page, the rules that apply to this page, and Settings,
-  and links to the source code.
+- **Full page** in the header opens the Tabs, Rules and Settings pages. The footer
+  shows the version and links to the source code.
 
 ## 📑 The Tabs page
 
@@ -123,8 +123,7 @@ picks up the other site's rules.
   global settings stay the default; a rule only replaces what it sets.
 
 The rules list is sorted by pattern. A filter box shows only the rules that match an
-address. **Make / edit rules for this page** in the popup opens the list filtered to
-the current site, and **Add rule** starts one for that site and scrolls to it.
+address, and **Add rule** starts one for the filtered site and scrolls to it.
 
 ## ⚙️ Settings
 
