@@ -143,6 +143,8 @@ jobs:
     with:
       # The two Firefoxes are required checks; Chrome stable reports beside them
       # and is advisory until branch protection says otherwise.
+      # The defaults, spelled out: the two Firefoxes are the required checks,
+      # Chrome stable reports beside them and is advisory.
       firefox: '["stable", "previous"]'
       chrome: '["stable"]'
       # A PR to main carrying `ci run full` runs these same versions inside the

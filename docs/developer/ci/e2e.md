@@ -204,9 +204,9 @@ version actually under test, and puts the number in the log and the job summary.
 The legs come from two inputs, `firefox` and `chrome`, each a JSON list of channels
 that is that browser's matrix directly; the workflow has one job per browser, near
 copies of each other, and a leg is named `<Browser> <channel>`. `previous-N` is N
-majors behind stable, so `previous` is `previous-1`. Firefox defaults to stable and
-previous and Chrome to nothing; `ci.yaml` adds Chrome stable, the beta gate stays
-Firefox-only, and the **CI run full** workflow passes all four channels of each
+majors behind stable, so `previous` is `previous-1`. The defaults are Firefox stable
+and previous plus Chrome stable, which is what CI and the beta gate run, and the
+**CI run full** workflow passes all four channels of each
 browser when a PR carries the `ci run full` label — see
 [README.md](README.md#the-full-run). To change
 the default pair, change the input's default and update branch protection in the same
