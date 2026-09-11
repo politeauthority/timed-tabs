@@ -25,7 +25,15 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ runner.tool_cache }}/node
-        key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}
+        # The key ends in the job id because CI and E2E run at the same time on
+        # the same commit. On a cold cache both miss, both try to save, and the
+        # second one loses the race with "Unable to reserve cache ... another job
+        # may be creating this cache", which every run then ends on. A key per
+        # job cannot collide; the prefix below still hands either job whatever
+        # the other one already cached, so nothing is unpacked twice.
+        key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}-${{ github.job }}
+        restore-keys: |
+          node-toolcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ inputs.node-version }}-
     - uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
