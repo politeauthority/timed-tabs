@@ -622,8 +622,15 @@ function tabOverrides() {
 }
 
 /** "global", the rule that won, or this tab -- shown next to each value. */
-function sourceBadge(entry) {
-  const el = document.createElement("span");
+function sourceBadge(entry, onClear) {
+  // A tab override is the only source the user can take back from here, so
+  // that badge is a button and the others stay plain text.
+  const clearable = entry.from === "tab" && typeof onClear === "function";
+  const el = document.createElement(clearable ? "button" : "span");
+  if (clearable) {
+    el.type = "button";
+    el.addEventListener("click", onClear);
+  }
   el.className = `setting-source is-${entry.from}`;
   if (entry.from === "rule") {
     const r = entry.rule;
@@ -631,7 +638,9 @@ function sourceBadge(entry) {
     el.title = `From the rule ${r?.pattern ?? ""}${r?.priority !== undefined ? ` (priority ${r.priority})` : ""}`;
   } else if (entry.from === "tab") {
     el.textContent = "this tab";
-    el.title = "Set on this tab, until it closes";
+    el.title = clearable
+      ? "Set on this tab, until it closes. Click to hand it back to the rules and your defaults."
+      : "Set on this tab, until it closes";
   } else {
     el.textContent = "default";
     el.title = "Your global setting, with no rule changing it here";
@@ -673,10 +682,23 @@ function renderTabSettings() {
       const entry = explained[def.key];
       const row = renderOverride(def, store, () => renderTabSettings(), {
         adopt: true,
+        compact: true,
       });
       // In the control column, not the label: the label is a two-column grid
       // and a third child there wraps onto a line of its own.
-      row.querySelector(".field-control")?.prepend(sourceBadge(entry));
+      const clear = () => tabAction("override", { key: def.key, value: null });
+      // Only badge a value something has changed. "default" on most rows is
+      // noise that costs the label its width, and the note below says what no
+      // badge means.
+      const badge = entry.from === "global" ? null : sourceBadge(entry, clear);
+      // A stacked control (the indicator list) is a column of its own, so the
+      // badge goes with the label; beside the column it reads as belonging to
+      // whichever row it happens to line up with.
+      if (badge && row.classList.contains("is-stacked")) {
+        row.querySelector(".field-label")?.append(" ", badge);
+      } else if (badge) {
+        row.querySelector(".field-control")?.prepend(badge);
+      }
       row.hidden = !tabSettingsExpanded && !isSettingActive(def.key, entry.value);
       return row;
     }),
@@ -1953,8 +1975,16 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
       Math.max(def.min ?? 1, Math.round(Number(num.value) * Number(units.value)));
   }
 
-  const wrap = settingRow(def.label, def.help, control, { checkbox: on });
+  // `compact`: one line per setting, for the popup. The checkbox is built
+  // either way because commit() reads it, but it is not shown -- editing the
+  // value is what takes the setting over -- and the help becomes the row's
+  // tooltip rather than a sentence under every label.
+  const wrap = opts.compact
+    ? settingRow(def.label, "", control)
+    : settingRow(def.label, def.help, control, { checkbox: on });
+  if (opts.compact && def.help) wrap.title = def.help;
   wrap.classList.add("override");
+  wrap.classList.toggle("is-compact", Boolean(opts.compact));
   wrap.classList.toggle("is-on", isOn);
   wrap.classList.toggle("is-stacked", stacked);
   wrap.classList.toggle("is-adopting", Boolean(opts.adopt));

@@ -552,13 +552,65 @@ body:not([data-context="popup"]) .pages {
    there is no room for checkbox, label and help beside a badge and a control:
    forcing them onto one line squeezes the label into a ladder of single words
    and overruns the badge. The value wraps to its own line instead. */
+/* One line per setting: label, source, value. The help is the row's tooltip,
+   which is what buys the room for the value to sit beside the label instead of
+   wrapping under a sentence. */
 .tab-settings-list .field {
-  padding: var(--sp-2) 0;
+  flex-wrap: nowrap;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+}
+
+.tab-settings-list .field-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* The badge leads the control column, so a row reads label - source - value. */
 .tab-settings-list .field-control {
+  flex: none;
   gap: var(--sp-2);
+}
+
+/* Nothing in the value column may push the row wider than the popup. The
+   label shrinks first: it has an ellipsis and a tooltip, and a clipped value
+   is a lie where a clipped label is only terse. */
+.tab-settings-list select {
+  max-width: 11em;
+}
+
+.tab-settings-list input[type="number"] {
+  /* Room for two digits and the spinner; 3.2em clipped "40" to "4". */
+  width: 4.2em;
+}
+
+/* The indicator list is a column of rows, so it takes the full width and its
+   badge rides with the label instead of floating beside the column. */
+.tab-settings-list .field.is-stacked {
+  flex-wrap: wrap;
+}
+
+.tab-settings-list .field.is-stacked .field-label {
+  width: 100%;
+  white-space: normal;
+}
+
+.tab-settings-list .field.is-stacked .field-control {
+  width: 100%;
+}
+
+/* A tab override can be handed back by clicking its badge. */
+button.setting-source {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.setting-source:hover {
+  color: var(--accent-ink);
+  background: var(--accent);
 }
 
 .tab-rules-note {
