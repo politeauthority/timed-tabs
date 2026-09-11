@@ -1376,6 +1376,17 @@ let rules = [];
 let groups = [];
 const groupsOn = () => featureOn(settings, "site-groups");
 /**
+ * The emoji of the settings group a rule field belongs to, so a rule's chips
+ * and its override headings read like the Settings page: ⏳ for timing, 🚪 for
+ * expiry, 🎨 for appearance. The rule-only timer switch counts as timing.
+ */
+function fieldEmoji(key) {
+  const def = RULE_FIELD_DEFS.find((f) => f.key === key);
+  const group = def?.group ?? (key === "neverExpire" ? "timing" : "appearance");
+  return GROUPS.find((g) => g.id === group)?.emoji ?? "";
+}
+
+/**
  * The reworked Rules page (flag "new-rules-display"). Off, `renderRule` builds
  * the original head and one-line summary, and the stylesheet keeps the cards
  * it had; the body -- description, match, priority, overrides -- is the same
@@ -1841,11 +1852,15 @@ function ruleHead(rule, el, targetsGroup, open) {
     target = document.createElement("select");
     target.className = "rule-target";
     target.setAttribute("aria-label", "What this rule applies to");
-    target.add(new Option(newRulesDisplay() ? "Address" : "Address pattern", ""));
-    for (const g of groups) target.add(new Option(`Group: ${g.name}`, groupRef(g.name)));
+    // The new display names targets with the same marks as the rest of the
+    // UI: 🔗 for an address, 🗂️ for a site group (its page heading's emoji).
+    const fresh = newRulesDisplay();
+    target.add(new Option(fresh ? "🔗 Address" : "Address pattern", ""));
+    for (const g of groups) target.add(new Option(fresh ? `🗂️ ${g.name}` : `Group: ${g.name}`, groupRef(g.name)));
     const current = targetsGroup ? groupRef(groupNameOf(rule.pattern)) : "";
     if (targetsGroup && !findGroup(groups, groupNameOf(rule.pattern))) {
-      target.add(new Option(`Group: ${groupNameOf(rule.pattern)} (missing)`, current));
+      const missing = groupNameOf(rule.pattern);
+      target.add(new Option(fresh ? `🗂️ ${missing} (missing)` : `Group: ${missing} (missing)`, current));
     }
     target.value = current;
     target.addEventListener("change", () => {
@@ -1965,7 +1980,8 @@ function ruleSummary(rule, targetsGroup) {
   for (const [k, v] of sets) {
     const chip = document.createElement("span");
     chip.className = "rule-chip";
-    chip.textContent = ruleChipText(k, v);
+    const emoji = fieldEmoji(k);
+    chip.textContent = emoji ? `${emoji} ${ruleChipText(k, v)}` : ruleChipText(k, v);
     chips.append(chip);
   }
   summary.append(chips);
@@ -2068,8 +2084,8 @@ function renderRule(rule) {
     commit: (set) => updateRule(rule.id, { set }, false),
   };
   body.append(
-    renderOverrideGroup("Timer settings this rule changes", defsFor(RULE_TIMING_FIELDS), store),
-    renderOverrideGroup("How matching tabs look", defsFor(RULE_VISUAL_FIELDS), store),
+    renderOverrideGroup(newRulesDisplay() ? "⏳ Timer settings this rule changes" : "Timer settings this rule changes", defsFor(RULE_TIMING_FIELDS), store),
+    renderOverrideGroup(newRulesDisplay() ? "🎨 How matching tabs look" : "How matching tabs look", defsFor(RULE_VISUAL_FIELDS), store),
   );
   return el;
 }
@@ -2461,6 +2477,10 @@ function applyRulesDisplay() {
   const fresh = $("rules-help-new");
   if (classic) classic.hidden = on;
   if (fresh) fresh.hidden = !on;
+  const filter = $("rules-filter");
+  if (filter) {
+    filter.placeholder = (on ? "🔍 " : "") + "Show rules matching an address, e.g. https://github.com/foo";
+  }
 }
 
 watchGroups((next) => {
