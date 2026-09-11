@@ -1,7 +1,7 @@
 name: E2E
 run-name: "E2E — ${{ github.ref_name }}"
 
-# 🦊 Runs the extension in a real, headless Firefox on the self-hosted runner and
+# 🦊🌐 Runs the extension in a real, headless browser on the self-hosted runner and
 # checks each scenario in tests/e2e/scenarios against the log it produces. See
 # docs/developer/ci/e2e.md.
 #
@@ -17,6 +17,16 @@ run-name: "E2E — ${{ github.ref_name }}"
 # rather than pinned, so "previous" follows every release without anyone editing
 # this file. Both must pass. The `firefox` input replaces that list: `previous-N`
 # is N majors back, and full.yaml passes four of them for the `ci run full` label.
+#
+# The `chrome` input is the same shape for Chrome: a JSON list of legs, `stable`
+# or `previous-N` for N majors behind the current stable, resolved from the Chrome
+# for Testing feed. It is empty by default and only the callers on `feat/chrome-e2e`
+# fill it while Chrome is being proven on this runner -- ci.yaml with one leg, and
+# full.yaml with four beside its four Firefoxes -- so every other caller stays
+# Firefox-only without knowing Chrome exists. The gate lives in the callers on
+# purpose: this file runs what it is told and holds no opinion about branches.
+# No Chrome leg is a required check yet; widening is a change in the callers made
+# in the same commit that adds the contexts to branch protection.
 #
 # Each leg is its own status check: called from CI they report as
 # `E2E / Firefox latest` and `E2E / Firefox previous`, GitHub prefixing a called
@@ -59,6 +69,13 @@ on:
         type: string
         required: false
         default: '["latest", "previous"]'
+      chrome:
+        # Same shape as `firefox`, and empty rather than absent so the `legs`
+        # job can always parse it.
+        description: 'JSON list of Chrome legs to run, e.g. ["stable", "previous"]. Empty for none.'
+        type: string
+        required: false
+        default: '[]'
       max-parallel:
         # Ten Firefoxes at once starved one another on the runner node until
         # a scenario saw a single tick in its whole window. The scenarios time
@@ -88,6 +105,11 @@ on:
         type: string
         required: false
         default: '["latest", "previous"]'
+      chrome:
+        description: 'JSON list of Chrome legs to run: stable, previous, previous-N. Empty for none.'
+        type: string
+        required: false
+        default: '[]'
       max-parallel:
         description: How many legs may run at once.
         type: number
@@ -104,15 +126,43 @@ permissions:
   actions: read        # the step-times action reads this run's job timings
 
 env:
-  FIREFOX_LIBS_KEY: v1
+  FIREFOX_LIBS_KEY: v2
 
 # No concurrency group. Called from CI this job is part of the caller's run, and
 # `ci-<ref>` already cancels the whole thing when a newer commit lands; a group here
 # would only be a second way to say the same thing, scoped to a different key.
 
 jobs:
+  # Turns the inputs into the matrix. Each Firefox leg name becomes an object
+  # whose `name` is the string it always was -- "Firefox latest", "Firefox
+  # previous-3" -- so no status-check context changes shape; Chrome legs are
+  # built the same way from the `chrome` list. A matrix `include` with
+  # heterogeneous legs has to be built somewhere, and a job that echoes JSON is
+  # the smallest somewhere. ubuntu-latest and no checkout: it cannot
+  # realistically fail, which matters because the Firefox legs that depend on
+  # it are required checks.
+  legs:
+    name: Which legs
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+      - id: pick
+        env:
+          FIREFOX: ${{ inputs.firefox }}
+          CHROME: ${{ inputs.chrome }}
+        run: |
+          set -euo pipefail
+          legs=$(jq -cn --argjson ff "$FIREFOX" --argjson ch "$CHROME" '
+            [ $ff[] | {browser: "firefox", channel: ., slug: ("firefox-" + .), name: ("Firefox " + .)} ]
+            + [ $ch[] | {browser: "chrome",  channel: ., slug: ("chrome-"  + .), name: ("Chrome "  + .)} ]')
+          echo "include=${legs}" >> "$GITHUB_OUTPUT"
+          echo "legs: $(jq -r '[.[].name] | join(", ")' <<<"$legs")"
+
   scenarios:
-    name: Firefox ${{ matrix.firefox }}
+    name: ${{ matrix.name }}
+    needs: legs
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     # Two ways a PR skips Firefox. Both skip the job rather than the caller, so
     # the check still reports: a required check that never reports blocks the PR
@@ -120,8 +170,8 @@ jobs:
     #
     # The release PR is the second. release-please only ever rewrites CHANGELOG.md
     # and the four files carrying the version, and no scenario can read any of
-    # them, so the two Firefoxes have nothing to say about it -- they just spent
-    # four minutes each saying it, on every push to main. Lint, the unit tests and
+    # them, so no browser has anything to say about it -- they just spent four
+    # minutes each saying it, on every push to main. Lint, the unit tests and
     # the build still run there, which is what keeps `web-ext lint` looking at the
     # bumped manifest version before the tag is cut; and the `package` job in
     # release-please.yaml re-runs lint and the tests against the tag itself before
@@ -139,7 +189,9 @@ jobs:
       fail-fast: false
       max-parallel: ${{ inputs.max-parallel }}
       matrix:
-        firefox: ${{ fromJSON(inputs.firefox) }}
+        # From the `legs` job. `name` is the status check branch protection matches
+        # on; `slug` keys the caches and the artifact, where a space would be awkward.
+        include: ${{ fromJSON(needs.legs.outputs.include) }}
     steps:
       # Full history: the changed-paths action diffs against the base commit.
       - uses: actions/checkout@v7
@@ -167,14 +219,16 @@ jobs:
         with:
           # Both legs of the matrix are the same `github.job`, so without this
           # they would share a key and race to save it on a cold cache.
-          key-suffix: "-${{ matrix.firefox }}"
+          key-suffix: "-${{ matrix.slug }}"
       - name: npm ci
         if: steps.changed.outputs.code == 'true'
         id: npm
         timeout-minutes: 4
         run: npm ci --prefer-offline --no-audit --no-fund
 
-      # Firefox's system libraries. Installed once, then cached as a tarball of
+      # The browser's system libraries -- GTK, NSS, ALSA and the X client libs,
+      # which Firefox and Chrome both want, so every leg installs the same list.
+      # Installed once, then cached as a tarball of
       # every file the install put down, so later runs untar instead of running
       # apt and dpkg (nine minutes on a starved CPU). Bump FIREFOX_LIBS_KEY after
       # changing the package list. Ubuntu 24.04: ALSA is libasound2t64.
@@ -195,7 +249,7 @@ jobs:
           # legs are cold at once on a fresh key, and both would try to save.
           # The system libraries do not depend on which Firefox runs, so the
           # prefix lets either leg restore whatever the other one cached.
-          key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}-${{ matrix.firefox }}
+          key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}-${{ matrix.slug }}
           restore-keys: |
             firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ steps.os.outputs.id }}-${{ env.FIREFOX_LIBS_KEY }}-
       - name: Firefox libraries
@@ -203,7 +257,10 @@ jobs:
         id: firefox-libs
         timeout-minutes: 6
         env:
-          PACKAGES: libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils
+          # binutils is for `ar`: setup-chrome fetches a .deb and unpacks it with
+          # that, and the ARC image does not have it. Its absence was the whole
+          # of the first Chrome leg's failure.
+          PACKAGES: libgtk-3-0 libdbus-glib-1-2 libasound2t64 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils binutils
         run: |
           set -euo pipefail
           if [ -f ~/firefox-libs.tar ]; then
@@ -249,11 +306,11 @@ jobs:
       # and puts the number in the log and the summary instead of leaving it to
       # be guessed from a run date.
       - name: Resolve the Firefox version
-        if: steps.changed.outputs.code == 'true'
+        if: steps.changed.outputs.code == 'true' && matrix.browser == 'firefox'
         id: ffver
         timeout-minutes: 2
         env:
-          WANT: ${{ matrix.firefox }}
+          WANT: ${{ matrix.channel }}
         run: |
           set -euo pipefail
           version=$(python3 - <<'PY'
@@ -303,21 +360,73 @@ jobs:
       # setup-firefox downloads a ~90 MB tarball every run; that took 14s and is
       # the smallest cost here, so it is left alone.
       - uses: browser-actions/setup-firefox@v1
-        if: steps.changed.outputs.code == 'true'
+        if: steps.changed.outputs.code == 'true' && matrix.browser == 'firefox'
         id: firefox
         timeout-minutes: 3
         with:
           firefox-version: ${{ steps.ffver.outputs.version }}
-      - run: '"${{ steps.firefox.outputs.firefox-path }}" --version'
+
+      # Which Chrome this leg tests, the way the Firefox step does it: `stable`
+      # is the current stable major and `previous-N` is N majors behind it,
+      # both read from the Chrome for Testing feed at run time so "previous"
+      # follows every release. setup-chrome takes a bare major and installs the
+      # latest build of it, which is what a version number here means.
+      - name: Resolve the Chrome version
+        if: steps.changed.outputs.code == 'true' && matrix.browser == 'chrome'
+        id: chver
+        timeout-minutes: 2
+        env:
+          WANT: ${{ matrix.channel }}
+        run: |
+          set -euo pipefail
+          version=$(python3 - <<'PY'
+          import json, os, re, sys, urllib.request
+
+          want = os.environ["WANT"]
+          url = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json"
+          with urllib.request.urlopen(url, timeout=30) as r:
+              stable = json.load(r)["channels"]["Stable"]["version"]
+          major = int(stable.split(".")[0])
+          if want == "stable":
+              print(stable)
+              sys.exit(0)
+          m = re.fullmatch(r"previous(?:-([1-9]\d*))?", want)
+          if not m:
+              sys.exit(f"unknown Chrome leg {want!r}: use stable, previous or previous-N")
+          print(major - int(m.group(1) or 1))
+          PY
+          )
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "${WANT} -> Chrome ${version}"
+
+      - uses: browser-actions/setup-chrome@v1
+        if: steps.changed.outputs.code == 'true' && matrix.browser == 'chrome'
+        id: chrome
+        timeout-minutes: 3
+        with:
+          chrome-version: ${{ steps.chver.outputs.version }}
+
+      - name: Which browser
         if: steps.changed.outputs.code == 'true'
+        id: browser
+        env:
+          BIN: ${{ matrix.browser == 'chrome' && steps.chrome.outputs.chrome-path || steps.firefox.outputs.firefox-path }}
+        run: |
+          set -euo pipefail
+          echo "bin=${BIN}" >> "$GITHUB_OUTPUT"
+          version=$("$BIN" --version 2>&1 | head -1)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "${version}"
 
       - name: Run the scenarios
         if: steps.changed.outputs.code == 'true'
         id: scenarios
         timeout-minutes: 8
         env:
-          FIREFOX: ${{ steps.firefox.outputs.firefox-path }}
-        run: npm run e2e
+          # Only the one for this leg is set; the runner reads the other as unset.
+          FIREFOX: ${{ matrix.browser == 'firefox' && steps.browser.outputs.bin || '' }}
+          CHROME: ${{ matrix.browser == 'chrome' && steps.browser.outputs.bin || '' }}
+        run: npm run ${{ matrix.browser == 'chrome' && 'e2e:chrome' || 'e2e' }}
 
       # One small record per leg -- which Firefox this was, how it went, and
       # the scenario results -- so a caller can sum several legs into one table
@@ -326,8 +435,11 @@ jobs:
       - name: Record the leg
         if: always()
         env:
-          LEG: ${{ matrix.firefox }}
-          VERSION: ${{ steps.ffver.outputs.version }}
+          LEG: ${{ matrix.channel }}
+          NAME: ${{ matrix.name }}
+          BROWSER: ${{ matrix.browser }}
+          # The resolved number for Firefox; what the binary said for Chrome.
+          VERSION: ${{ steps.ffver.outputs.version || steps.browser.outputs.version }}
           OUTCOME: ${{ steps.scenarios.outcome }}
           CODE: ${{ steps.changed.outputs.code }}
           REASON: ${{ steps.changed.outputs.reason }}
@@ -337,6 +449,8 @@ jobs:
           import json, os
           record = {
               "leg": os.environ["LEG"],
+              "name": os.environ["NAME"],
+              "browser": os.environ["BROWSER"],
               "version": os.environ["VERSION"],
               # success | failure | cancelled | skipped (docs-only, or never reached)
               "outcome": os.environ["OUTCOME"] or "skipped",
@@ -354,7 +468,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: e2e-leg-${{ matrix.firefox }}
+          name: e2e-leg-${{ matrix.slug }}
           path: e2e-artifacts/leg.json
 
       - uses: actions/upload-artifact@v7
@@ -367,7 +481,7 @@ jobs:
         with:
           # One name per leg. Two uploads under the same name in one run is an
           # error, and when a version fails you want its artifacts on their own.
-          name: e2e-artifacts-${{ matrix.firefox }}
+          name: e2e-artifacts-${{ matrix.slug }}
           path: e2e-artifacts/
           if-no-files-found: ignore
 
@@ -384,17 +498,18 @@ jobs:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref_name }}
           REASON: ${{ steps.changed.outputs.reason }}
-          WANT: ${{ matrix.firefox }}
-          # Empty when the resolve step did not run, which the heading allows for.
-          VERSION: ${{ steps.ffver.outputs.version }}
+          WHO: ${{ matrix.name }}
+          EMOJI: ${{ matrix.browser == 'chrome' && '🌐' || '🦊' }}
+          # Empty when nothing resolved, which the heading allows for.
+          VERSION: ${{ steps.ffver.outputs.version || steps.browser.outputs.version }}
         run: |
-          who="Firefox ${WANT}${VERSION:+ (${VERSION})}"
+          who="${WHO}${VERSION:+ (${VERSION})}"
           case "${{ job.status }}" in
             success)
-              if [ "${{ steps.changed.outputs.code }}" = "true" ]; then head="### ✅ 🦊 ${who} passed"
-              else head="### ⏭️ 🦊 ${who} skipped: ${REASON}"; fi ;;
-            cancelled) head="### ⏹️ 🦊 ${who} cancelled (the job timed out, or a newer run took over)" ;;
-            *) head="### ❌ 🦊 ${who} failed" ;;
+              if [ "${{ steps.changed.outputs.code }}" = "true" ]; then head="### ✅ ${EMOJI} ${who} passed"
+              else head="### ⏭️ ${EMOJI} ${who} skipped: ${REASON}"; fi ;;
+            cancelled) head="### ⏹️ ${EMOJI} ${who} cancelled (the job timed out, or a newer run took over)" ;;
+            *) head="### ❌ ${EMOJI} ${who} failed" ;;
           esac
           {
             echo "$head"
@@ -416,5 +531,5 @@ jobs:
           slow-over: 60
           # The same numbers as the steps' timeout-minutes, so a step that hit
           # its limit is named as timed out rather than shown as a bare failure.
-          timeouts: "Run ./.github/actions/node-toolcache=4, npm ci=4, Firefox libraries=6, Resolve the Firefox version=2, Run browser-actions/setup-firefox@v1=3, Run the scenarios=8"
+          timeouts: "Run ./.github/actions/node-toolcache=4, npm ci=4, Firefox libraries=6, Resolve the Firefox version=2, Run browser-actions/setup-firefox@v1=3, Resolve the Chrome version=2, Run browser-actions/setup-chrome@v1=3, Run the scenarios=8"
           job-timeout: 20

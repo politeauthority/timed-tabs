@@ -17,6 +17,7 @@
     "icons": "node scripts/icons.mjs",
     "icons:check": "node scripts/icons.mjs --check",
     "e2e": "node scripts/e2e.mjs",
+    "e2e:chrome": "node scripts/e2e.mjs --browser=chrome",
     "package": "npm run package:firefox && npm run package:chrome",
     "package:firefox": "npm run build:firefox && web-ext build --source-dir dist/firefox --artifacts-dir web-ext-artifacts --overwrite-dest --filename timed-tabs-firefox-${ZIP_VERSION:-$npm_package_version}.zip",
     "package:chrome": "npm run build:chrome && web-ext build --source-dir dist/chrome --artifacts-dir web-ext-artifacts --overwrite-dest --filename timed-tabs-chrome-${ZIP_VERSION:-$npm_package_version}.zip",

@@ -40,6 +40,14 @@ E2E / Firefox previous
 CI run full
 ```
 
+`E2E / Chrome stable` exists but is not among them: it runs only on the
+`feat/chrome-e2e` branch while Chrome is being proven on the runner, and is
+advisory there. `ci.yaml` is the one caller that switches it on, via `e2e.yaml`'s
+`chrome` input; the full run and the beta call the same workflow and stay
+Firefox-only. When it is reliably green it becomes a sixth required context, which
+means adding it both here and to the `gh api` call below in the same change that
+drops the branch condition in `ci.yaml`.
+
 `Not paused` was missing from that list for a while, and the gap is worth
 remembering: the job ran on every PR, went red on every paused one, and held up
 nothing, because branch protection was never reading it — so `ci pause` skipped

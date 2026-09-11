@@ -1,8 +1,13 @@
 # End-to-end tests
 
 `npm run e2e` runs the extension in a real, headless Firefox and checks what it did.
-CI runs the same thing on the self-hosted runner for every push to `main` and every
-open PR, as the second half of the **CI** workflow, against two versions of Firefox.
+`npm run e2e:chrome` runs the same scenarios in a real, headless Chrome. CI runs the
+Firefox half on the self-hosted runner for every push to `main` and every open PR, as
+the second half of the **CI** workflow, against two versions of Firefox; the Chrome
+leg joins on one branch while it is being proven there.
+
+Both take the same arguments: `npm run e2e -- navigation` runs one scenario by name,
+`FIREFOX=` and `CHROME=` pick a binary.
 
 ## How a scenario works
 
@@ -17,10 +22,39 @@ A scenario is one file in `tests/e2e/scenarios/`:
 }
 ```
 
-`scripts/e2e.mjs` builds the dev target with that `dev` object as its `dev.json`,
-runs `web-ext run` headless for `runSeconds`, stops it, and matches the log against
-the expectations. The log, and the screenshot the scenario captured, are written to
+`scripts/e2e.mjs` builds the dev target with that `dev` object as its `dev.json`, runs
+it headless for `runSeconds`, stops it, and matches the log against the expectations.
+The log, and the screenshot the scenario captured, are written to
 `e2e-artifacts/<name>.*`, which CI uploads.
+
+`runSeconds` counts from the extension's **first log line**, not from launch, so a
+slow browser start on a busy runner does not eat into the scenario.
+
+## Getting the log out of each browser
+
+The scenario format, the matching and the artifacts are identical in both browsers.
+Only the part that produces the log differs, and it differs a lot.
+
+**Firefox** prints the extension's console straight to stdout given
+`devtools.console.stdout.{content,chrome}`, so `web-ext run` is the entire driver and
+the log is just what the process wrote.
+
+**Chrome** has no such pref. An MV3 service worker's console goes to the DevTools
+console and nowhere else, so `scripts/e2e-chrome.mjs` starts Chrome with a debugging
+port, attaches over the DevTools Protocol, and collects `Runtime.consoleAPICalled`.
+Two Chrome behaviours shape that file:
+
+- **`--load-extension` has been off by default since Chrome 137.** A build loaded that
+  way is silently ignored — the browser starts fine and the extension simply is not
+  there, with nothing in any log to say so. `Extensions.loadUnpacked` over CDP is the
+  supported route now, and it needs `--enable-unsafe-extension-debugging`.
+- **The service worker is lazy and short-lived.** Attaching after it has already run
+  misses everything it said, so `Target.setAutoAttach` goes on *before* the extension
+  is loaded — which is why `loadUnpacked` is the last thing the driver does.
+
+Chrome's port comes from `--remote-debugging-port=0` and is read back out of
+`DevToolsActivePort` in the throwaway profile, so two legs on one runner cannot race
+for a fixed port.
 
 ## What a run prints
 
@@ -122,16 +156,30 @@ the end of the run instead of one by one — and neither is the apt source rewri
 just above it, which is there because the runner pod cannot reach the Ubuntu mirrors
 on port 80 at all.
 
-## Which Firefox
+## Which browsers
 
-Two, in parallel, and both must pass:
+Two Firefox legs by default, in parallel, and both must pass. A Chrome leg joins them
+on one branch:
 
-| Leg | What it is | Today |
-|---|---|---|
-| `Firefox latest` | the current release | 155.0.1 |
-| `Firefox previous` | the last release of the major before it | 154.0.1 |
+| Leg | What it is | Today | Runs on |
+|---|---|---|---|
+| `Firefox latest` | the current release | 155.0.1 | every branch, required |
+| `Firefox previous` | the last release of the major before it | 154.0.1 | every branch, required |
+| `Chrome stable` | whatever `setup-chrome` calls stable | 152.x | `feat/chrome-e2e` only, advisory |
 
-Neither is pinned. The `Resolve the Firefox version` step reads Mozilla's
+All legs run the same scenarios in `tests/e2e/scenarios`. Nothing in them is
+browser-specific — they pin `indicators` explicitly rather than relying on a default,
+so the Firefox-only theme tint never enters — and that is the point: a scenario that
+passes in one browser and fails in another is a real difference in the extension.
+
+Chrome is not pinned to a pair the way Firefox is. There is one stable channel and no
+"previous" to hold a line against, so the leg tracks whatever stable is that day and
+reports the version it got in the log and the summary. It is switched on by the
+workflow's `chrome` input, which only `ci.yaml` passes, and only on that branch; the
+full run and the beta call the same workflow and stay Firefox-only without knowing
+Chrome exists.
+
+Neither Firefox is pinned either. The `Resolve the Firefox version` step reads Mozilla's
 [product-details feed](https://product-details.mozilla.org/1.0/firefox.json), takes
 the shipped desktop releases from it (`major` and `stability`; betas, ESRs and
 devedition are filtered out), and picks the newest — or, for `previous`, the last
@@ -142,21 +190,25 @@ Both legs resolve an exact version from that one feed rather than handing
 `setup-firefox` the string `latest`, which keeps `previous` defined relative to the
 version actually under test, and puts the number in the log and the job summary.
 
-The matrix comes from the workflow's `firefox` input, a JSON list of legs, and the
+The Firefox legs come from the workflow's `firefox` input, a JSON list, and the
 resolve step also understands `previous-N`: N majors behind the current release, so
 `previous` is `previous-1`. The **CI run full** workflow calls it with four legs,
 `latest` through `previous-3`, when a PR carries the `ci run full` label — see
-[README.md](README.md#the-full-run). To change the default pair, change the
-input's default and update branch protection in the same change, because those two
-legs are the required checks. See below.
+[README.md](README.md#the-full-run). The `legs` job at the top of the workflow
+turns that list, plus the `chrome` input, into the matrix; each Firefox entry keeps
+the name it always had, so no status-check context changes shape. To change the
+default pair, change the input's default and update branch protection in the same
+change, because those two legs are the required checks. See below.
 
 ## The status checks
 
-Each leg reports its own check, and both are required on `main`, alongside
-**Lint, test & build** and **Not paused**:
+Each leg reports its own check, and both Firefox ones are required on `main`,
+alongside **Lint, test & build**, **Not paused** and **CI run full**:
 
 - **E2E / Firefox latest**
 - **E2E / Firefox previous**
+
+`E2E / Chrome stable` reports too, on its branch, but is not required yet.
 
 Both halves of each name are load-bearing. GitHub prefixes a called workflow's jobs
 with the calling job's name, so the context is `jobs.e2e` in `ci.yaml` (named `E2E`)
