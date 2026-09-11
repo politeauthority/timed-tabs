@@ -84,7 +84,8 @@ turning the flag off silently gives those tabs your default lifetime instead.
 Adds a **Statistics** section to the Tabs page, below **Recently expired**: how many
 tabs have run out of time and how each one ended, a chart of the last fortnight a day
 at a time, your snoozes and the time they granted, timers you have restarted by hand,
-and the most tabs you have had open at once.
+the most tabs you have had open at once, and the all-time count of tabs killed, which
+survives **Clear statistics** and travels in a backup.
 
 **The counting does not depend on this switch.** Timed Tabs keeps its tally whether
 the flag is on or off, so turning it off loses nothing and turning it back on shows

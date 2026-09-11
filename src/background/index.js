@@ -11,7 +11,7 @@ import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
 import { createNotifier } from "./notify.js";
 import { recordFor } from "../shared/recent.js";
-import { emptyStats, record as recordStat, summarise } from "../shared/stats.js";
+import { clearStats, emptyStats, record as recordStat, restoreKilled, summarise } from "../shared/stats.js";
 import { findIndicators } from "./indicators/index.js";
 import { lastOutcome as faviconOutcome } from "./indicators/favicon.js";
 
@@ -439,8 +439,24 @@ api.runtime.onMessage.addListener((msg) => {
     case "timed-tabs:stats":
       return loadStats().then((s) => summarise(s));
     case "timed-tabs:stats-clear":
-      stats = emptyStats();
-      return api.storage.local.set({ [STATS_KEY]: stats }).then(() => "ok");
+      // Everything but the lifetime count of tabs killed, which a clear keeps.
+      return serial(async () => {
+        stats = clearStats(await loadStats());
+        await api.storage.local.set({ [STATS_KEY]: stats });
+        return "ok";
+      });
+    case "timed-tabs:stats-restore":
+      // A backup being loaded. The count only ever goes up, and an unchanged
+      // one costs no write, on the same contract as `bumpStats`.
+      return serial(async () => {
+        const before = await loadStats();
+        const after = restoreKilled(before, msg.killed);
+        if (after !== before) {
+          stats = after;
+          await api.storage.local.set({ [STATS_KEY]: after });
+        }
+        return "ok";
+      });
     case "timed-tabs:recent-clear":
       recent = [];
       return api.storage.local.set({ [RECENT_KEY]: [] }).then(() => "ok");

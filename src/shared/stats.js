@@ -30,6 +30,13 @@ export function emptyStats() {
     since: null,
     closed: 0,
     discarded: 0,
+    /**
+     * Every tab ever closed, for good. Unlike `closed` it survives
+     * **Clear statistics** and travels in a backup, so it is the one number
+     * here that can outlive a profile. Never a window and never reset short
+     * of "Reset everything".
+     */
+    killed: 0,
     reloaded: 0,
     snoozes: 0,
     snoozeSeconds: 0,
@@ -89,6 +96,7 @@ export function record(stats, event, now = Date.now()) {
       ...s,
       since: s.since ?? now,
       [key]: s[key] + 1,
+      killed: event.action === "close" ? s.killed + 1 : s.killed,
       days: pruneDays({ ...s.days, [today]: (s.days[today] ?? 0) + 1 }, now),
     };
   }
@@ -103,6 +111,29 @@ export function record(stats, event, now = Date.now()) {
   }
 
   return stats;
+}
+
+/**
+ * **Clear statistics**: everything back to nothing, except the lifetime count of
+ * tabs killed, which a clear is not meant to touch. It is a life story, and the
+ * button is for starting the chart and the tiles afresh, not for forgetting it.
+ */
+export function clearStats(stats) {
+  return { ...emptyStats(), killed: mergeStats(stats).killed };
+}
+
+/**
+ * A lifetime count arriving from a backup. It only ever goes up: a backup
+ * loaded into a profile that has already killed more tabs than the file says
+ * would otherwise turn the clock back, and a total that can shrink is not a
+ * total. Returns `stats` itself when nothing changes, on the same contract as
+ * `record`.
+ */
+export function restoreKilled(stats, killed) {
+  const s = mergeStats(stats);
+  const n = Number.isFinite(killed) && killed > 0 ? Math.floor(killed) : 0;
+  if (n <= s.killed) return stats;
+  return { ...s, killed: n };
 }
 
 /** Days within DAYS_KEPT of today, oldest ones dropped. */
@@ -141,6 +172,7 @@ export function mergeStats(stored) {
     since: stamp(stored.since),
     closed: count(stored.closed),
     discarded: count(stored.discarded),
+    killed: count(stored.killed),
     reloaded: count(stored.reloaded),
     snoozes: count(stored.snoozes),
     snoozeSeconds: count(stored.snoozeSeconds),
@@ -186,7 +218,7 @@ export function summarise(stats, now = Date.now()) {
     daysTracked: daysSince(s.since, now),
     perDay: perDay(expired, s.since, now),
     /** True before anything at all has happened, which the panel says in words. */
-    empty: expired === 0 && s.snoozes === 0 && s.resets === 0 && s.peakTabs === 0,
+    empty: expired === 0 && s.snoozes === 0 && s.resets === 0 && s.peakTabs === 0 && s.killed === 0,
   };
 }
 

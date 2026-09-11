@@ -1567,6 +1567,13 @@ function statsChart(s) {
 /** The rest of it, one tile each; a tile with nothing to say is left out. */
 function statsTiles(s) {
   const tiles = [
+    // First because it is the one that lasts: a clear leaves it, and a backup
+    // carries it, so after either it may be the only tile here.
+    s.killed && {
+      value: s.killed.toLocaleString(),
+      label: s.killed === 1 ? "tab killed, all time" : "tabs killed, all time",
+      note: "kept through a clear and in backups",
+    },
     s.snoozes && {
       value: s.snoozes.toLocaleString(),
       label: s.snoozes === 1 ? "snooze" : "snoozes",
@@ -2807,7 +2814,11 @@ const backupText = $("backup-text");
  */
 async function showBackup() {
   const v = await getDisplayVersion().catch(() => null);
-  backupText.value = exportText(settings, rules, groups, v?.display ?? "");
+  // The lifetime count of tabs killed rides along; the rest of the tally does
+  // not. A background that cannot be reached writes a zero, which a later
+  // load can never lower anything with.
+  const s = await api.runtime.sendMessage({ type: "timed-tabs:stats" }).catch(() => null);
+  backupText.value = exportText(settings, rules, groups, v?.display ?? "", s);
 }
 
 /**
@@ -2918,6 +2929,14 @@ async function applyBackup() {
   settings = loaded;
   rules = parsed.rules;
   groups = parsed.groups ?? [];
+  // Not part of the write above: the tally is the background's, and a count
+  // that fails to land is a number, not a setting the user is now looking at.
+  if (parsed.stats.killed > 0) {
+    await api.runtime
+      .sendMessage({ type: "timed-tabs:stats-restore", killed: parsed.stats.killed })
+      .catch(() => {});
+    if (statsOn() && $("stats").open) refreshStats();
+  }
   renderFields();
   renderFlagged();
   if ($("overview").open) refreshOverview();

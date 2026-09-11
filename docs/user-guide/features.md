@@ -124,9 +124,14 @@ unloaded, reloaded), how many snoozes you have granted and how much time they bo
 how many timers you have restarted, and the most tabs you have ever had open at once.
 A small chart shows the last fortnight a day at a time, and names your busiest day.
 
+One tile is different from the rest: **tabs killed, all time** counts every tab Timed
+Tabs has ever closed. **Clear statistics** empties everything else and leaves that
+one standing, and it is the only part of the tally that goes into a backup, so it can
+follow you to a new profile. Loading a backup never lowers it.
+
 It is counts and dates only — no addresses, no titles, nothing about any particular
 tab — which makes it the one list on that page holding nothing about where you have
-been. **Clear statistics** empties it. See [privacy.md](privacy.md#-statistics).
+been. See [privacy.md](privacy.md#-statistics).
 
 ## 📋 Rules
 
@@ -220,8 +225,9 @@ Settings sync through the browser's extension storage; rules are kept locally.
 - **Manage tabs** is the master switch. Off leaves every tab alone, with no timers,
   no closing and no colours, and undoes every mark already made. Back on, every tab
   starts its life afresh from that moment.
-- **Backup**, on its own pill, exports every setting and every rule as one JSON document, to copy or
-  download, and loads one back. Loading replaces everything. The file records the
+- **Backup**, on its own pill, exports every setting and every rule as one JSON document, plus the
+  all-time count of tabs killed, to copy or download, and loads one back. Loading replaces every
+  setting and rule; the count only ever goes up. The file records the
   Timed Tabs that wrote it, and says so when you load one from a different version;
   the copy shown after a load carries the version you loaded it into, not the one it
   came from.
