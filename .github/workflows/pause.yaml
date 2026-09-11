@@ -24,6 +24,13 @@ run-name: "Not paused — PR #${{ github.event.pull_request.number }}"
 # ⚠️ PREREQ: `Not paused` has to be a required check on main, or a red one
 # blocks nothing. Add it only once this file is on main: a required check whose
 # workflow is missing never reports, and that blocks every PR for ever.
+#
+# It is required now. It was not for a while, and the gap is worth remembering:
+# the job ran on every PR, went red on every paused one, and merged none of them
+# any slower, because branch protection was not reading it. A check nobody
+# requires is decoration. The canonical list of required contexts is the
+# `gh api` call in docs/developer/ci/README.md -- add to that list and to the
+# branch in the same change.
 
 on:
   pull_request:

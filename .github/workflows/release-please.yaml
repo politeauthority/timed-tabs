@@ -368,7 +368,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit --no-fund
         if: steps.creds.outputs.have == 'true'
       - name: Build the Firefox target
         if: steps.creds.outputs.have == 'true'

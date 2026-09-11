@@ -148,7 +148,8 @@ the legs are the required checks. See below.
 
 ## The status checks
 
-Each leg reports its own check, and both are required on `main`:
+Each leg reports its own check, and both are required on `main`, alongside
+**Lint, test & build** and **Not paused**:
 
 - **E2E / Firefox latest**
 - **E2E / Firefox previous**
@@ -169,6 +170,14 @@ check as passed, so the label lets a PR merge without waiting for Firefox. CI do
 label events, so applying the label does not retroactively skip a run that already
 happened — the next push picks it up, and in the meantime the `Not paused` check is
 red and holding the merge anyway.
+
+The release PR skips the matrix too. release-please's branch only ever rewrites
+`CHANGELOG.md` and the four files that carry the version, and no scenario reads any of
+them, so both Firefoxes had nothing to say about it — while still costing four minutes
+each on every push to `main`. Lint, the unit tests and the build still run there, so
+`web-ext lint` sees the bumped manifest version before the tag is cut, and the
+`package` job re-runs lint and the tests against the tag itself before anything is
+attached to a release.
 
 `workflow_dispatch` is still there, so a Firefox-only run on a branch is one click
 from the Actions tab. Dispatched rather than called, the job reports under its bare

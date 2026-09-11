@@ -33,9 +33,17 @@ permissions:
   contents: read
   actions: read        # the step-times action reads this run's job timings
 
+# Cancel superseded runs on a PR, never on main. A PR's older run is answering a
+# question about a commit nobody will merge any more, so killing it is free. On
+# main it is the only run that commit will ever get: branch protection does not
+# require branches to be up to date (`strict: false`), so the merge-ref result
+# from the PR does not cover what actually landed. Merge two PRs in quick
+# succession with cancel-in-progress on and the first commit goes to main having
+# been tested in no combination at all -- which is how six main runs were killed
+# in one morning.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint-test:
@@ -57,8 +65,13 @@ jobs:
 
       - uses: ./.github/actions/node-toolcache
         if: steps.changed.outputs.code == 'true'
+      # Same flags as every other npm ci in this repo. setup-node has already
+      # restored ~/.npm, so --prefer-offline takes packages from it instead of
+      # revalidating each one against the registry, and the audit and funding
+      # round trips buy nothing in CI. Measured on one run, against the two E2E
+      # legs installing the same lockfile beside it: 27s here, 16s there.
       - if: steps.changed.outputs.code == 'true'
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
       - name: Lint
         id: lint
         if: steps.changed.outputs.code == 'true'
