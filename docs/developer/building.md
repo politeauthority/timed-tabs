@@ -68,7 +68,7 @@ commit what it writes.
 Each dist tree gets a `build.json` next to the manifest holding the version, semver,
 tag, channel, commit and build time. A plain `src/` load has no `build.json`, and that
 absence is what marks it as a dev load in the UI. Set `BUILD_TAG=rc1` to stamp a tag.
-[releasing.md](releasing.md) covers versions, channels and how releases are cut.
+[releasing.md](ci/releasing.md) covers versions, channels and how releases are cut.
 
 ## Taskfile
 

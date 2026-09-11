@@ -15,6 +15,9 @@ run-name: "CI — ${{ github.event_name == 'pull_request' && format('PR #{0}', g
 # arc/runners/values-timed-tabs.yaml); setup-node installs the Node it needs. `npm run
 # lint` covers both eslint and `web-ext lint`, so manifest/WebExtension problems are
 # caught here rather than at AMO submission time.
+#
+# The pipeline as a whole is written up in docs/developer/ci/, and the runner and its
+# caches in docs/developer/ci/runners.md.
 
 on:
   pull_request:

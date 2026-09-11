@@ -20,7 +20,7 @@ run-name: "Auto-merge — PR #${{ github.event.pull_request.number }}"
 # because nothing is blocking the PR.
 #
 # 🔒 The release PR is deliberately left out of all this: it is admin-gated
-# behind the STABLE_RELEASES variable (see docs/developer/releasing.md). It has
+# behind the STABLE_RELEASES variable (see docs/developer/ci/releasing.md). It has
 # no `automerge` label, so this workflow never touches it. Do not add one.
 
 on:

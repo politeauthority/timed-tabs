@@ -105,25 +105,22 @@ tool directory and the Firefox libraries (on Ubuntu 24.04 the ALSA package is
 `libasound2t64`) from the Actions cache, fetches Firefox with
 `browser-actions/setup-firefox`, then runs `npm run e2e`.
 
-The caches exist because the runner node is short of CPU rather than bandwidth:
-downloads take seconds, but unpacking Node took two minutes and installing the
-libraries with dpkg took nine on a busy day. The Node cache is the extracted tool
-directory, which `setup-node` then finds without extracting anything. The library
-cache, via `awalsh128/cache-apt-pkgs-action`, is the installed files, restored with
-one untar. Bump `FIREFOX_LIBS_KEY` in the workflow after changing the package list. Firefox
-itself is not cached: its download and extraction take under half a minute.
+The caches exist because the runner is short of CPU rather than bandwidth —
+[ci/runners.md](ci/runners.md) has that story, the Node tool cache both workflows
+share, and how cache scoping decides which runs see a warm one.
 
-Two things about the install that look like problems and are not. apt prints
-"debconf: delaying package configuration, since apt-utils is not installed"; that is
-debconf noting it will configure packages at the end of the run instead of one by one,
-and nothing needs apt-utils. And the runner pod cannot reach the Ubuntu mirrors on
-port 80 at all, so the workflow points apt at an HTTPS mirror on IPv4 before
-installing; without that the install took nine minutes or failed outright.
+What is specific to this job is the **Firefox libraries**. They are not restored with
+an off-the-shelf apt action: the workflow installs the packages once, works out every
+file `dpkg` put down, and packs those into `~/firefox-libs.tar`, which later runs
+restore with a single untar. Bump `FIREFOX_LIBS_KEY` after changing the package list.
+On Ubuntu 24.04 the ALSA package is `libasound2t64`. Firefox itself is not cached: its
+download and extraction take under half a minute.
 
-Caches are scoped by GitHub: a pull request's runs save under the PR's merge ref and
-read from it and from `main`. A manual run on a branch reads only that branch and
-`main`. So the first run on `main` after this lands is a cold one, and every PR after
-that reads `main`'s caches.
+The install prints `debconf: delaying package configuration, since apt-utils is not
+installed`. That is not a problem — debconf is saying it will configure packages at
+the end of the run instead of one by one — and neither is the apt source rewriting
+just above it, which is there because the runner pod cannot reach the Ubuntu mirrors
+on port 80 at all.
 
 ## Which Firefox
 
@@ -164,17 +161,8 @@ what puts `latest` and `previous` in there.
 That last part is the sharp edge: **changing the matrix renames a protected context.**
 Add a third version, rename a leg, drop one — each of those silently stops a required
 check from being required, because branch protection goes on matching a name nothing
-reports any more. Update the required checks on `main` in the same change:
-
-```
-gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/required_status_checks \
-  --input - <<'JSON'
-{"strict": false,
- "checks": [{"context": "Lint, test & build", "app_id": 15368},
-            {"context": "E2E / Firefox latest", "app_id": 15368},
-            {"context": "E2E / Firefox previous", "app_id": 15368}]}
-JSON
-```
+reports any more. Update the required checks on `main` in the same change — the full list and the
+`gh api` call that sets it are in [ci/README.md](ci/README.md#what-must-be-green).
 
 A PR with the label **ci pause** skips the matrix; GitHub counts a skipped required
 check as passed, so the label lets a PR merge without waiting for Firefox. CI does not wake on

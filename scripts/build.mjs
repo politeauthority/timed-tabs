@@ -18,7 +18,7 @@
 //   BUILD_SEMVER      the version the release is named after (0.8.0)
 //   BUILD_TAG         the prerelease part (beta.14)
 // so the UI reads 0.8.0-beta.14 while Firefox sees 0.7.0.14, which sorts
-// after the last stable and before the next one. See docs/developer/releasing.md.
+// after the last stable and before the next one. See docs/developer/ci/releasing.md.
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { execSync } from "node:child_process";
 import path from "node:path";

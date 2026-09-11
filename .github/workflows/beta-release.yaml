@@ -11,7 +11,7 @@ run-name: "Beta Release — ${{ github.ref_name }}"
 # MANIFEST_VERSION=<last stable>.N (0.7.0.14). That sorts after 0.7.0 and before
 # 0.8.0, so a beta install updates cleanly to the next stable once builds are
 # signed. The UI shows 0.8.0-beta.14 and a BETA badge; see
-# docs/developer/releasing.md.
+# docs/developer/ci/releasing.md.
 #
 # Refuses to run when there is no open release PR (nothing releasable on main)
 # or when the beta tag for the current commit already exists.

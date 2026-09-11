@@ -51,7 +51,7 @@ beta. Grab a zip from the newest pre-release under
 Betas are snapshots of `main`, published as
 [pre-releases](https://github.com/politeauthority/timed-tabs/releases). A beta shows
 a yellow BETA badge beside the title, and `about:addons` lists it as "Timed Tabs
-Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
+Beta". Details in [docs/developer/ci/releasing.md](docs/developer/ci/releasing.md).
 
 ## 📚 Documentation
 
@@ -61,5 +61,6 @@ Beta". Details in [docs/developer/releasing.md](docs/developer/releasing.md).
 - 🔒 [Privacy policy](PRIVACY.md) — what is stored, what is never sent, and why each
   permission is asked for.
 - 🔧 [Developer docs](docs/developer/) — [build it
-  yourself](docs/developer/building.md), tests, releases and security notes.
+  yourself](docs/developer/building.md), tests and security notes, plus
+  [ci/](docs/developer/ci/) for the workflows, the runner and releases.
 - 🛣️ [Road map](docs/road-map.md) — what is not there yet.

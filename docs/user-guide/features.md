@@ -227,4 +227,4 @@ Firefox only because Chrome has no theme API for it.
 
 While the project is in development, each release is a beta. A beta shows a yellow
 BETA badge beside the title and is listed as "Timed Tabs Beta" in the add-ons
-manager. See [developer/releasing.md](../developer/releasing.md).
+manager. See [developer/ci/releasing.md](../developer/ci/releasing.md).
