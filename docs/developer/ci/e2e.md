@@ -106,6 +106,12 @@ lines the scenarios rely on, all prefixed `[timed-tabs]`, are:
 - `expired <tabId> <url> action=<close|discard|reload|none>` when a tab runs out.
 - `recorded <url> icon=<yes|no>` when a closed tab is added to Recently expired.
 - `navigated <tabId> <url>` after a `navigate` entry in the scenario moved a tab.
+- `painted <tabId> <key>` when the toolbar button's icon changes, where the key is
+  the mark and its fill — `running:<n>`, `face-running:<n>`, `face-paused:<n>`,
+  `face-exempt`, `expired`, or `none` when the icon is taken off. Only a change is
+  ever pushed, so there is one line per change rather than one per tick. It is the
+  only witness to what the button shows: the button is browser chrome, so
+  `captureVisibleTab` cannot photograph it.
 - `CAPTURE <i>/<n> <data>` chunks of the screenshot, which the runner reassembles.
 
 Two `dev.json` keys exist for scenarios: `navigate` sends the tab that is on one

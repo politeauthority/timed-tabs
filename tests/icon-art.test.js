@@ -82,21 +82,20 @@ const wedges = (shapes) => shapes.filter((s) => s.kind === "wedge");
 const cutOut = (shapes) => shapes.find((s) => s.kind === "erase")?.shapes ?? [];
 
 describe("faceShapes", () => {
-  it("empties the face as progress rises, keeping the rim and the track", () => {
-    let previous = Infinity;
+  it("empties the face clockwise from twelve, keeping the rim and the track", () => {
+    // The same orientation as the ring: what is left ends at twelve, so the
+    // bite opens at twelve and sweeps right as the tab runs down.
+    let previous = -Infinity;
     for (const progress of [0, 0.2, 0.5, 0.8, 0.99]) {
       const shapes = faceShapes({ progress });
       const [track, remaining] = wedges(shapes);
       expect(track.to - track.from).toBe(1);
       expect(track.alpha).toBeLessThan(1);
-      expect(remaining.to).toBeLessThan(previous);
-      previous = remaining.to;
+      expect(remaining.to).toBe(1);
+      expect(remaining.from).toBeGreaterThan(previous);
+      previous = remaining.from;
       expect(arcs(shapes)).toHaveLength(1);
     }
-  });
-
-  it("leaves no full-strength wedge once the face is empty", () => {
-    expect(wedges(faceShapes({ progress: 1 })).filter((w) => w.alpha === undefined)).toHaveLength(0);
   });
 
   it("cuts the hands out of the face rather than painting them over it", () => {
@@ -105,15 +104,24 @@ describe("faceShapes", () => {
     expect(shapes.filter((s) => s.kind === "capsule")).toHaveLength(0);
   });
 
-  it("swaps the hands for a pause bar on a stopped clock, at the same fill", () => {
-    const paused = faceShapes({ progress: 0.4, state: "paused" });
-    const running = faceShapes({ progress: 0.4 });
-    expect(wedges(paused)).toEqual(wedges(running));
-    const bars = cutOut(paused);
-    expect(bars).toHaveLength(2);
-    // Two uprights, mirrored about the centre: nothing like a clock hand.
-    expect(bars.every((b) => b.x1 === b.x2)).toBe(true);
-    expect(bars[0].x1 + bars[1].x1).toBeCloseTo(GRID);
+  it("draws a stopped clock exactly as a running one at the same fill", () => {
+    // A stopped clock needs no artwork of its own: the face is drawn from
+    // `progress`, which is the thing that stops advancing, so it freezes where
+    // it stood. Only the colour says stopped, and that is `specFor`'s job.
+    // The hands used to give way to a pause bar, which the drain ate: the bar
+    // is punched out of the face, so past halfway there was no face to punch.
+    for (const progress of [0, 0.4, 0.75, 0.9]) {
+      expect(faceShapes({ progress, state: "paused" })).toEqual(faceShapes({ progress }));
+    }
+  });
+
+  it("keeps the hands legible however far the face has drained", () => {
+    // The regression the pause bar had: whatever the fill, the cut-out is the
+    // two hands, and they reach beyond the wedge that is left rather than
+    // living inside it.
+    for (const progress of [0.5, 0.9]) {
+      expect(cutOut(faceShapes({ progress }))).toHaveLength(2);
+    }
   });
 
   it("draws a tab that never expires hollow, with nothing draining", () => {

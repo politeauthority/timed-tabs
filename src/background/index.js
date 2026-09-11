@@ -2,7 +2,7 @@
  * Background entry point. Wires settings, the tab tracker and the active
  * indicators together. Keep this file thin; logic lives in the modules.
  */
-import { api, withTimeout } from "../shared/browser.js";
+import { api, isDevBuild, withTimeout } from "../shared/browser.js";
 import { watchGroups, watchRules, watchSettings } from "../shared/settings.js";
 import { featureOn } from "../shared/flags.js";
 import { RULE_FIELDS, applicableRules, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
@@ -29,8 +29,8 @@ function managing() {
 
 const tracker = createTabTracker();
 const notifier = createNotifier({
-  // Evaluated per call, since IS_DEV_BUILD is declared further down.
-  log: (msg) => IS_DEV_BUILD && console.log(`[timed-tabs] notify ${msg}`),
+  // Evaluated per call, since isDevBuild is declared further down.
+  log: (msg) => isDevBuild && console.log(`[timed-tabs] notify ${msg}`),
 });
 notifier.start();
 let settings = null;
@@ -88,7 +88,7 @@ async function recordExpiredNow(tab, action) {
   list.unshift(entry);
   list.splice(RECENT_MAX);
   await api.storage.local.set({ [RECENT_KEY]: list });
-  if (IS_DEV_BUILD) console.log(`[timed-tabs] recorded ${tab.url} icon=${list[0].favIconUrl ? "yes" : "no"}`);
+  if (isDevBuild) console.log(`[timed-tabs] recorded ${tab.url} icon=${list[0].favIconUrl ? "yes" : "no"}`);
 }
 
 /**
@@ -127,30 +127,13 @@ function bumpStats(event) {
 
 const ready = tracker.seed();
 
-/**
- * True in a dev build (scripts/build.mjs dev or chrome-dev), which is the gate
- * on the hook below and on a few log lines.
- *
- * Two independent marks, and either one is enough. Firefox installs a dev build
- * under a "-dev@" id, which is what docs/developer/security-notes.md records as
- * the guarantee. Chrome has no such id to look at — it derives one from the key
- * or the install path — so the manifest name carries it there instead;
- * scripts/manifest.js is what writes it.
- *
- * Neither can fire in the user's own profile. A plain `src/` load is named
- * `__MSG_extensionName__`, which resolves to "Timed Tabs", and carries the
- * real add-on id.
- */
-const IS_DEV_BUILD =
-  (typeof api.runtime.id === "string" && api.runtime.id.includes("-dev@")) ||
-  api.runtime.getManifest().name.endsWith("(dev)");
 // @dev-only-start  (scripts/build.mjs removes everything down to @dev-only-end from release builds)
 // Development hook. Only the dev build reads dev.json, which can open extension
 // pages and seed settings/rules for a test profile:
 //   { "openUrls": ["ui/panel.html"], "settings": {...}, "rules": [...] }
 // The id check (not the file's presence) is the gate, so the user's own
 // profile, which loads src/, can never be seeded.
-if (IS_DEV_BUILD) {
+if (isDevBuild) {
   fetch(api.runtime.getURL("dev.json"), { cache: "no-store" })
     .then((r) => r.json())
     .then(async (dev) => {
@@ -481,7 +464,7 @@ async function tabState(tabId, tab) {
   const s = await tracker.track(tabId, now);
   tab ??= await api.tabs.get(tabId).catch(() => ({ id: tabId }));
   const eff = settingsFor(tab, s);
-  if (IS_DEV_BUILD) console.log(`[timed-tabs] tabState ${tabId} lifetime=${eff.tabLifetimeSeconds} ignored=${JSON.stringify(s.ignoredRules)} all=${s.ignoreRules}`);
+  if (isDevBuild) console.log(`[timed-tabs] tabState ${tabId} lifetime=${eff.tabLifetimeSeconds} ignored=${JSON.stringify(s.ignoredRules)} all=${s.ignoreRules}`);
   const lifetime = tracker.lifetimeFor(tabId, eff.tabLifetimeSeconds);
   const elapsed = tracker.elapsedSeconds(tabId, now);
   return {
@@ -667,7 +650,7 @@ async function tick() {
       const quiet = exempt || (eff.hideWhileGreen && progress < quietUntil);
       const flashing =
         eff.flashBeforeExpiry && !quiet && remainingSeconds > 0 && remainingSeconds <= eff.flashLeadSeconds;
-      if (IS_DEV_BUILD) devLogLook(tab, eff, quiet);
+      if (isDevBuild) devLogLook(tab, eff, quiet);
       snapshot.push({
         exempt,
         quiet,
@@ -717,7 +700,7 @@ const expiring = new Set();
 async function expire(tab, onExpire) {
   if (expired.has(tab.id) || expiring.has(tab.id)) return;
   expiring.add(tab.id);
-  if (IS_DEV_BUILD) console.log(`[timed-tabs] expired ${tab.id} ${tab.url} action=${onExpire}`);
+  if (isDevBuild) console.log(`[timed-tabs] expired ${tab.id} ${tab.url} action=${onExpire}`);
   try {
     if (onExpire === "close") {
       // Only tabs we actually close are worth listing. The favicon indicator

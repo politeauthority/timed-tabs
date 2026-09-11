@@ -3,6 +3,7 @@
 #   task run                      run Firefox with the extension from this checkout
 #   task run WT=visual-language   ...from the worktree at worktrees/visual-language
 #   task run:dev DEV=path.json    dev build (seeded settings/rules, "-dev" version tag)
+#   task run:dev:pinned DEV=...   the same, in a kept profile with the button on the toolbar
 #   task run:dev:chrome DEV=...   the same dev build, in Chrome
 #   task check                    lint + test
 #   task package                  release zips into web-ext-artifacts/
@@ -27,6 +28,10 @@ vars:
     --pref termsofuse.bypassNotification=true
     --pref browser.aboutwelcome.enabled=false
     --pref app.update.enabled=false
+  # A profile that is kept between runs, so the toolbar button can stay pinned.
+  # Outside the repo, so every worktree shares one and none of them ship it.
+  PROFILE:
+    sh: echo "${TIMED_TABS_PROFILE:-$HOME/.cache/timed-tabs-profile}"
 
 tasks:
   default:
@@ -48,6 +53,19 @@ tasks:
       - >-
         npx web-ext run --verbose --source-dir dist/dev --start-url "{{.URL}}" {{.PREFS}}
         --pref devtools.console.stdout.content=true --pref devtools.console.stdout.chrome=true
+
+  run:dev:pinned:
+    desc: "run:dev in a kept profile with the toolbar button pinned to the toolbar, where users actually see it. DEV=<dev.json> to seed."
+    dir: "{{.ROOT}}"
+    cmds:
+      - DEV_JSON="{{.DEV}}" node scripts/build.mjs dev
+      - node "{{.ROOT}}/scripts/dev-profile.mjs" "{{.PROFILE}}"
+      - >-
+        npx web-ext run --verbose --source-dir dist/dev --start-url "{{.URL}}"
+        --firefox-profile "{{.PROFILE}}" --profile-create-if-missing --keep-profile-changes
+        --pref devtools.console.stdout.content=true
+        --pref devtools.console.stdout.chrome=true
+        {{.PREFS}}
 
   run:dev:chrome:
     desc: "Build dist/chrome-dev (optional DEV=<dev.json> seed) and launch Chrome with it."

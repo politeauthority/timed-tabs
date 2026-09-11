@@ -88,3 +88,55 @@ task run:dev DEV=<file>  # seeded dev build
 task check               # lint and test
 task package             # the release zips
 ```
+
+### Seeds worth keeping
+
+`DEV=<file>` is a `dev.json`: settings, rules, tabs and windows to open, and clicks
+to replay, applied on every load of the dev build. It is copied into `dist/dev`,
+never into `src/`, which is what the user's own profile loads. A few live in
+[`examples/dev/`](../../examples/dev/) so a state that is awkward to reach by hand
+is one command away:
+
+```sh
+task run:dev DEV=examples/dev/toolbar-ring.json          # the ring, two windows
+task run:dev DEV=examples/dev/toolbar-clock.json         # the clock, two windows
+task run:dev DEV=examples/dev/toolbar-clock-paused.json  # a stopped clock, 70% drained
+```
+
+A seed sets only the keys it names, so with a kept profile (below) anything it leaves
+out is inherited from the run before. Spell out every setting the state depends on.
+
+### Seeing the toolbar button
+
+`task run:dev` will not show you the toolbar button. Firefox puts a new extension
+button in the unified extensions panel — the puzzle piece — and a throwaway profile is
+new every run, so the button the `action-icon` indicator is entirely about is never
+where a user would see it.
+
+```sh
+task run:dev:pinned DEV=examples/dev/toolbar-clock.json
+```
+
+That keeps a profile between runs (`~/.cache/timed-tabs-profile`, or
+`TIMED_TABS_PROFILE`) and pins the button to the toolbar. It takes two runs to settle:
+the widget has to exist before a placement naming it is honoured, so the first run
+leaves the button in the panel and the second puts it on the toolbar. Pinning it by
+hand the first time — puzzle piece, the gear beside Timed Tabs, Pin to Toolbar — does
+the same thing and sticks just as well.
+
+Seeding `browser.uiCustomization.state` on a fresh profile does not work, and is worth
+not trying twice: a temporary add-on loads *after* CustomizableUI starts, so the widget
+does not exist when the placement is read, the placement is dropped, and the button is
+auto-placed in the panel regardless.
+
+Each opens the popup as an ordinary tab, where the fuse slider sets the used share
+outright — the only way to reach a given fill without waiting for one. The dev build
+also logs `painted <tabId> <key>` for every icon the toolbar button is given, which
+is the only way to see what it shows: the button is browser chrome, so a screenshot
+of the page cannot include it. `task run:dev` already passes `--verbose`; add the two
+console prefs to get the extension's own lines on stdout:
+
+```sh
+npx web-ext run --source-dir dist/dev --verbose \
+  --pref devtools.console.stdout.content=true --pref devtools.console.stdout.chrome=true
+```

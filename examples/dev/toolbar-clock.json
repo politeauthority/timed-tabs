@@ -1,0 +1,12 @@
+{
+  "openWindows": [["https://example.com", "https://example.org"]],
+  "openUrls": ["ui/panel.html"],
+  "settings": {
+    "featureFlags": { "beta-features": true, "primary-icon-interactive": true },
+    "indicators": ["action-icon"],
+    "tabLifetimeSeconds": 120,
+    "hideWhileGreen": false,
+    "tickSeconds": 1
+  },
+  "rules": []
+}
