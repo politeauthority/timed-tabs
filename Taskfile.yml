@@ -1,0 +1,74 @@
+# Task runner for Timed Tabs. https://taskfile.dev
+#
+#   task run                      run Firefox with the extension from this checkout
+#   task run WT=visual-language   ...from the worktree at .claude/worktrees/visual-language
+#   task run:dev DEV=path.json    dev build (seeded settings/rules, "-dev" version tag)
+#   task check                    lint + test
+#   task package                  release zips into web-ext-artifacts/
+#
+# Any target that takes WT works against a worktree; without WT it uses the
+# checkout the Taskfile lives in.
+
+version: "3"
+
+vars:
+  # Source tree to load: this checkout, or a named worktree under .claude/worktrees.
+  WT: ""
+  # The main checkout, found via git's common dir so this works from inside any worktree.
+  REPO:
+    sh: dirname "$(git -C "{{.TASKFILE_DIR}}" rev-parse --path-format=absolute --git-common-dir)"
+  ROOT:
+    sh: '[ -n "{{.WT}}" ] && echo "{{.REPO}}/.claude/worktrees/{{.WT}}" || echo "{{.TASKFILE_DIR}}"'
+  # A page the test browser opens; the extension's own pages need the dev build.
+  URL: "about:debugging#/runtime/this-firefox"
+  # Firefox prefs that keep a throwaway profile quiet.
+  PREFS: >-
+    --pref termsofuse.bypassNotification=true
+    --pref browser.aboutwelcome.enabled=false
+    --pref app.update.enabled=false
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  run:
+    desc: "Launch Firefox (throwaway profile) with the extension loaded from src/. WT=<worktree> to use a worktree."
+    dir: "{{.ROOT}}"
+    cmds:
+      - echo "Loading {{.ROOT}}/src"
+      - npx web-ext run --source-dir src --start-url "{{.URL}}" {{.PREFS}}
+
+  run:dev:
+    desc: "Build dist/dev (dev id, optional DEV=<dev.json> seed) and launch Firefox with it, logging console output."
+    dir: "{{.ROOT}}"
+    cmds:
+      - DEV_JSON="{{.DEV}}" node scripts/build.mjs dev
+      - >-
+        npx web-ext run --verbose --source-dir dist/dev --start-url "{{.URL}}" {{.PREFS}}
+        --pref devtools.console.stdout.content=true --pref devtools.console.stdout.chrome=true
+
+  check:
+    desc: "Lint and test. WT=<worktree> to check a worktree."
+    dir: "{{.ROOT}}"
+    cmds:
+      - npm run lint
+      - npm test
+
+  package:
+    desc: "Build the Firefox and Chrome release zips into web-ext-artifacts/. WT=<worktree> to package a worktree."
+    dir: "{{.ROOT}}"
+    cmds:
+      - npm run package
+      - ls -la web-ext-artifacts
+
+  install:
+    desc: "Install dependencies (npm ci). WT=<worktree> for a worktree."
+    dir: "{{.ROOT}}"
+    cmds:
+      - npm ci
+
+  worktrees:
+    desc: "List git worktrees."
+    cmds:
+      - git worktree list
