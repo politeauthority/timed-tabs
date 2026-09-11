@@ -6,7 +6,7 @@
 
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue)](src/manifest.json)
 [![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)](https://www.mozilla.org/firefox/)
-[![Chrome](https://img.shields.io/badge/Chrome-supported-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
+[![Chrome: planned](https://img.shields.io/badge/Chrome-planned-9E9E9E?logo=googlechrome&logoColor=white)](docs/road-map.md)
 [![Data collected: none](https://img.shields.io/badge/data%20collected-none-success)](src/manifest.json)
 
 **Tabs that expire.** Every tab gets a lifetime. Its icon goes green, then yellow,
@@ -35,14 +35,16 @@ The full list, with screenshots, is in the user guide:
 > [!WARNING]
 > 🚧 **Timed Tabs is in beta.** Every release is a snapshot of `main`, published as a
 > [pre-release](https://github.com/politeauthority/timed-tabs/releases). There is no
-> store listing yet, so installing means loading the extension yourself — see
+> store listing yet, so installing means loading the extension yourself.
 
-No store listing yet, and while the project is in development every release is a
-beta. Grab a zip from the newest pre-release under
+Grab a zip from the newest pre-release under
 [Releases](https://github.com/politeauthority/timed-tabs/releases):
 
 - 🦊 **Firefox 140+** — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
-- 🌐 **Chrome** — unzip `timed-tabs-chrome-*.zip`, then `chrome://extensions` → Developer mode → Load unpacked
+
+Firefox is the only supported browser. Chrome is planned — see the
+[road map](docs/road-map.md). A Chrome zip is attached to each release so the build
+can be tried, but it is not supported yet.
 
 ### 🚧 Betas
 

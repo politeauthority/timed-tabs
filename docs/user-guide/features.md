@@ -18,7 +18,7 @@ there is no account and no server.
 - [🗂️ Site groups](#-site-groups)
 - [⚙️ Settings](#-settings)
 - [🔒 Privacy and permissions](#-privacy-and-permissions)
-- [🦊 Firefox and Chrome](#-firefox-and-chrome)
+- [🦊 Firefox](#-firefox)
 - [🚧 Betas](#-betas)
 
 ## ⏳ The timer
@@ -232,11 +232,12 @@ permission, asked for only when the setting is turned on.
 how long the recently expired list keeps the addresses of closed tabs, and what to do
 about private windows.
 
-## 🦊 Firefox and Chrome
+## 🦊 Firefox
 
-Firefox 140 or later is the primary target. Firefox for Android is not declared yet;
-see the [road map](../road-map.md). Chrome builds are produced from the same source; the tab tint indicator is
-Firefox only because Chrome has no theme API for it.
+Firefox 140 or later is the supported browser. Firefox for Android is not declared yet,
+and Chrome is planned but not yet supported; both are on the [road map](../road-map.md).
+A Chrome build is produced from the same source and attached to each release so it can
+be tried. The tab tint indicator is Firefox only because Chrome has no theme API for it.
 
 ## 🚧 Betas
 
