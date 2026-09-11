@@ -1,0 +1,109 @@
+{
+  "timedTabs": 1,
+  "settings": {
+    "tabLifetimeSeconds": 1800,
+    "resetOnActivate": true,
+    "pauseWhileActive": false,
+    "hideWhileGreen": false,
+    "quietUntilPercent": 40,
+    "indicators": [
+      "favicon",
+      "title-prefix",
+      "theme-tint",
+      "badge"
+    ],
+    "faviconStyle": "square",
+    "onExpire": "close",
+    "recentRetentionSeconds": 1800,
+    "tickSeconds": 5
+  },
+  "rules": [
+    {
+      "id": "rmtw12t9rc5he",
+      "description": "",
+      "pattern": "https://google.com/*",
+      "match": "wildcard",
+      "priority": 5,
+      "set": {
+        "tabLifetimeSeconds": 900,
+        "onExpire": "close",
+        "resetOnActivate": false,
+        "pauseWhileActive": false
+      }
+    },
+    {
+      "id": "rmtw27nnd919e",
+      "description": "Close reddit pages in subreddits",
+      "pattern": "https://www.reddit.com/r/*",
+      "match": "wildcard",
+      "priority": 5,
+      "set": {
+        "tabLifetimeSeconds": 300,
+        "onExpire": "close",
+        "resetOnActivate": false,
+        "pauseWhileActive": false
+      }
+    },
+    {
+      "id": "rmtw2ka8n10m5",
+      "description": "",
+      "pattern": "ha.squid-ink.us/*",
+      "match": "wildcard",
+      "priority": 5,
+      "set": {
+        "tabLifetimeSeconds": 300,
+        "onExpire": "close",
+        "resetOnActivate": true,
+        "pauseWhileActive": true
+      }
+    },
+    {
+      "id": "rmtw39pqd207o",
+      "description": "",
+      "pattern": "about:newtab",
+      "match": "wildcard",
+      "priority": 5,
+      "set": {
+        "tabLifetimeSeconds": 20,
+        "onExpire": "close",
+        "pauseWhileActive": false
+      }
+    },
+    {
+      "id": "rmtw4g5whbz3f",
+      "description": "",
+      "pattern": "https://github.com/politeauthority/private-ops/*",
+      "match": "wildcard",
+      "priority": 5,
+      "set": {
+        "tabLifetimeSeconds": 300,
+        "onExpire": "close",
+        "resetOnActivate": true,
+        "pauseWhileActive": true
+      }
+    },
+    {
+      "id": "rmtw56ng8o5l9",
+      "description": "",
+      "pattern": "https://www.reddit.com/r/trashy/*",
+      "match": "wildcard",
+      "priority": 10,
+      "set": {
+        "onExpire": "close",
+        "tabLifetimeSeconds": 60,
+        "resetOnActivate": false,
+        "pauseWhileActive": false
+      }
+    },
+    {
+      "id": "rmtw6lww5wqiz",
+      "description": "",
+      "pattern": "https://github.com/politeauthority/timed-tabs/actions/runs/*",
+      "match": "wildcard",
+      "priority": 8,
+      "set": {
+        "tabLifetimeSeconds": 1800
+      }
+    }
+  ]
+}
