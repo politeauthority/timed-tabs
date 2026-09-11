@@ -41,22 +41,22 @@ Manual workflows name what they produce rather than a ref, because the ref is al
 ### `jobs.<id>.name:` — the status check
 
 This one is load-bearing. A job's name is the status-check context that branch
-protection matches on, so renaming `Lint, test & build`, `E2E / headless Firefox` or
-`Not paused` silently stops the check from being required. Update branch protection
-in the same change or leave the name alone.
+protection matches on, so renaming `Lint, test & build`, `E2E / Firefox latest`,
+`E2E / Firefox previous` or `Not paused` silently stops the check from being
+required. Update branch protection in the same change or leave the name alone.
 
 A called workflow's jobs are named `<calling job's name> / <called job's name>`.
-That is where `E2E / headless Firefox` comes from: `jobs.e2e` in `ci.yaml` is named
-`E2E`, and `jobs.report` in `e2e.yaml` is named `headless Firefox`. Both halves are
+That is where `E2E / Firefox latest` comes from: `jobs.e2e` in `ci.yaml` is named
+`E2E`, and the matrix leg in `e2e.yaml` is named `Firefox latest`. Both halves are
 part of the required context, so either one renamed breaks it. The prefix is not
 optional — a called workflow cannot report under a bare name — which is the price of
 calling one, and worth knowing before moving a required check into one.
 
-A matrix job's name carries its matrix values (`Firefox latest`, `Firefox
-previous`), so a matrix leg makes a poor required check: changing what the matrix
-covers renames it. `E2E` puts the legs behind one `report` job that `needs` them and
-reports the verdict, which is why its versions can change without anyone opening
-branch protection.
+A matrix job's name carries its matrix values, which is where the `latest` and
+`previous` in those contexts come from. So changing what the matrix covers renames a
+protected context: adding a version, renaming a leg or dropping one all need the
+required checks on `main` updated in the same change, or branch protection goes on
+waiting for a name nothing reports.
 
 ## Label triggers
 
