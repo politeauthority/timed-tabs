@@ -4,7 +4,7 @@
  */
 import { api, withTimeout } from "../shared/browser.js";
 import { watchRules, watchSettings } from "../shared/settings.js";
-import { RULE_FIELDS, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
+import { RULE_FIELDS, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
 import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
@@ -161,7 +161,7 @@ watchRules(async (next) => {
  * and stop the rest. Which of them paint a given tab is decided per tab in tick().
  */
 async function syncIndicators() {
-  const wanted = findIndicators(wantedIndicatorIds(settings, rules));
+  const wanted = findIndicators(wantedIndicatorIds(settings, rules, tracker.allOverrides()));
   await Promise.all(active.filter((i) => !wanted.includes(i)).map((i) => i.stop()));
   await Promise.all(wanted.filter((i) => !active.includes(i)).map((i) => i.start({ api, tracker, settings })));
   for (const i of wanted) if (active.includes(i)) i.configure?.(settings);
@@ -181,6 +181,7 @@ function settingsFor(tab, tabState) {
     eff.resetOnActivate = tabState.resetOnActivate;
   }
   if (tabState?.neverExpire) eff.neverExpire = true;
+  applyOverrides(eff, tabState?.overrides);
   return eff;
 }
 
@@ -304,6 +305,7 @@ async function tabState(tabId, tab) {
     resetOnActivate: s.resetOnActivate,
     ignoreRules: s.ignoreRules,
     ignoredRules: s.ignoredRules ?? [],
+    overrides: { ...(s.overrides ?? {}) },
     effective: Object.fromEntries(RULE_FIELDS.map((k) => [k, eff[k]])),
     rules: eff.allMatched.map((r) => ({
       id: r.id,
@@ -379,6 +381,21 @@ async function tabAction({ tabId, action, value }) {
       if (pct < 100) expired.delete(tabId);
       break;
     }
+    // One row of the popup's Page settings: `value` is { key, value }, and a
+    // null value hands the setting back to the rules and the globals.
+    case "override":
+      if (!RULE_FIELDS.includes(value?.key)) break;
+      await tracker.setOverride(tabId, value.key, value.value);
+      expired.delete(tabId);
+      await syncIndicators();
+      await applyPauseSetting();
+      break;
+    case "clearOverrides":
+      await tracker.clearOverrides(tabId);
+      expired.delete(tabId);
+      await syncIndicators();
+      await applyPauseSetting();
+      break;
     case "neverExpire":
       await tracker.setNeverExpire(tabId, value);
       expired.delete(tabId);

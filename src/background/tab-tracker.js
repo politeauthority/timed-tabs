@@ -9,6 +9,7 @@
  *  - resetOnActivate per-tab override of the global setting, or null
  *  - ignoreRules     skip all URL rules for this tab (lasts as long as the tab)
  *  - ignoredRules    ids of individual rules skipped for this tab
+ *  - overrides       per-tab settings laid over globals and rules, until close
  *
  * State is persisted per tab with `sessions.setTabValue` on Firefox
  * (survives extension reloads and, via session restore, browser restarts).
@@ -27,6 +28,7 @@ function fresh(now) {
     resetOnActivate: null,
     ignoreRules: false,
     ignoredRules: [],
+    overrides: {},
   };
 }
 
@@ -111,6 +113,36 @@ export function createTabTracker() {
       now,
     );
 
+  /**
+   * Set or clear one per-tab override. `null` or `undefined` removes the key,
+   * which is how a row hands the setting back to the rules and the globals.
+   */
+  const setOverride = (tabId, key, value, now) =>
+    mutate(
+      tabId,
+      (s) => {
+        s.overrides ??= {};
+        if (value === null || value === undefined) delete s.overrides[key];
+        else s.overrides[key] = value;
+      },
+      now,
+    );
+
+  /** Drop every per-tab override, putting the tab back on rules and globals. */
+  const clearOverrides = (tabId, now) =>
+    mutate(
+      tabId,
+      (s) => {
+        s.overrides = {};
+      },
+      now,
+    );
+
+  /** Every tab's overrides, for working out which indicators to run. */
+  function allOverrides() {
+    return [...state.values()].map((s) => s.overrides ?? {});
+  }
+
   const setNeverExpire = (tabId, value, now) =>
     mutate(
       tabId,
@@ -183,6 +215,9 @@ export function createTabTracker() {
     resume,
     snooze,
     setElapsed,
+    setOverride,
+    clearOverrides,
+    allOverrides,
     setNeverExpire,
     setResetOnActivate,
     setIgnoreRules,

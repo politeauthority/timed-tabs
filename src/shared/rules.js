@@ -54,6 +54,39 @@ export function applyOverrides(eff, overrides) {
   return eff;
 }
 
+/**
+ * Where each of RULE_FIELDS gets its value for one tab: the globals
+ * underneath, then every matching rule in priority order, then whatever the
+ * tab itself overrides. Pure, so the popup can explain a page's settings
+ * without asking the background a second time.
+ *
+ * `matched` is highest priority last, the order effectiveSettings applies;
+ * rules flagged `ignored` are skipped, exactly as the background skips them.
+ * Returns { [key]: { value, from: "global" | "rule" | "tab", rule } }.
+ */
+export function explainSettings(settings, matched = [], overrides = {}) {
+  const out = {};
+  for (const key of RULE_FIELDS) {
+    const base = settings?.[key] ?? (key === "neverExpire" ? false : undefined);
+    out[key] = { value: base, from: "global", rule: null };
+  }
+  for (const rule of matched) {
+    if (rule?.ignored) continue;
+    for (const key of RULE_FIELDS) {
+      const set = rule?.set ?? {};
+      if (key in set && isSet(set[key])) {
+        out[key] = { value: overrideValue(key, out[key].value, set[key]), from: "rule", rule };
+      }
+    }
+  }
+  for (const key of RULE_FIELDS) {
+    if (key in (overrides ?? {}) && isSet(overrides[key])) {
+      out[key] = { value: overrideValue(key, out[key].value, overrides[key]), from: "tab", rule: null };
+    }
+  }
+  return out;
+}
+
 export const MAX_PRIORITY = 10;
 
 export function newRule(partial = {}) {
