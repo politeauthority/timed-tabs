@@ -1,10 +1,10 @@
 {
   "extensionName": {
     "message": "Timed Tabs",
-    "description": "Name of the extension."
+    "description": "Tab expiration on demand",
   },
   "extensionDescription": {
-    "message": "Put an expiry timer on tabs and see how close each one is to running out.",
-    "description": "Short description shown in the add-ons manager."
+    "message": "Put an expiration on tabs, and reep them or be visually aware.",
+    "description": "Tab expiration on demand. Endlessly configurable and goregous."
   }
 }
