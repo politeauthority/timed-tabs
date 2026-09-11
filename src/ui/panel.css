@@ -529,6 +529,33 @@ body[data-context="popup"] .mini-nav {
 }
 
 /* Pages: the page and preferences views show one page at a time. */
+/* The master switch is off: say so, and hide the readouts that would
+   otherwise keep counting down for tabs nothing is going to act on. */
+.off-banner {
+  display: none;
+}
+
+body[data-managing="off"] .off-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-card);
+  background: var(--warn-wash);
+  line-height: 1.4;
+}
+
+.off-banner button {
+  margin-left: auto;
+  flex: none;
+}
+
+body[data-managing="off"] #tab,
+body[data-managing="off"] #overview {
+  display: none;
+}
+
 body:not([data-context="popup"]) [data-pages] {
   display: none;
 }
