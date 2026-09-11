@@ -2,8 +2,9 @@ name: CI run full
 run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 
 # 🏷️ The `ci run full` label: required to merge into main, and while it is on,
-# the E2E scenarios run on the last four Firefox and Chrome releases instead of
-# CI's three legs.
+# the E2E scenarios run on nightly, stable and the two stables before it, in
+# Firefox and in Chrome, instead of CI's three legs. Nightly is advisory: a
+# daily build breaking is worth seeing and not worth holding a merge for.
 #
 # GitHub has no such thing as a required label, so the label is enforced by a
 # required status named `CI run full` that reads it. The gate job at the bottom
@@ -20,7 +21,7 @@ run-name: "CI run full — PR #${{ github.event.pull_request.number }}"
 # Three jobs:
 #   - plan     decides what this event needs, on a hosted runner in seconds
 #   - Full     the eight legs, e2e.yaml called with a longer `legs` list, so
-#              they report as `Full / Firefox latest` ... `Full / Chrome previous-3`
+#              they report as `Full / Firefox nightly` ... `Full / Chrome previous-2`
 #   - Full run gate   posts the `CI run full` status, which is the only thing
 #              branch protection reads. Its own check is not required and is
 #              named differently on purpose, so the two cannot be confused.
@@ -159,17 +160,18 @@ jobs:
       contents: read
       actions: read
     with:
-      # The current release and the three majors before it, in both browsers.
-      # None of the legs is required on its own; the status the gate posts is.
+      # The standard set, in both browsers: the daily build, the current stable
+      # and the two stables before it. None of the legs is required on its own;
+      # the status the gate posts is, and it ignores nightly.
       legs: >-
-        [{"browser": "firefox", "channel": "latest"},
+        [{"browser": "firefox", "channel": "nightly"},
+         {"browser": "firefox", "channel": "stable"},
          {"browser": "firefox", "channel": "previous"},
          {"browser": "firefox", "channel": "previous-2"},
-         {"browser": "firefox", "channel": "previous-3"},
+         {"browser": "chrome", "channel": "nightly"},
          {"browser": "chrome", "channel": "stable"},
          {"browser": "chrome", "channel": "previous"},
-         {"browser": "chrome", "channel": "previous-2"},
-         {"browser": "chrome", "channel": "previous-3"}]
+         {"browser": "chrome", "channel": "previous-2"}]
       # Not all at once: ten at a time starved one another on the runner node
       # until three legs saw one tick in their whole window and failed on
       # timing alone. Three at a time passed every leg; eight legs is three
@@ -207,17 +209,28 @@ jobs:
           path: legs
           run-id: ${{ needs.plan.outputs.run }}
           github-token: ${{ github.token }}
+      # The table, and the verdict: the script exits 0 when every leg that
+      # counts passed, 3 when one failed, and nightly legs do not count -- so
+      # the `Full` job's own result (which nightly does drag down) is not what
+      # the status is set from.
       - name: Table of the legs
         if: needs.plan.outputs.mode == 'run' || needs.plan.outputs.mode == 'reuse'
+        id: table
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN: ${{ needs.plan.outputs.run }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           gh run view "$RUN" --json jobs > jobs.json || echo '{"jobs": []}' > jobs.json
-          python3 scripts/e2e-full-summary.py legs jobs.json > table.md \
-            || echo "_The leg table could not be built; see the browser jobs on this run._" > table.md
+          python3 scripts/e2e-full-summary.py legs jobs.json > table.md
+          case $? in
+            0) verdict=pass ;;
+            3) verdict=fail ;;
+            *) verdict=error; echo "_The leg table could not be built; see the browser jobs on this run._" > table.md ;;
+          esac
+          echo "verdict=${verdict}" >> "$GITHUB_OUTPUT"
+          echo "verdict: ${verdict}"
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -227,6 +240,7 @@ jobs:
           REASON: ${{ needs.plan.outputs.reason }}
           PLAN: ${{ needs.plan.result }}
           FIREFOX: ${{ needs.firefox.result }}
+          VERDICT: ${{ steps.table.outputs.verdict }}
           ACTION: ${{ github.event.action }}
           PR: ${{ github.event.pull_request.number }}
         run: |
@@ -267,22 +281,28 @@ jobs:
               status pending "Add the 'ci run full' label to merge into main; arming auto-merge adds it for you"
               report 🏷️ "waiting for the label" \
                 "The merge is held, not failed: ${REASON}." "" \
-                "Merging into \`main\` needs the E2E scenarios to pass on the last four Firefox and Chrome releases." \
+                "Merging into \`main\` needs the E2E scenarios to pass on stable and the two stables before it, in Firefox and Chrome." \
                 "Add the **\`ci run full\`** label to run them; arming auto-merge adds it for you." ;;
             reuse)
               status success "Passed on this commit already: ${REASON}"
               report ✅ "passed" "Reused an earlier result: ${REASON}." "" "$(cat table.md)" ;;
             run)
-              case "$FIREFOX" in
-                success)
-                  status success "All eight legs passed, four Firefoxes and four Chromes"
+              # The verdict comes from the leg records, not from the `Full` job:
+              # a nightly leg failing turns that job red and changes nothing here.
+              if [ "$FIREFOX" = "cancelled" ]; then
+                status error "The legs were cancelled; re-run or push again"
+                report ⏹️ "cancelled" "The legs were cancelled: a job timed out, or a newer commit took over." "" "$(cat table.md)"; exit 1
+              fi
+              case "$VERDICT" in
+                pass)
+                  status success "Stable and the two before it passed in Firefox and Chrome"
                   report ✅ "passed" "$(cat table.md)" ;;
-                cancelled)
-                  status error "The legs were cancelled; re-run or push again"
-                  report ⏹️ "cancelled" "The legs were cancelled: a job timed out, or a newer commit took over." "" "$(cat table.md)"; exit 1 ;;
-                *)
-                  status failure "At least one of the eight legs failed"
+                fail)
+                  status failure "A stable or previous leg failed; nightly does not count"
                   report ❌ "failed" "$(cat table.md)"; exit 1 ;;
+                *)
+                  status error "The leg records could not be read; see the run"
+                  report ❌ "no verdict" "$(cat table.md)"; exit 1 ;;
               esac ;;
             *)
               status error "Plan mode '${MODE}' is not one the gate knows"
