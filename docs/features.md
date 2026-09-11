@@ -15,7 +15,7 @@ there is no account and no server.
 - [🪟 The popup](#-the-popup)
 - [📑 The Tabs page](#-the-tabs-page)
 - [📋 Rules](#-rules)
-- [🗂️ Site groups](#️-site-groups)
+- [🗂️ Site groups](#-site-groups)
 - [⚙️ Settings](#-settings)
 - [🔒 Privacy and permissions](#-privacy-and-permissions)
 - [🦊 Firefox and Chrome](#-firefox-and-chrome)
@@ -187,6 +187,10 @@ The manifest declares no data collection. Timed Tabs asks for access to all site
 because the favicon and title indicators run a small script in each page to change
 its icon or title; nothing is read from the page. Notifications are an optional
 permission, asked for only when the setting is turned on.
+
+[user-guide/privacy.md](user-guide/privacy.md) covers what is stored on your machine,
+how long the recently expired list keeps the addresses of closed tabs, and what to do
+about private windows.
 
 ## 🦊 Firefox and Chrome
 

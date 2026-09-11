@@ -110,9 +110,13 @@ function adaptManifest(base, target, channel) {
   }
   if (target === "chrome") {
     // Chrome MV3 requires a service worker and has no dynamic theme API.
+    // `sessions` goes too: only setTabValue is used, which is Firefox-only, and
+    // tab-tracker falls back to storage.session everywhere else. Asking for it
+    // on Chrome would take the recently-closed-tabs privilege and spend it on
+    // nothing. See docs/developer/security-notes.md.
     m.background = { service_worker: "background/index.js", type: "module" };
     delete m.browser_specific_settings;
-    m.permissions = m.permissions.filter((p) => p !== "theme");
+    m.permissions = m.permissions.filter((p) => !["theme", "sessions"].includes(p));
   }
   return m;
 }
