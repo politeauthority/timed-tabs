@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render e2e-artifacts/results.json as a GitHub step summary.
+"""Render artifacts/results.json as a GitHub step summary.
 
 scripts/e2e.mjs writes the results; this only formats them. It prints nothing
 and exits non-zero when there is no readable results file, which is the caller's
@@ -59,9 +59,9 @@ def render(scenarios, url=""):
         out.append("</details>")
 
     if url:
-        out.append(f"\n📦 [Download **e2e-artifacts**]({url}) — logs, screenshots and the seeded `dev.json` per scenario.")
+        out.append(f"\n📦 [Download **artifacts**]({url}) — logs, screenshots and the seeded `dev.json` per scenario.")
     else:
-        out.append("\n📦 Logs and screenshots are in the **e2e-artifacts** artifact on this run.")
+        out.append("\n📦 Logs and screenshots are in the **artifacts** upload on this run.")
 
     return "\n".join(out)
 

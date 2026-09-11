@@ -375,7 +375,7 @@ jobs:
           CODE: ${{ steps.go.outputs.run }}
           REASON: ${{ steps.go.outputs.reason }}
         run: |
-          mkdir -p e2e-artifacts
+          mkdir -p artifacts
           python3 - <<'PY'
           import json, os
           record = {
@@ -389,34 +389,34 @@ jobs:
               "scenarios": [],
           }
           try:
-              with open("e2e-artifacts/results.json", encoding="utf-8") as fh:
+              with open("artifacts/results.json", encoding="utf-8") as fh:
                   record["scenarios"] = json.load(fh)["scenarios"]
           except (OSError, ValueError, KeyError):
               pass
-          with open("e2e-artifacts/leg.json", "w", encoding="utf-8") as fh:
+          with open("artifacts/leg.json", "w", encoding="utf-8") as fh:
               json.dump(record, fh, indent=2)
           PY
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-leg-firefox-${{ matrix.channel }}
-          path: e2e-artifacts/leg.json
+          path: artifacts/leg.json
 
       - uses: actions/upload-artifact@v7
         id: artifacts
         # always(), so a failed run still uploads its logs -- but not when the
-        # scenarios never ran: there is no e2e-artifacts/ on a docs-only change,
+        # scenarios never ran: there is no artifacts/ on a docs-only change,
         # and starting the upload only to find nothing costs a few seconds of
         # what is otherwise a twenty-second job.
         if: always() && steps.go.outputs.run == 'true'
         with:
           # One name per leg. Two uploads under the same name in one run is an
           # error, and when a version fails you want its artifacts on their own.
-          name: e2e-artifacts-firefox-${{ matrix.channel }}
-          path: e2e-artifacts/
+          name: artifacts-firefox-${{ matrix.channel }}
+          path: artifacts/
           if-no-files-found: ignore
 
-      # Reads e2e-artifacts/results.json, which scripts/e2e.mjs writes with one
+      # Reads artifacts/results.json, which scripts/e2e.mjs writes with one
       # record per scenario. The console output of the run is the same data, but
       # it is 2000 lines down inside a log nobody opens on a green run.
       - name: 📋 Summary
@@ -449,7 +449,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "${{ steps.go.outputs.run }}" = "true" ]; then
-            python3 scripts/e2e-summary.py e2e-artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
+            python3 scripts/e2e-summary.py artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
               echo "_No scenario results were written; see the job log._" >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -669,7 +669,7 @@ jobs:
           CODE: ${{ steps.go.outputs.run }}
           REASON: ${{ steps.go.outputs.reason }}
         run: |
-          mkdir -p e2e-artifacts
+          mkdir -p artifacts
           python3 - <<'PY'
           import json, os
           record = {
@@ -683,34 +683,34 @@ jobs:
               "scenarios": [],
           }
           try:
-              with open("e2e-artifacts/results.json", encoding="utf-8") as fh:
+              with open("artifacts/results.json", encoding="utf-8") as fh:
                   record["scenarios"] = json.load(fh)["scenarios"]
           except (OSError, ValueError, KeyError):
               pass
-          with open("e2e-artifacts/leg.json", "w", encoding="utf-8") as fh:
+          with open("artifacts/leg.json", "w", encoding="utf-8") as fh:
               json.dump(record, fh, indent=2)
           PY
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-leg-chrome-${{ matrix.channel }}
-          path: e2e-artifacts/leg.json
+          path: artifacts/leg.json
 
       - uses: actions/upload-artifact@v7
         id: artifacts
         # always(), so a failed run still uploads its logs -- but not when the
-        # scenarios never ran: there is no e2e-artifacts/ on a docs-only change,
+        # scenarios never ran: there is no artifacts/ on a docs-only change,
         # and starting the upload only to find nothing costs a few seconds of
         # what is otherwise a twenty-second job.
         if: always() && steps.go.outputs.run == 'true'
         with:
           # One name per leg. Two uploads under the same name in one run is an
           # error, and when a version fails you want its artifacts on their own.
-          name: e2e-artifacts-chrome-${{ matrix.channel }}
-          path: e2e-artifacts/
+          name: artifacts-chrome-${{ matrix.channel }}
+          path: artifacts/
           if-no-files-found: ignore
 
-      # Reads e2e-artifacts/results.json, which scripts/e2e.mjs writes with one
+      # Reads artifacts/results.json, which scripts/e2e.mjs writes with one
       # record per scenario. The console output of the run is the same data, but
       # it is 2000 lines down inside a log nobody opens on a green run.
       - name: 📋 Summary
@@ -743,7 +743,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "${{ steps.go.outputs.run }}" = "true" ]; then
-            python3 scripts/e2e-summary.py e2e-artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
+            python3 scripts/e2e-summary.py artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
               echo "_No scenario results were written; see the job log._" >> "$GITHUB_STEP_SUMMARY"
           fi
 
