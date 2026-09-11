@@ -90,7 +90,7 @@
            rule changes, and whatever this tab overrides on top. -->
       <section id="tab-settings" class="tab tab-settings-section" hidden>
         <div class="section-head">
-          <h2 class="settings-title">Page settings</h2>
+          <h2 class="settings-title">⚙️ Page settings</h2>
           <button type="button" id="tab-settings-more" class="quiet" aria-expanded="false">Show more</button>
         </div>
         <div id="tab-settings-list" class="tab-settings-list"></div>
@@ -102,7 +102,7 @@
 
       <section id="tab-rules" class="tab tab-rules-section" hidden>
         <div class="section-head">
-          <h2 class="settings-title">Rules for this page</h2>
+          <h2 class="settings-title">📋 Rules for this page</h2>
           <button type="button" id="tab-rules-open" class="quiet" title="Open the Rules page, filtered to this site">Make / edit</button>
         </div>
         <div id="tab-rules-list" class="tab-rules-list"></div>
@@ -126,7 +126,7 @@
       <!-- Tabs page -->
       <details id="overview" class="overview" data-pages="tabs" data-page-only>
         <summary class="chev">
-          <span>All open tabs</span>
+          <span>📑 All open tabs</span>
           <span id="overview-count" class="overview-count"></span>
         </summary>
         <p class="overview-legend">
@@ -145,7 +145,7 @@
 
       <details id="recent" class="overview recent" data-pages="tabs" data-page-only>
         <summary class="chev">
-          <span>Recently expired</span>
+          <span>🕯️ Recently expired</span>
           <span id="recent-count" class="overview-count"></span>
         </summary>
         <p class="overview-legend">Tabs that Timed Tabs closed when they ran out of time. Reopen them from here.</p>
@@ -165,7 +165,7 @@
       <!-- Rules page -->
       <section id="rules" class="rules" data-pages="rules" data-page-only>
         <header class="rules-head">
-          <h2 class="settings-title">Rules</h2>
+          <h2 class="settings-title">📋 Rules</h2>
           <span class="rules-head-actions">
             <button type="button" id="rules-remove-empty" class="danger" hidden><svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>Remove empty rules</button>
             <button type="button" id="rule-add" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>Add rule</button>
@@ -186,7 +186,7 @@
       <!-- Site groups (feature flag "site-groups"): named lists of sites a rule can target as one. -->
       <section id="site-groups" class="rules site-groups" data-pages="rules" data-page-only hidden>
         <header class="rules-head">
-          <h2 class="settings-title">Site groups</h2>
+          <h2 class="settings-title">🗂️ Site groups</h2>
           <span class="rules-head-actions">
             <button type="button" id="group-add" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>Add group</button>
           </span>
@@ -211,7 +211,7 @@
       </section>
 
       <section id="backup" class="backup group" data-pages="settings" data-page-only>
-        <h2 class="settings-title">Backup</h2>
+        <h2 class="settings-title">💾 Backup</h2>
         <p class="rules-help">
           Everything above, including rules, as one JSON document. Copy or download it to keep,
           and paste or choose a file to restore. Loading replaces all current settings and rules.
@@ -234,7 +234,7 @@
       </section>
 
       <details id="diagnostics" class="diagnostics" data-pages="settings" data-page-only>
-        <summary class="chev">Diagnostics</summary>
+        <summary class="chev">🩺 Diagnostics</summary>
         <p class="diag-actions">
           <button type="button" id="diag-refresh">Refresh</button>
           <button type="button" id="diag-tick">Force tick</button>

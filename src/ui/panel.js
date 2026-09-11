@@ -145,7 +145,7 @@ function renderFields() {
     sec.id = `group-${g.id}`;
     const h = document.createElement("h2");
     h.className = "settings-title";
-    h.textContent = g.title;
+    h.textContent = `${g.emoji ? g.emoji + " " : ""}${g.title}`;
     const help = document.createElement("p");
     help.className = "group-help";
     help.textContent = g.help;
@@ -157,29 +157,71 @@ function renderFields() {
   });
   root.replaceChildren(...sections);
   updateFieldVisibility();
-  renderJumpLinks();
+  renderGroupTabs();
+  showGroup(currentGroup());
 }
 
-function renderJumpLinks() {
+/** Which group of settings is on show. Remembered like the folds are. */
+const GROUP_KEY = "settings-group";
+function currentGroup() {
+  let stored = null;
+  try {
+    stored = localStorage.getItem(`ui:${GROUP_KEY}`);
+  } catch {
+    // Private window or blocked storage: fall back to the first group.
+  }
+  return GROUPS.some((g) => g.id === stored) ? stored : GROUPS[0].id;
+}
+
+function showGroup(id) {
+  try {
+    localStorage.setItem(`ui:${GROUP_KEY}`, id);
+  } catch {
+    // ignore
+  }
+  for (const sec of $("fields").querySelectorAll(".group")) {
+    sec.hidden = sec.id !== `group-${id}`;
+  }
+  for (const pill of $("settings-jump").querySelectorAll("[data-group]")) {
+    const on = pill.dataset.group === id;
+    pill.classList.toggle("is-selected", on);
+    pill.setAttribute("aria-selected", String(on));
+    pill.tabIndex = on ? 0 : -1;
+  }
+}
+
+/**
+ * The pills over the settings. They switch which group is shown rather than
+ * scrolling to it, so the page is only ever as long as one group.
+ *
+ * Backup and Diagnostics are deliberately not pills: they are not settings,
+ * and they keep their own places below.
+ */
+function renderGroupTabs() {
   const nav = $("settings-jump");
-  const links = [
-    ...GROUPS.map((g) => ({ id: `group-${g.id}`, title: g.title })),
-    { id: "backup", title: "Backup" },
-    { id: "diagnostics", title: "Diagnostics" },
-  ];
+  nav.setAttribute("role", "tablist");
   nav.replaceChildren(
-    ...links.map(({ id, title }) => {
-      const a = document.createElement("a");
-      a.href = `#${id}`;
-      a.textContent = title;
-      a.addEventListener("click", (e) => {
-        // Stay on the settings page; just scroll.
+    ...GROUPS.map((g) => {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "jump-pill";
+      pill.dataset.group = g.id;
+      pill.setAttribute("role", "tab");
+      pill.setAttribute("aria-controls", `group-${g.id}`);
+      pill.title = g.help;
+      pill.textContent = `${g.emoji ? g.emoji + " " : ""}${g.short ?? g.title}`;
+      pill.addEventListener("click", () => showGroup(g.id));
+      // Arrow keys move between tabs, which is what role="tablist" promises.
+      pill.addEventListener("keydown", (e) => {
+        const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+        if (!step) return;
         e.preventDefault();
-        const el = $(id);
-        if (el.tagName === "DETAILS") el.open = true;
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        const at = GROUPS.findIndex((x) => x.id === g.id);
+        const next = GROUPS[(at + step + GROUPS.length) % GROUPS.length];
+        showGroup(next.id);
+        nav.querySelector(`[data-group="${next.id}"]`)?.focus();
       });
-      return a;
+      return pill;
     }),
   );
 }
