@@ -12,7 +12,7 @@
  * the old PNGs had drifted away from icon.svg because nothing regenerated
  * them.
  */
-import { deflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -146,6 +146,72 @@ export function encodePng(rgba, width, height = width) {
   ]);
 }
 
+/**
+ * Read an RGBA PNG back to its pixels.
+ *
+ * Comparing compressed bytes would be the obvious way to spot a stale icon,
+ * but `deflateSync` is not byte-stable across zlib builds, so the same art
+ * encodes differently on different Node versions. Decoding means the check
+ * asks the only question that matters: does the committed file draw what the
+ * geometry says it should? Returns null for anything this script did not
+ * write, which counts as stale.
+ */
+export function decodePng(file) {
+  if (file.length < 8 || file.readUInt32BE(0) !== 0x89504e47) return null;
+  let pos = 8;
+  let width = 0;
+  let height = 0;
+  const idat = [];
+  while (pos + 8 <= file.length) {
+    const length = file.readUInt32BE(pos);
+    const type = file.toString("latin1", pos + 4, pos + 8);
+    const body = file.subarray(pos + 8, pos + 8 + length);
+    if (type === "IHDR") {
+      width = body.readUInt32BE(0);
+      height = body.readUInt32BE(4);
+      if (body[8] !== 8 || body[9] !== 6) return null; // not 8-bit RGBA
+    } else if (type === "IDAT") {
+      idat.push(body);
+    } else if (type === "IEND") {
+      break;
+    }
+    pos += length + 12;
+  }
+  if (!width || !height || !idat.length) return null;
+
+  const bpp = 4;
+  const stride = width * bpp;
+  const raw = inflateSync(Buffer.concat(idat));
+  if (raw.length < (stride + 1) * height) return null;
+  const out = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    const line = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    for (let i = 0; i < stride; i++) {
+      const a = i >= bpp ? out[y * stride + i - bpp] : 0;
+      const b = y > 0 ? out[(y - 1) * stride + i] : 0;
+      const c = i >= bpp && y > 0 ? out[(y - 1) * stride + i - bpp] : 0;
+      let value = line[i];
+      if (filter === 1) value += a;
+      else if (filter === 2) value += b;
+      else if (filter === 3) value += (a + b) >> 1;
+      else if (filter === 4) value += paeth(a, b, c);
+      else if (filter !== 0) return null;
+      out[y * stride + i] = value & 0xff;
+    }
+  }
+  return { width, height, pixels: out };
+}
+
+function paeth(a, b, c) {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  if (pa <= pb && pa <= pc) return a;
+  return pb <= pc ? b : c;
+}
+
 /* ----------------------------------------------------------------- SVG --- */
 
 const round = (n) => Number(n.toFixed(3));
@@ -198,15 +264,26 @@ export function toSvg(shapes, color) {
 
 /** The icons as they should be on disk, ready to compare or write. */
 
+/**
+ * Every icon as it should be, with the test for whether what is on disk
+ * already says the same thing. The PNGs compare by pixel and the SVG by text.
+ */
 function artefacts() {
   const rgb = VIVID_RAMP[0][1];
   const files = [];
   for (const size of SIZES) {
-    const shapes = dialShapes({ progress: IDENTITY_PROGRESS, size });
-    files.push({ name: `icon-${size}.png`, bytes: encodePng(rasterise(shapes, size, rgb), size) });
+    const pixels = rasterise(dialShapes({ progress: IDENTITY_PROGRESS, size }), size, rgb);
+    files.push({
+      name: `icon-${size}.png`,
+      bytes: encodePng(pixels, size),
+      matches(current) {
+        const decoded = decodePng(current);
+        return Boolean(decoded) && decoded.width === size && decoded.height === size && decoded.pixels.equals(pixels);
+      },
+    });
   }
-  const svgShapes = dialShapes({ progress: IDENTITY_PROGRESS, size: 128 });
-  files.push({ name: "icon.svg", bytes: Buffer.from(toSvg(svgShapes, IDENTITY_COLOR), "utf8") });
+  const svg = Buffer.from(toSvg(dialShapes({ progress: IDENTITY_PROGRESS, size: 128 }), IDENTITY_COLOR), "utf8");
+  files.push({ name: "icon.svg", bytes: svg, matches: (current) => current.equals(svg) });
   return files;
 }
 
@@ -214,10 +291,12 @@ function artefacts() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const check = process.argv.includes("--check");
   let stale = 0;
-  for (const { name, bytes } of artefacts()) {
+  for (const { name, bytes, matches } of artefacts()) {
     const path = join(iconsDir, name);
     const current = existsSync(path) ? readFileSync(path) : null;
-    if (current && current.equals(bytes)) continue;
+    // Already draws the right thing: leave the file alone rather than churn
+    // the diff with a re-encode from a different zlib.
+    if (current && matches(current)) continue;
     if (check) {
       console.error(`stale: src/icons/${name}`);
       stale += 1;

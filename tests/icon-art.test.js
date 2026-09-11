@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GRID, dialShapes, metrics, paintShapes } from "../src/shared/icon-art.js";
+import { decodePng, encodePng, rasterise } from "../scripts/icons.mjs";
 
 const arcs = (shapes) => shapes.filter((s) => s.kind === "arc");
 const hands = (shapes) => shapes.filter((s) => s.kind === "capsule");
@@ -124,5 +125,32 @@ describe("paintShapes", () => {
     const saves = calls.filter((c) => c[0] === "save").length;
     const restores = calls.filter((c) => c[0] === "restore").length;
     expect(saves).toBe(restores);
+  });
+});
+
+describe("the generated icon set", () => {
+  const green = [0x2e, 0xcc, 0x71];
+
+  it("reads back the pixels it wrote, at every shipped size", () => {
+    for (const size of [16, 32, 48, 96, 128]) {
+      const pixels = rasterise(dialShapes({ progress: 0.25, size }), size, green);
+      const decoded = decodePng(encodePng(pixels, size));
+      expect(decoded).not.toBeNull();
+      expect([decoded.width, decoded.height]).toEqual([size, size]);
+      // Decoding is what lets `npm run icons:check` compare art rather than
+      // compressed bytes, which are not stable across zlib builds.
+      expect(decoded.pixels.equals(pixels)).toBe(true);
+    }
+  });
+
+  it("draws something, rather than an empty square", () => {
+    const pixels = rasterise(dialShapes({ progress: 0.25, size: 32 }), 32, green);
+    const opaque = pixels.filter((_, i) => i % 4 === 3 && pixels[i] > 0);
+    expect(opaque.length).toBeGreaterThan(0);
+  });
+
+  it("treats a file it did not write as no icon at all", () => {
+    expect(decodePng(Buffer.from("not a png"))).toBeNull();
+    expect(decodePng(Buffer.alloc(0))).toBeNull();
   });
 });
