@@ -45,6 +45,13 @@ export const FLAGS = [
     default: false,
     requires: "beta-features",
   },
+  {
+    id: "settings-toasts",
+    label: "Settings toasts",
+    help: "Say whether a change landed in a small message that slides in over the page instead of a “Saved” tick beside the setting. A success fades on its own; a failure stays until you dismiss it. These are the extension's own messages, nothing to do with the desktop notifications a tab gets when it expires.",
+    default: false,
+    requires: "beta-features",
+  },
 ];
 
 /** The shape a fresh profile starts with. */

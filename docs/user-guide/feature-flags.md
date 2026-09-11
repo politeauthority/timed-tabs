@@ -77,6 +77,27 @@ target a group match nothing**. The rules are still there and their cards say so
 they stop applying. If a group rule is the only thing keeping a site's tabs short,
 turning the flag off silently gives those tabs your default lifetime instead.
 
+### Settings toasts
+
+Changes a setting's confirmation from a small **Saved** tick beside the setting into a
+message that slides in at the bottom of the window, naming what you changed.
+
+A success fades after a few seconds, with a line burning down the bottom of it so you
+can see how long it has. **A failure stays until you dismiss it**, and says what went
+wrong: a setting that could not be written is one you would otherwise go on believing
+you had changed. Resting the pointer on a message holds every countdown, so nothing
+slips away mid-sentence.
+
+Rules and the per-tab controls keep their **Saved** tick. It sits on the row you
+edited, which a message at the bottom of the window cannot do. What moves to a message
+is the Settings page, and anything that never had a good place to be said: the outcome
+of a **Backup** copy, load or reset, and any save that fails.
+
+These are the extension's own messages, drawn inside the popup or the page you are
+looking at. They are nothing to do with the desktop notifications in
+[features.md](features.md), which come from your operating system when a tab is closed,
+need a permission, and show up whether or not Timed Tabs is open.
+
 ## 🧹 When a flag goes away
 
 A flag is temporary by nature. When the work behind it is finished, the feature
