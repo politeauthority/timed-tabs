@@ -59,6 +59,11 @@
   --sp-5: 20px;
   --sp-6: 24px;
   --gutter: var(--sp-4);
+  /* The one width every page view shares. Tabs, Rules, Settings and Backup
+     all sit in the same column, so switching pages never shifts the header
+     or the edges of the content. Prose inside keeps its own measure through
+     per-element max-widths, so a wide column does not mean long lines. */
+  --page-width: 960px;
   --r-control: 6px;
   --r-card: 8px;
   --r-pill: 999px;
@@ -112,7 +117,7 @@ body[data-context="options"] #app {
 }
 
 body[data-context="page"] #app {
-  max-width: 760px;
+  max-width: var(--page-width);
   margin: 0 auto;
   padding: var(--sp-6) var(--gutter) 48px;
 }
@@ -1948,12 +1953,6 @@ body:not([data-context="popup"]) .field {
    A collapsed rule is a row: priority badge, pattern, on/off switch and a quiet
    delete across the head, then the description and one chip per setting below
    it, hanging under the pattern. */
-
-body[data-context="page"][data-page="rules"] #app {
-  /* A rule is a row of controls, not a paragraph, so it is given more width
-     than the measure the prose pages want. */
-  max-width: 1040px;
-}
 
 /* The "Saved" tick lands at the end of the head row. */
 .rule-head .saved-mark {
