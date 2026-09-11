@@ -1,0 +1,88 @@
+name: Auto-merge
+run-name: "Auto-merge — #${{ github.event.pull_request.number }} ${{ github.event.pull_request.title }}"
+
+# 🏷️ Label a PR `automerge` and GitHub merges it once CI is green.
+#
+# This job does not merge anything itself. It arms GitHub's own auto-merge and
+# steps back, which matters for two reasons:
+#
+#   1. A merge made with GITHUB_TOKEN does not trigger other workflows, so a
+#      hand-rolled merge here would leave release-please asleep on the push to
+#      main. Native auto-merge is attributed to the person who armed it, so the
+#      push behaves like any other and the release pipeline wakes up. The same
+#      trap is why release-please.yaml uses secrets.PAT for its gated merge.
+#   2. What it waits for is the branch protection on main, not a rule written
+#      here, so there is one definition of "green" rather than two that can
+#      drift apart.
+#
+# ⚠️ PREREQ: main must require the "Lint, test & build" check, and the repo must
+# allow auto-merge. Without a required check GitHub refuses to arm auto-merge,
+# because nothing is blocking the PR.
+#
+# 🔒 The release PR is deliberately left out of all this: it is admin-gated
+# behind the STABLE_RELEASES variable (see docs/developer/releasing.md). It has
+# no `automerge` label, so this workflow never touches it. Do not add one.
+
+on:
+  pull_request:
+    types: [labeled, opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  arm:
+    name: Arm auto-merge
+    # Only labelled PRs, and never a draft: arming one would merge it the moment
+    # it is marked ready, before anyone has looked.
+    if: contains(github.event.pull_request.labels.*.name, 'automerge') && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## 🏷️ Auto-merge"
+            echo
+            echo "> ▶️ **Why this ran:** \`${{ github.event.action }}\` on [#${PR}](${URL}), which carries the \`automerge\` label."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Already armed by an earlier run, or merged while this one queued.
+          state=$(gh pr view "$PR" --json state,autoMergeRequest --jq '.state + " " + ((.autoMergeRequest != null) | tostring)')
+          if [ "${state#* }" = "true" ]; then
+            echo "✅ Auto-merge is already armed. Nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "${state%% *}" != "OPEN" ]; then
+            echo "✅ PR is ${state%% *}, not open. Nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if gh pr merge "$PR" --auto --squash 2>err.txt; then
+            {
+              echo "✅ Armed. GitHub will squash-merge this PR as soon as **Lint, test & build** passes,"
+              echo "and delete the branch afterwards. Remove the label to cancel."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # The usual cause is a PR that nothing is blocking, which GitHub will
+          # not arm. Say so rather than failing the run over it.
+          {
+            echo "⚠️ Could not arm auto-merge:"
+            echo
+            echo '```'
+            cat err.txt
+            echo '```'
+            echo
+            echo "If this says the pull request is not in a mergeable state, check that"
+            echo "\`main\` still requires the **Lint, test & build** check: with nothing"
+            echo "blocking a PR there is nothing for auto-merge to wait on."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
