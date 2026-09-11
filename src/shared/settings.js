@@ -30,7 +30,7 @@ export const DEFAULTS = Object.freeze({
   /** How long before expiry the flashing starts (seconds). */
   flashLeadSeconds: 60,
   /** Which indicator strategies signal remaining time. See background/indicators. */
-  indicators: ["favicon", "theme-tint"],
+  indicators: ["favicon", "theme-tint", "action-icon"],
   /** How the favicon indicator draws its colour: "square" | "ring" | "dot". */
   faviconStyle: "square",
   /** What to do when a tab expires: "none" | "reload" | "close" | "discard". */

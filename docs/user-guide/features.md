@@ -52,7 +52,7 @@ is switched on.
 
 ## 🎨 Seeing the time left
 
-Settings, Appearance, offers four indicators. Use any combination. Colour runs
+Settings, Appearance, offers five indicators. Use any combination. Colour runs
 green, yellow, red as time runs out.
 
 - **Colour every tab's favicon.** The icon gets a coloured square, ring or dot,
@@ -61,6 +61,11 @@ green, yellow, red as time runs out.
   History entries show it too.
 - **Tint the active tab.** The background of the tab you are viewing takes the
   colour. Firefox only.
+- **Timer ring on the toolbar button.** The Timed Tabs button draws a ring that
+  empties as the tab you are on runs out of time, and turns into an exclamation
+  once it has expired. This one needs nothing from the page, so it keeps working
+  on `about:` pages and the add-ons store where the favicon and title indicators
+  cannot reach.
 - **Minutes left on the toolbar button.** The Timed Tabs button shows the minutes
   left for the current tab.
 
