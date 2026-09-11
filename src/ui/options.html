@@ -54,13 +54,6 @@
         <button type="button" id="off-resume" class="primary">Turn it back on</button>
       </p>
 
-      <!-- Every view, while a beta feature is on: what is different, and why. -->
-      <p id="flags-note" class="flags-note" hidden>
-        <svg class="icon" aria-hidden="true"><use href="#i-flag" /></svg>
-        <span id="flags-note-text"></span>
-        <button type="button" id="flags-note-manage" class="quiet">Change</button>
-      </p>
-
       <!-- Mini UI only: the current tab -->
       <section id="tab" class="tab" hidden>
         <header class="tab-head">
@@ -181,6 +174,16 @@
           <button type="button" id="stats-clear" class="quiet"><svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>Clear statistics</button>
         </p>
       </details>
+
+      <!-- Every view, while a beta feature is on: what is different, and why.
+           It sits at the foot of the view: here in the popup, where the DOM
+           already puts it above the version line, and below everything on a
+           page view, which panel.css reorders it into. -->
+      <p id="flags-note" class="flags-note" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-flag" /></svg>
+        <span id="flags-note-text"></span>
+        <button type="button" id="flags-note-manage" class="quiet">Change</button>
+      </p>
 
       <!-- Mini UI footer: what the popup is, not where to go. "Open in a tab"
            in the header is the way through to the full pages. -->

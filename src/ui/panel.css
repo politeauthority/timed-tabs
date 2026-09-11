@@ -767,12 +767,19 @@ body[data-managing="off"] .off-banner {
  * off-banner: nothing is wrong, something is merely different, and it is
  * shown on every view for as long as a beta feature is on -- so it has to be
  * bearable to look at rather than something to dismiss.
+ *
+ * It sits at the foot of the view, under the thing it is talking about rather
+ * than in front of it. In the popup the markup already puts it there, above
+ * the version line; a page view has its own footer at the very end, so the
+ * two below reorder it down to just above that. `#app` is a flex column, and
+ * everything else in it is at the default order 0, which is what lets one
+ * element be last in both views without the markup carrying it twice.
  */
 .flags-note {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin: 0 0 var(--sp-2);
+  margin: var(--sp-2) 0 0;
   padding: var(--sp-1) var(--sp-2);
   border-radius: var(--r-card);
   border: 1px solid var(--line);
@@ -780,6 +787,22 @@ body[data-managing="off"] .off-banner {
   color: var(--ink-2);
   font-size: var(--fs-sm);
   line-height: 1.4;
+}
+
+/* A page view's #app carries the gutter, so the note is already inset there.
+   The popup's does not: without this the note runs to both edges and has its
+   corners clipped by the window, a hand's width from a version line that is
+   inset. */
+body[data-context="popup"] .flags-note {
+  margin-inline: var(--gutter);
+}
+
+body:not([data-context="popup"]) .flags-note {
+  order: 1;
+}
+
+body:not([data-context="popup"]) .page-foot {
+  order: 2;
 }
 
 .flags-note .icon {
