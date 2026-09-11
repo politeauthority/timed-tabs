@@ -42,7 +42,16 @@ jobs:
     if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci pause')
     timeout-minutes: 20
     steps:
+      # Full history: the changed-paths action diffs against the base commit.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Like CI: the job always runs and reports, because it is a required
+      # check, but on a docs-only change it skips the work. Firefox is not
+      # going to notice a README.
+      - uses: ./.github/actions/changed-paths
+        id: changed
 
       # The runner node is short of CPU, not bandwidth: unpacking Node took two
       # minutes and apt nine on a busy day. So the caches below hold the
@@ -50,17 +59,20 @@ jobs:
       # and setup-node then finds it without downloading or extracting; the
       # Firefox libraries come back as installed files, skipping dpkg entirely.
       - name: Cache the Node toolchain
+        if: steps.changed.outputs.code == 'true'
         uses: actions/cache@v4
         with:
           path: ${{ runner.tool_cache }}/node
           key: node-toolcache-${{ runner.os }}-${{ runner.arch }}-22
       - uses: actions/setup-node@v7
+        if: steps.changed.outputs.code == 'true'
         id: node
         timeout-minutes: 4
         with:
           node-version: 22
           cache: npm
       - name: npm ci
+        if: steps.changed.outputs.code == 'true'
         id: npm
         timeout-minutes: 4
         run: npm ci --prefer-offline --no-audit --no-fund
@@ -70,12 +82,14 @@ jobs:
       # apt and dpkg (nine minutes on a starved CPU). Bump FIREFOX_LIBS_KEY after
       # changing the package list. Ubuntu 24.04: ALSA is libasound2t64.
       - name: Restore the Firefox libraries
+        if: steps.changed.outputs.code == 'true'
         id: libs
         uses: actions/cache@v4
         with:
           path: ~/firefox-libs.tar
           key: firefox-libs-${{ runner.os }}-${{ runner.arch }}-${{ env.FIREFOX_LIBS_KEY }}
       - name: Firefox libraries
+        if: steps.changed.outputs.code == 'true'
         id: firefox-libs
         timeout-minutes: 6
         env:
@@ -111,13 +125,16 @@ jobs:
       # setup-firefox downloads a ~90 MB tarball every run; that took 14s and is
       # the smallest cost here, so it is left alone until a version is pinned.
       - uses: browser-actions/setup-firefox@v1
+        if: steps.changed.outputs.code == 'true'
         id: firefox
         timeout-minutes: 3
         with:
           firefox-version: latest
       - run: '"${{ steps.firefox.outputs.firefox-path }}" --version'
+        if: steps.changed.outputs.code == 'true'
 
       - name: Run the scenarios
+        if: steps.changed.outputs.code == 'true'
         id: scenarios
         timeout-minutes: 8
         env:
@@ -141,7 +158,9 @@ jobs:
           ARTIFACT_URL: ${{ steps.artifacts.outputs.artifact-url }}
         run: |
           case "${{ job.status }}" in
-            success) head="### ✅ 🦊 E2E passed" ;;
+            success)
+              if [ "${{ steps.changed.outputs.code }}" = "true" ]; then head="### ✅ 🦊 E2E passed"
+              else head="### ⏭️ 🦊 E2E skipped: ${{ steps.changed.outputs.reason }}"; fi ;;
             cancelled) head="### ⏹️ 🦊 E2E cancelled (the job timed out, or a newer run took over)" ;;
             *) head="### ❌ 🦊 E2E failed" ;;
           esac
@@ -152,8 +171,10 @@ jobs:
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-          python3 scripts/e2e-summary.py e2e-artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
-            echo "_No scenario results were written; see the job log._" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.changed.outputs.code }}" = "true" ]; then
+            python3 scripts/e2e-summary.py e2e-artifacts/results.json >> "$GITHUB_STEP_SUMMARY" || \
+              echo "_No scenario results were written; see the job log._" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: ⏱️ Step times
         if: always()
