@@ -3,7 +3,7 @@
   "dev": {
     "openWindows": [["about:blank", "https://example.com/", "https://example.org/"]],
     "settings": { "tabLifetimeSeconds": 1800, "tickSeconds": 2, "indicators": ["favicon"], "faviconStyle": "square",
-                  "featureFlags": { "site-groups": true } },
+                  "featureFlags": { "beta-features": true, "site-groups": true } },
     "groups": [ { "id": "g1", "name": "news", "patterns": ["example.org/*"] } ],
     "rules": [
       { "id": "r1", "description": "ring on .com", "pattern": "example.com/*", "match": "wildcard", "priority": 5,
