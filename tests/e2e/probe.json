@@ -1,0 +1,4 @@
+{ "openWindows": [["https://example.com/"]], "openUrls": ["ui/panel.html?view=page#tabs"],
+  "settings": { "tabLifetimeSeconds": 120, "tickSeconds": 2 },
+  "rules": [ { "id": "r1", "description": "probe", "pattern": "example.com/*", "match": "wildcard", "priority": 5, "set": { "tabLifetimeSeconds": 30, "faviconStyle": "dot" } } ],
+  "captureAfterMs": 8000 }

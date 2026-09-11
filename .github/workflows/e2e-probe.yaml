@@ -1,0 +1,77 @@
+name: E2E probe
+run-name: "E2E probe — ${{ github.ref_name }}"
+
+# Throwaway: can the self-hosted runner install Firefox and drive the
+# extension headless through the dev hook? Answers the feasibility question
+# in docs/personal/e2e-browser-testing.md. Not a required check.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Headless Firefox on the runner
+    runs-on: timed-tabs
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Runner facts
+        run: |
+          id; cat /etc/os-release | head -2; nproc; free -m | head -2
+          sudo -n true && echo "sudo: yes" || echo "sudo: NO"
+
+      - name: Firefox libraries
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            libgtk-3-0 libdbus-glib-1-2 libasound2 libx11-xcb1 libxt6 libpci3 libxtst6 libxrandr2 libxcomposite1 libxdamage1 libgbm1 libnss3 libxss1 bzip2 xz-utils > /dev/null
+      - uses: browser-actions/setup-firefox@v1
+        id: firefox
+        with:
+          firefox-version: latest
+      - run: |
+          echo "firefox at ${{ steps.firefox.outputs.firefox-path }}"
+          "${{ steps.firefox.outputs.firefox-path }}" --version
+
+      - name: Build the dev target with the probe scenario
+        run: DEV_JSON=tests/e2e/probe.json npm run build:dev
+
+      - name: Run headless for 30 seconds
+        env:
+          MOZ_HEADLESS: "1"
+          FIREFOX: ${{ steps.firefox.outputs.firefox-path }}
+        run: |
+          set +e
+          timeout 30 npx web-ext run --source-dir dist/dev --firefox "$FIREFOX" --args=-headless --verbose \
+            --pref devtools.console.stdout.content=true --pref devtools.console.stdout.chrome=true \
+            --pref termsofuse.bypassNotification=true --pref browser.aboutwelcome.enabled=false > web-ext.log 2>&1
+          echo "web-ext exit $? (124 = stopped by timeout, expected)"
+
+      - name: Check what happened
+        run: |
+          set -euo pipefail
+          echo "== look lines"; grep -o "timed-tabs\] look [^\"]*" web-ext.log | cut -c1-140 || true
+          echo "== capture chunks: $(grep -c 'CAPTURE [0-9]' web-ext.log || true)"
+          grep -o "timed-tabs\] look [^\"]*example.com[^\"]*style=dot" web-ext.log > /dev/null \
+            && echo "PASS: rule applied to example.com in headless Firefox" \
+            || { echo "FAIL: no look line with style=dot for example.com"; exit 1; }
+          grep -o "CAPTURE [0-9]*/[0-9]* [^\"]*" web-ext.log | sort -t' ' -k2 -n | sed 's/^CAPTURE [0-9]*\/[0-9]* //' | tr -d '\n' | sed 's/^data:image\/png;base64,//' | base64 -d > capture.png || true
+          ls -la capture.png || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-probe
+          path: |
+            web-ext.log
+            capture.png
+          if-no-files-found: ignore
