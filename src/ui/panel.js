@@ -572,8 +572,12 @@ function renderTabSettings() {
   list.replaceChildren(
     ...defs.map((def) => {
       const entry = explained[def.key];
-      const row = renderOverride(def, store, () => renderTabSettings());
-      row.querySelector(".field-label")?.append(" ", sourceBadge(entry));
+      const row = renderOverride(def, store, () => renderTabSettings(), {
+        adopt: true,
+      });
+      // In the control column, not the label: the label is a two-column grid
+      // and a third child there wraps onto a line of its own.
+      row.querySelector(".field-control")?.prepend(sourceBadge(entry));
       row.hidden = !tabSettingsExpanded && !isSettingActive(def.key, entry.value);
       return row;
     }),
@@ -1556,7 +1560,7 @@ function settingRow(labelText, helpText, control, { checkbox } = {}) {
   return row;
 }
 
-function renderOverride(def, store, onChanged = () => {}) {
+function renderOverride(def, store, onChanged = () => {}, opts = {}) {
   const isOn = def.key in store.set;
 
   const on = document.createElement("input");
@@ -1571,14 +1575,14 @@ function renderOverride(def, store, onChanged = () => {}) {
   let read;
   let stacked = false;
   if (def.type === "toggle") {
-    const sw = makeSwitch(Boolean(current), () => commit());
+    const sw = makeSwitch(Boolean(current), () => commit(true));
     control.append(sw.el);
     read = () => sw.input.checked;
   } else if (def.type === "choice") {
     const select = document.createElement("select");
     for (const opt of def.options) select.add(new Option(opt.label, opt.value));
     select.value = current ?? def.options[0].value;
-    select.addEventListener("change", () => commit());
+    select.addEventListener("change", () => commit(true));
     control.append(select);
     read = () => select.value;
   } else if (def.type === "percent") {
@@ -1588,7 +1592,7 @@ function renderOverride(def, store, onChanged = () => {}) {
     num.max = String(def.max ?? 100);
     num.step = "1";
     num.value = String(current ?? 40);
-    num.addEventListener("change", () => commit());
+    num.addEventListener("change", () => commit(true));
     const suffix = document.createElement("span");
     suffix.className = "field-suffix";
     suffix.textContent = "%";
@@ -1604,7 +1608,7 @@ function renderOverride(def, store, onChanged = () => {}) {
     control.classList.add("override-indicators");
     stacked = true;
     for (const ind of indicators) {
-      const sw = makeSwitch(chosen.has(ind.id), () => commit());
+      const sw = makeSwitch(chosen.has(ind.id), () => commit(true));
       sw.input.value = ind.id;
       sw.input.disabled = !ind.supported();
       const item = document.createElement("label");
@@ -1631,8 +1635,8 @@ function renderOverride(def, store, onChanged = () => {}) {
     ])
       units.add(new Option(label, String(secs)));
     units.value = String(unit);
-    num.addEventListener("change", () => commit());
-    units.addEventListener("change", () => commit());
+    num.addEventListener("change", () => commit(true));
+    units.addEventListener("change", () => commit(true));
     control.append(num, units);
     read = () =>
       Math.max(def.min ?? 1, Math.round(Number(num.value) * Number(units.value)));
@@ -1642,9 +1646,13 @@ function renderOverride(def, store, onChanged = () => {}) {
   wrap.classList.add("override");
   wrap.classList.toggle("is-on", isOn);
   wrap.classList.toggle("is-stacked", stacked);
+  wrap.classList.toggle("is-adopting", Boolean(opts.adopt));
   wrap.dataset.key = def.key;
 
-  const commit = async () => {
+  const commit = async (fromControl = false) => {
+    // `adopt`: touching the value is itself the decision to override, so the
+    // row ticks itself rather than quietly discarding what was just typed.
+    if (fromControl && opts.adopt && !on.checked) on.checked = true;
     const set = { ...store.set };
     if (on.checked) set[def.key] = read();
     else delete set[def.key];
