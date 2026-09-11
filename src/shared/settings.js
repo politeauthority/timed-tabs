@@ -1,5 +1,5 @@
 import { api } from "./browser.js";
-import { DEFAULT_TAB_SORT } from "./tab-sort.js";
+import { DEFAULT_TAB_SORT, TAB_SORTS } from "./tab-sort.js";
 import { DEFAULT_FLAGS, mergeFlags } from "./flags.js";
 
 /**
@@ -215,11 +215,49 @@ export const FIELDS = [
 
 const STORAGE_AREA = "sync";
 
+/**
+ * A stored or imported value for `key`, or undefined when it is not one this
+ * setting can hold: the wrong type, a choice not among the options, a number
+ * outside the field's range. Used for backups and for what storage hands
+ * back, since a value synced from another device or an older build is no
+ * more trustworthy than a pasted file.
+ */
+export function coerceSetting(key, value) {
+  const def = DEFAULTS[key];
+  if (Array.isArray(def)) return Array.isArray(value) && value.every((x) => typeof x === "string") ? value : undefined;
+  // Feature flags: keep the ones this build still declares and drop the rest,
+  // so a backup written either side of a flag being added or retired loads
+  // without a warning and without turning anything unexpected on.
+  if (key === "featureFlags") {
+    return value && typeof value === "object" && !Array.isArray(value) ? mergeFlags(value) : undefined;
+  }
+  if (typeof def === "boolean") return typeof value === "boolean" ? value : undefined;
+  const field = FIELDS.find((f) => f.key === key);
+  if (typeof def === "number") {
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+    const min = field?.min ?? (field?.type === "percent" ? 0 : 1);
+    const max = field?.max ?? (field?.type === "percent" ? 100 : Infinity);
+    return value >= min && value <= max ? value : undefined;
+  }
+  if (typeof def === "string") {
+    if (typeof value !== "string") return undefined;
+    const options = key === "tabSort" ? TAB_SORTS.map((s) => s.id) : field?.options?.map((o) => o.value);
+    return !options || options.includes(value) ? value : undefined;
+  }
+  return undefined;
+}
+
 export async function getSettings() {
   const stored = await api.storage[STORAGE_AREA].get(Object.keys(DEFAULTS));
+  const out = { ...DEFAULTS };
+  for (const [key, value] of Object.entries(stored)) {
+    const v = coerceSetting(key, value);
+    if (v !== undefined) out[key] = v;
+  }
   // Flags merge key by key rather than replacing wholesale: a stored object
   // from an older build would otherwise hide every flag added since.
-  return { ...DEFAULTS, ...stored, featureFlags: mergeFlags(stored.featureFlags) };
+  out.featureFlags = mergeFlags(stored.featureFlags);
+  return out;
 }
 
 export async function saveSettings(partial) {

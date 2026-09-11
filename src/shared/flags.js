@@ -68,7 +68,7 @@ export function mergeFlags(stored) {
 
 /** True when a flag's own switch is on. An id this build does not know is off, not an error. */
 export function flagOn(settings, id) {
-  return settings?.featureFlags?.[id] === true;
+  return FLAGS.some((f) => f.id === id) && settings?.featureFlags?.[id] === true;
 }
 
 /** The flag another flag requires, or null. */

@@ -87,7 +87,7 @@ describe("site groups in backups", () => {
     expect(parsed.groups).toEqual(groups);
     expect(parsed.warnings).toEqual([]);
     const messy = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [], groups: [{ name: "" }, { id: "x", name: "news", patterns: ["a"] }, { name: "NEWS", patterns: [] }, 4] }));
-    expect(parsed.groups.length).toBe(1);
+    expect(messy.groups.length).toBe(1);
     expect(messy.groups.map((g) => g.name)).toEqual(["news"]);
     expect(messy.warnings.length).toBe(3);
   });
@@ -95,5 +95,33 @@ describe("site groups in backups", () => {
     const parsed = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [] }));
     expect(parsed.groups).toEqual([]);
     expect(parsed.warnings).toEqual([]);
+  });
+});
+
+describe("validation on import", () => {
+  it("refuses a choice outside its options and a number outside its range, with a warning each", () => {
+    const { settings, warnings } = parseBundle(JSON.stringify({ timedTabs: 1, settings: { onExpire: "nuke", quietUntilPercent: 500, tabLifetimeSeconds: 600 }, rules: [] }));
+    expect(settings.onExpire).toBeUndefined();
+    expect(settings.quietUntilPercent).toBeUndefined();
+    expect(settings.tabLifetimeSeconds).toBe(600);
+    expect(warnings.length).toBe(2);
+  });
+  it("gives a second rule with the same id a new one", () => {
+    const { rules, warnings } = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [{ id: "a", pattern: "x/*" }, { id: "a", pattern: "y/*" }] }));
+    expect(rules.length).toBe(2);
+    expect(rules[0].id).not.toBe(rules[1].id);
+    expect(warnings.length).toBe(1);
+  });
+  it("keeps only rule fields in a rule's set", () => {
+    const { rules } = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [{ id: "a", pattern: "x/*", set: { tabManagement: false, tickSeconds: 1, tabLifetimeSeconds: 60, neverExpire: true } }] }));
+    expect(rules[0].set).toEqual({ tabLifetimeSeconds: 60, neverExpire: true });
+  });
+  it("gives groups without a usable id one, and separates two that share one", () => {
+    const { groups, warnings } = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [], groups: [{ id: "", name: "a", patterns: [1, null, "ok/*", {}] }, { id: "g", name: "b" }, { id: "g", name: "c" }] }));
+    expect(groups.map((g) => g.name)).toEqual(["a", "b", "c"]);
+    expect(groups[0].id).not.toBe("");
+    expect(groups[0].patterns).toEqual(["ok/*"]);
+    expect(groups[1].id).not.toBe(groups[2].id);
+    expect(warnings.length).toBe(1);
   });
 });
