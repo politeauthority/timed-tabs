@@ -1,0 +1,78 @@
+name: Changed paths
+description: >
+  Whether this change touches anything that could alter a build or test result.
+  Answers "false" only when every changed file is documentation or an asset,
+  so a new kind of file runs the checks rather than silently skipping them.
+
+outputs:
+  code:
+    description: '"true" when the checks should run.'
+    value: ${{ steps.detect.outputs.code }}
+  reason:
+    description: Why, for the job summary.
+    value: ${{ steps.detect.outputs.reason }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect
+      shell: bash
+      env:
+        EVENT: ${{ github.event_name }}
+        BEFORE: ${{ github.event.before }}
+      run: |
+        set -euo pipefail
+
+        say() {
+          echo "code=$1" >> "$GITHUB_OUTPUT"
+          echo "reason=$2" >> "$GITHUB_OUTPUT"
+          echo "$2"
+        }
+
+        # Anything not listed here counts as code. A deny-list fails safe: add a
+        # file type nobody thought about and the checks still run.
+        is_docs() {
+          case "$1" in
+            docs/*|assets/*|*.md|LICENSE|.gitignore|.editorconfig) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+
+        case "$EVENT" in
+          pull_request)
+            # The checkout is the merge ref, so its first parent is the base.
+            range="HEAD^1 HEAD"
+            ;;
+          push)
+            # All zeros on a branch's first push: nothing to compare against.
+            if [ -z "${BEFORE:-}" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              say true "First push on this ref, so nothing to compare against."
+              exit 0
+            fi
+            range="$BEFORE HEAD"
+            ;;
+          *)
+            say true "Triggered by ${EVENT}, which says nothing about what changed."
+            exit 0
+            ;;
+        esac
+
+        if ! files=$(git diff --name-only $range 2>/dev/null); then
+          say true "Could not diff ${range}; running rather than guessing."
+          exit 0
+        fi
+        if [ -z "$files" ]; then
+          say true "No files reported as changed."
+          exit 0
+        fi
+
+        while IFS= read -r f; do
+          [ -n "$f" ] || continue
+          if ! is_docs "$f"; then
+            say true "\`$f\` is not documentation."
+            exit 0
+          fi
+        done <<< "$files"
+
+        count=$(printf '%s\n' "$files" | grep -c . || true)
+        say false "All ${count} changed file(s) are documentation or assets."

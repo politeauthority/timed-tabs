@@ -28,29 +28,59 @@ jobs:
     name: Lint, test & build
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
+      # Full history: the changed-paths action diffs against the base commit.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # This job always runs and always reports. It is a required check, so a
+      # `paths:` filter on the trigger would leave it pending for ever on a
+      # docs-only PR and nothing would be mergeable. Skipping the work while
+      # still answering is the part that is safe.
+      - uses: ./.github/actions/changed-paths
+        id: changed
+
       - uses: actions/setup-node@v7
+        if: steps.changed.outputs.code == 'true'
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - if: steps.changed.outputs.code == 'true'
+        run: npm ci
       - name: Lint
         id: lint
+        if: steps.changed.outputs.code == 'true'
         run: npm run lint
       - name: Test
         id: test
+        if: steps.changed.outputs.code == 'true'
         run: npm test
       - name: Build (firefox + chrome)
         id: build
+        if: steps.changed.outputs.code == 'true'
         run: npm run build
       - name: 📋 Summary
         if: always()
         run: |
+          if [ "${{ steps.changed.outputs.code }}" != "true" ]; then
+            {
+              echo "### ⏭️ 🧪 Lint, test & build skipped"
+              echo ""
+              echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`."
+              echo ""
+              echo "${{ steps.changed.outputs.reason }} Nothing here can change what lint, the tests or the build would say, so they did not run."
+              echo ""
+              echo "The job still reports, because it is a required check."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [ "${{ job.status }}" = "success" ]; then head="### ✅ 🧪 Lint, test & build passed"; else head="### ❌ 🧪 Lint, test & build failed"; fi
           {
             echo "$head"
             echo ""
             echo "> ▶️ **Why this ran:** ${{ github.event_name }} on \`${{ github.ref_name }}\`."
+            echo ""
+            echo "${{ steps.changed.outputs.reason }}"
             echo ""
             echo "🔬 \`npm run lint\`: \`${{ steps.lint.outcome }}\` · 🧪 \`npm test\`: \`${{ steps.test.outcome }}\` · 🏗️ \`npm run build\`: \`${{ steps.build.outcome }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
