@@ -1,5 +1,10 @@
 # Workflow conventions
 
+How workflows, runs and jobs are named here, and which of them may listen for labels.
+For what the pipeline actually does — which checks are required, how a PR is paused,
+the runner, and how a release is cut — see
+[docs/developer/ci/](../../docs/developer/ci/README.md).
+
 ## Naming
 
 Two names appear in the GitHub UI and they answer different questions.

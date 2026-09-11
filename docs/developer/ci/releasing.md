@@ -131,7 +131,7 @@ The first submission is not this job's work. A listing has to exist before the A
 add versions to it, so the first upload is done by hand on the developer hub, along
 with the description, categories and screenshots. That copy lives outside the repo, in
 `docs/personal/amo-listing.md`; the reviewer notes are tracked, in
-[amo-review-notes.md](amo-review-notes.md).
+[amo-review-notes.md](../amo-review-notes.md).
 
 ## 🚧 How a beta happens
 
