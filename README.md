@@ -21,15 +21,6 @@ then red as the clock runs down, and at zero the tab can close itself.
 
 That tab you opened on Tuesday and swore you'd read? It's red now.
 
-## 📦 Install
-
-No store listing yet, and while the project is in development every release is a
-beta. Grab a zip from the newest pre-release under
-[Releases](https://github.com/politeauthority/timed-tabs/releases):
-
-- 🦊 **Firefox 140+** — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
-- 🌐 **Chrome** — unzip `timed-tabs-chrome-*.zip`, then `chrome://extensions` → Developer mode → Load unpacked
-
 ## ✨ What you get
 
 - 🎨 **Four ways to show the time left.** The favicon, a coloured dot in the page
@@ -45,6 +36,15 @@ beta. Grab a zip from the newest pre-release under
 
 The full list, with screenshots, is in the user guide:
 [docs/user-guide/features.md](docs/user-guide/features.md).
+
+## 📦 Install
+
+No store listing yet, and while the project is in development every release is a
+beta. Grab a zip from the newest pre-release under
+[Releases](https://github.com/politeauthority/timed-tabs/releases):
+
+- 🦊 **Firefox 140+** — `timed-tabs-firefox-*.zip`, then `about:debugging` → This Firefox → Load Temporary Add-on
+- 🌐 **Chrome** — unzip `timed-tabs-chrome-*.zip`, then `chrome://extensions` → Developer mode → Load unpacked
 
 ### 🚧 Betas
 
