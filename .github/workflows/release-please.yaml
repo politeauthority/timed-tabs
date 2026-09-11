@@ -207,11 +207,16 @@ jobs:
     permissions:
       contents: write        # gh release upload
     steps:
+      # Same order as the beta job: gh from this ref, then the tag to package.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions/gh-cli
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/gh-cli
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
           fetch-depth: 0
-      - uses: ./.github/actions/gh-cli
       - uses: actions/setup-node@v7
         with:
           node-version: 22
