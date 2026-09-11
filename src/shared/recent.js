@@ -4,6 +4,20 @@
  */
 
 /**
+ * A tab whose address and title must not outlive its window.
+ *
+ * Browsers do not run extensions in private windows unless the user allows it,
+ * but once allowed, a private tab arrives at expiry looking like any other. It
+ * is expired and closed the same way; what must not happen is a record of it
+ * being written to disk, or its title being read out in a desktop notification
+ * that the operating system keeps in its own history. Both outlive the private
+ * session, which is the one thing the session promised.
+ */
+export function isPrivateTab(tab) {
+  return tab?.incognito === true;
+}
+
+/**
  * The icon to remember for a closed tab. Our favicon indicator swaps the tab's
  * icon for a painted data: URL, so that one is never kept. Prefer what the
  * content script reported as the page's own icon, then the browser's plain
@@ -41,4 +55,29 @@ export function groupRecent(list) {
     }
   }
   return [...groups.values()];
+}
+
+/**
+ * The row to remember for a tab we just closed, or `null` when there must not
+ * be one.
+ *
+ * The decision lives here, next to the predicate it depends on, so that "a
+ * private tab is never written down" is a pure function with a test rather
+ * than a line of the background script nothing exercises.
+ */
+export function recordFor(tab, action, now = Date.now()) {
+  if (isPrivateTab(tab)) return null;
+  return {
+    id: `${tab.id}-${now}`,
+    tabId: tab.id,
+    title: tab.title || tab.url || "",
+    url: tab.url ?? "",
+    favIconUrl: iconForRecord({
+      url: tab.url,
+      favIconUrl: tab.favIconUrl,
+      originalIcon: tab.originalIcon,
+    }),
+    expiredAt: now,
+    action,
+  };
 }

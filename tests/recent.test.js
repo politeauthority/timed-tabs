@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupRecent, iconForRecord } from "../src/shared/recent.js";
+import { groupRecent, iconForRecord, isPrivateTab, recordFor } from "../src/shared/recent.js";
 
 describe("iconForRecord", () => {
   it("prefers the page's own icon over the browser's and never a painted data: URL", () => {
@@ -25,5 +25,60 @@ describe("groupRecent", () => {
   it("handles an empty list", () => {
     expect(groupRecent([])).toEqual([]);
     expect(groupRecent(undefined)).toEqual([]);
+  });
+});
+
+describe("isPrivateTab", () => {
+  it("is true only for a tab the browser marks incognito", () => {
+    expect(isPrivateTab({ incognito: true })).toBe(true);
+    expect(isPrivateTab({ incognito: false })).toBe(false);
+  });
+
+  it("treats a tab that says nothing as ordinary", () => {
+    // tabs.query fills `incognito` in, but a tab rebuilt from stored state or
+    // handed in by a test may not have it. Guessing "private" there would
+    // silently stop recording every tab.
+    expect(isPrivateTab({})).toBe(false);
+    expect(isPrivateTab(undefined)).toBe(false);
+    expect(isPrivateTab(null)).toBe(false);
+  });
+
+  it("does not take a truthy value for the flag", () => {
+    expect(isPrivateTab({ incognito: "yes" })).toBe(false);
+    expect(isPrivateTab({ incognito: 1 })).toBe(false);
+  });
+});
+
+describe("recordFor", () => {
+  const tab = {
+    id: 7,
+    title: "Reddit",
+    url: "https://reddit.com/r/all",
+    favIconUrl: "https://reddit.com/favicon.ico",
+  };
+
+  it("remembers enough to put an ordinary tab back", () => {
+    expect(recordFor(tab, "close", 1000)).toEqual({
+      id: "7-1000",
+      tabId: 7,
+      title: "Reddit",
+      url: "https://reddit.com/r/all",
+      favIconUrl: "https://reddit.com/favicon.ico",
+      expiredAt: 1000,
+      action: "close",
+    });
+  });
+
+  it("writes nothing down for a tab from a private window", () => {
+    expect(recordFor({ ...tab, incognito: true }, "close", 1000)).toBeNull();
+  });
+
+  it("falls back to the address when a tab has no title", () => {
+    expect(recordFor({ ...tab, title: "" }, "close", 1000).title).toBe("https://reddit.com/r/all");
+  });
+
+  it("stamps the id and the time from the same clock reading", () => {
+    const row = recordFor(tab, "close", 4242);
+    expect(row.id.endsWith(String(row.expiredAt))).toBe(true);
   });
 });
