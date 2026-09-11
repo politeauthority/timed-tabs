@@ -31,6 +31,7 @@ concurrency:
 jobs:
   lint-test:
     name: Lint, test & build
+    timeout-minutes: 15
     runs-on: timed-tabs   # self-hosted ARC scale set (private-ops arc/runners/values-timed-tabs.yaml)
     steps:
       # Full history: the changed-paths action diffs against the base commit.
