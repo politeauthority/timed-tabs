@@ -98,6 +98,12 @@ body {
 
 body[data-context="popup"] {
   width: 320px;
+  /* Once the popup is tall enough for a vertical scrollbar, Firefox lays that
+     scrollbar inside the 320px viewport and leaves about 305px. A rigid 320px
+     body is then wider than the window it sits in, which is a horizontal
+     scrollbar. Letting it give way those few pixels costs nothing and stops
+     the bar appearing whenever the panel grows. */
+  max-width: 100%;
 }
 
 body[data-context="options"] #app {
@@ -573,6 +579,7 @@ body:not([data-context="popup"]) .pages {
 
 body[data-context="popup"] .mini-foot {
   display: flex;
+  justify-content: flex-end;
 }
 
 /* Pages: the page and preferences views show one page at a time. */
@@ -1717,8 +1724,8 @@ body[data-context="page"] .version {
 .version-mini {
   flex: none;
   align-self: center;
-  margin-left: auto;
   padding: 0 var(--sp-1);
+  font-size: var(--fs-xs);
 }
 
 /* Link to the repository: an icon in the popup footer, a line at the foot of the page view. */
@@ -1735,17 +1742,6 @@ body[data-context="page"] .version {
   text-decoration: underline;
 }
 
-.repo-link-mini {
-  flex: none;
-  align-self: center;
-  padding: 6px;
-  border-radius: var(--r-control);
-}
-
-.repo-link-mini:hover {
-  background: var(--control);
-  text-decoration: none;
-}
 
 .page-foot {
   display: flex;
