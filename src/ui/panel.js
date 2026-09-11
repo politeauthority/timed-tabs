@@ -596,8 +596,15 @@ const DEPENDENT_SETTINGS = new Set([
 ]);
 
 /** Whether a setting is doing something, and so belongs in the short list. */
+/**
+ * Always in the short list, whatever they are set to. How long this tab has
+ * and whether looking at it starts that over are the two questions the popup
+ * exists to answer, so neither should need "Show more" to reach.
+ */
+const ALWAYS_SHOWN = new Set(["tabLifetimeSeconds", "resetOnActivate"]);
+
 function isSettingActive(key, value) {
-  if (key === "tabLifetimeSeconds") return true;
+  if (ALWAYS_SHOWN.has(key)) return true;
   if (DEPENDENT_SETTINGS.has(key)) return false;
   if (key === "onExpire") return value !== "none";
   if (key === "indicators") {
