@@ -3,7 +3,8 @@
  * indicators together. Keep this file thin; logic lives in the modules.
  */
 import { api, withTimeout } from "../shared/browser.js";
-import { watchRules, watchSettings } from "../shared/settings.js";
+import { watchGroups, watchRules, watchSettings } from "../shared/settings.js";
+import { flagOn } from "../shared/flags.js";
 import { RULE_FIELDS, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
 import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
@@ -30,6 +31,9 @@ const notifier = createNotifier();
 notifier.start();
 let settings = null;
 let rules = [];
+let groups = [];
+/** Site groups only take part while their feature flag is on; off, group rules match nothing. */
+const activeGroups = () => (flagOn(settings, "site-groups") ? groups : []);
 let active = [];
 const expired = new Set();
 const diag = { ticks: 0, lastTick: null, lastError: null, lastSnapshot: [] };
@@ -82,6 +86,7 @@ if (IS_DEV_BUILD) {
     .then(async (dev) => {
       if (dev.settings) await api.storage.sync.set(dev.settings);
       if (dev.rules) await api.storage.local.set({ rules: dev.rules });
+      if (dev.groups) await api.storage.local.set({ siteGroups: dev.groups });
       for (const urls of dev.openWindows ?? []) await api.windows.create({ url: urls }).catch(() => {});
       await Promise.all((dev.openUrls ?? []).map((u) => api.tabs.create({ url: api.runtime.getURL(u) })));
       // "captureAfterMs": render the active tab via the browser (works even
@@ -157,6 +162,15 @@ watchRules(async (next) => {
   await tick();
 });
 
+// A group edit can change which tabs a rule matches, exactly like a rule edit.
+watchGroups(async (next) => {
+  groups = next;
+  if (!settings) return;
+  await ready;
+  await applyPauseSetting();
+  await tick();
+});
+
 /**
  * Start every indicator any tab could need (globals and every enabled rule)
  * and stop the rest. Which of them paint a given tab is decided per tab in tick().
@@ -174,9 +188,9 @@ function settingsFor(tab, tabState) {
   const url = tab.url ?? "";
   const ignoredIds = new Set(tabState?.ignoredRules ?? []);
   const active = tabState?.ignoreRules ? [] : rules.filter((r) => !ignoredIds.has(r.id));
-  const eff = effectiveSettings(settings, active, url);
+  const eff = effectiveSettings(settings, active, url, activeGroups());
   // Everything that would match if nothing were ignored, for the UI.
-  eff.allMatched = effectiveSettings(settings, rules, url).matched;
+  eff.allMatched = effectiveSettings(settings, rules, url, activeGroups()).matched;
   eff.ignoredIds = ignoredIds;
   if (tabState?.resetOnActivate !== null && tabState?.resetOnActivate !== undefined) {
     eff.resetOnActivate = tabState.resetOnActivate;

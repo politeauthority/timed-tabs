@@ -13,7 +13,13 @@
  * Matching: a pattern containing "://" is matched against the full URL;
  * otherwise the URL's scheme is stripped first, so "github.com/*" works.
  * Wildcard "*" matches any run of characters; matching is case-insensitive.
+ *
+ * A pattern of "@<name>" targets a site group (see groups.js): the rule
+ * matches when any pattern in that group matches. Callers pass the groups in
+ * force; with none, a group rule matches nothing, which is how the
+ * site-groups feature flag switches such rules off.
  */
+import { groupForRule, isGroupRef } from "./groups.js";
 
 /** Timer settings a rule may override, in display order. */
 export const RULE_TIMING_FIELDS = ["tabLifetimeSeconds", "onExpire", "resetOnActivate", "pauseWhileActive", "neverExpire"];
@@ -111,12 +117,20 @@ function subject(pattern, url) {
   return url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
 }
 
-export function matchesRule(rule, url) {
+export function matchesRule(rule, url, groups = []) {
   if (!rule?.pattern || typeof url !== "string") return false;
-  const pattern = rule.pattern.trim().toLowerCase();
+  if (isGroupRef(rule.pattern)) {
+    const group = groupForRule(rule, groups);
+    return Boolean(group) && group.patterns.some((p) => matchesPattern(p, "wildcard", url));
+  }
+  return matchesPattern(rule.pattern, rule.match, url);
+}
+
+function matchesPattern(rawPattern, match, url) {
+  const pattern = String(rawPattern ?? "").trim().toLowerCase();
   if (!pattern) return false;
   const target = subject(pattern, url).toLowerCase();
-  if (rule.match === "prefix") return target.startsWith(pattern);
+  if (match === "prefix") return target.startsWith(pattern);
   return wildcardToRegExp(pattern).test(target);
 }
 
@@ -132,10 +146,10 @@ export function wildcardToRegExp(pattern) {
 }
 
 /** Enabled rules that match, lowest priority first (later wins on ties). */
-export function applicableRules(rules, url) {
+export function applicableRules(rules, url, groups = []) {
   return (rules ?? [])
     .map((rule, index) => ({ rule, index }))
-    .filter(({ rule }) => rule.priority > 0 && matchesRule(rule, url))
+    .filter(({ rule }) => rule.priority > 0 && matchesRule(rule, url, groups))
     .sort((a, b) => a.rule.priority - b.rule.priority || a.index - b.index)
     .map(({ rule }) => rule);
 }
@@ -157,8 +171,8 @@ export function wantedIndicatorIds(settings, rules) {
  * Global settings with matching rules layered on top, per field.
  * Returns { ...values, matched: [rule, ...] } where matched is highest priority last.
  */
-export function effectiveSettings(settings, rules, url) {
-  const matched = applicableRules(rules, url);
+export function effectiveSettings(settings, rules, url, groups = []) {
+  const matched = applicableRules(rules, url, groups);
   const out = {};
   for (const key of RULE_FIELDS) out[key] = settings[key] ?? (key === "neverExpire" ? false : undefined);
   for (const rule of matched) applyOverrides(out, rule.set);

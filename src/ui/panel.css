@@ -1368,6 +1368,45 @@ body:not([data-context="popup"]) .field {
   gap: var(--sp-5);
 }
 
+/* Site groups: cards like rules, with a name in the head and the patterns below. */
+.site-groups {
+  margin-top: var(--sp-5);
+}
+
+.group-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.group-patterns {
+  width: 100%;
+  min-height: 5em;
+  margin: 0 0 var(--sp-2);
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.group-meta {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+/* A rule's target: an address pattern, or one of the site groups. */
+.rule-target {
+  flex: none;
+  max-width: 40%;
+}
+
+.rule-group-note {
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
 .rule {
   padding: var(--sp-1) var(--gutter) 6px;
   border: 1px solid var(--line);

@@ -20,6 +20,12 @@ export const FLAGS = [
     help: "Turn on parts of Timed Tabs that are still settling down. Right now: the Page settings section in the popup, which lists every setting in force on the page and lets this tab take any of them over.",
     default: false,
   },
+  {
+    id: "site-groups",
+    label: "Site groups",
+    help: "Name a list of sites once and point rules at it: a \"news\" group can hold every news site, and one rule covers them all. Adds a Site groups section to the Rules page. While this is off, rules that target a group match nothing.",
+    default: false,
+  },
 ];
 
 /** The shape a fresh profile starts with. */

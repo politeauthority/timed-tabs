@@ -45,7 +45,7 @@ describe("feature flags in a backup", () => {
   it("round-trips a flag that is on", () => {
     const text = exportText({ ...DEFAULTS, featureFlags: { "beta-features": true } }, []);
     const { settings, warnings } = parseBundle(text);
-    expect(settings.featureFlags).toEqual({ "beta-features": true });
+    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false });
     expect(warnings).toEqual([]);
   });
 
@@ -56,7 +56,7 @@ describe("feature flags in a backup", () => {
       rules: [],
     });
     const { settings, warnings } = parseBundle(text);
-    expect(settings.featureFlags).toEqual({ "beta-features": true });
+    expect(settings.featureFlags).toEqual({ "beta-features": true, "site-groups": false });
     expect(warnings).toEqual([]);
   });
 
@@ -75,5 +75,24 @@ describe("feature flags in a backup", () => {
       expect(settings.featureFlags).toBeUndefined();
       expect(warnings.length).toBe(1);
     }
+  });
+});
+
+describe("site groups in backups", () => {
+  it("round-trips groups and drops bad ones with a warning", () => {
+    const groups = [{ id: "g1", name: "news", patterns: ["a.com/*", "b.com/*"] }];
+    const text = exportText({ ...DEFAULTS }, [], groups);
+    const parsed = parseBundle(text);
+    expect(parsed.groups).toEqual(groups);
+    expect(parsed.warnings).toEqual([]);
+    const messy = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [], groups: [{ name: "" }, { id: "x", name: "news", patterns: ["a"] }, { name: "NEWS", patterns: [] }, 4] }));
+    expect(parsed.groups.length).toBe(1);
+    expect(messy.groups.map((g) => g.name)).toEqual(["news"]);
+    expect(messy.warnings.length).toBe(3);
+  });
+  it("takes a backup written before groups existed", () => {
+    const parsed = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [] }));
+    expect(parsed.groups).toEqual([]);
+    expect(parsed.warnings).toEqual([]);
   });
 });

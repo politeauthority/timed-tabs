@@ -2,26 +2,38 @@
  * Export/import of every user setting as one JSON document.
  * Pure: storage is handled by the caller.
  *
- * { "timedTabs": 1, "settings": { ...DEFAULTS keys... }, "rules": [ ...rules ] }
+ * { "timedTabs": 1, "settings": { ...DEFAULTS keys... }, "rules": [ ...rules ], "groups": [ ...site groups ] }
+ * "groups" is optional: backups written before site groups existed load as before.
  */
 import { DEFAULTS } from "./settings.js";
 import { clampPriority, newRule } from "./rules.js";
+import { newGroup } from "./groups.js";
 import { mergeFlags } from "./flags.js";
 
 export const FORMAT_VERSION = 1;
 
-export function exportBundle(settings, rules) {
+export function exportBundle(settings, rules, groups = []) {
   const out = {};
   for (const key of Object.keys(DEFAULTS)) out[key] = settings[key] ?? DEFAULTS[key];
-  return { timedTabs: FORMAT_VERSION, settings: out, rules: (rules ?? []).map(cleanRule) };
+  return {
+    timedTabs: FORMAT_VERSION,
+    settings: out,
+    rules: (rules ?? []).map(cleanRule),
+    groups: (groups ?? []).map(cleanGroup),
+  };
 }
 
-export function exportText(settings, rules) {
-  return JSON.stringify(exportBundle(settings, rules), null, 2) + "\n";
+export function exportText(settings, rules, groups = []) {
+  return JSON.stringify(exportBundle(settings, rules, groups), null, 2) + "\n";
+}
+
+function cleanGroup(g) {
+  const { id, name, patterns } = newGroup(g);
+  return { id, name, patterns };
 }
 
 /**
- * Parse and validate a backup. Returns { settings, rules, warnings }.
+ * Parse and validate a backup. Returns { settings, rules, groups, warnings }.
  * Unknown settings are dropped with a warning; wrong types fall back to the
  * default with a warning. Throws only when the text is not a backup at all.
  */
@@ -64,7 +76,25 @@ export function parseBundle(text) {
       }
     }
   }
-  return { settings, rules, warnings };
+  const groups = [];
+  if (data.groups !== undefined) {
+    if (!Array.isArray(data.groups)) warnings.push("Site groups were not a list and were ignored.");
+    else {
+      for (const g of data.groups) {
+        const clean = g && typeof g === "object" ? cleanGroup(g) : null;
+        if (!clean?.name) {
+          warnings.push("Skipped a site group without a name.");
+          continue;
+        }
+        if (groups.some((x) => x.name.toLowerCase() === clean.name.toLowerCase())) {
+          warnings.push(`Skipped a second site group named "${clean.name}".`);
+          continue;
+        }
+        groups.push(clean);
+      }
+    }
+  }
+  return { settings, rules, groups, warnings };
 }
 
 function coerce(key, value) {
