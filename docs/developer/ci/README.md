@@ -35,18 +35,21 @@ Five contexts are required on `main`:
 ```
 Lint, test & build
 Not paused
-E2E / Firefox latest
+E2E / Firefox stable
 E2E / Firefox previous
 CI run full
 ```
 
-`E2E / Chrome stable` exists but is not among them: it runs only on the
-`feat/chrome-e2e` branch while Chrome is being proven on the runner, and is
-advisory there. `ci.yaml` is the one caller that switches it on, via `e2e.yaml`'s
-`chrome` input; the full run and the beta call the same workflow and stay
-Firefox-only. When it is reliably green it becomes a sixth required context, which
-means adding it both here and to the `gh api` call below in the same change that
-drops the branch condition in `ci.yaml`.
+`E2E / Chrome stable` runs on every PR and push beside the two Firefoxes but is not
+among them: it is advisory until it has been reliably green for a while, at which
+point it becomes a sixth required context by adding it here and to the `gh api` call
+below. Nothing in the workflows needs to change for that.
+
+CI's three E2E legs stand down on a PR to `main` that carries the `ci run full`
+label, because the full run below tests those same versions and more, and the
+`CI run full` status holds the merge until it has. A skipped required check reads as
+a pass, which is safe here only because the status is the thing actually holding the
+door. The legs still run on every push to `main`, where there is no full run.
 
 `Not paused` was missing from that list for a while, and the gap is worth
 remembering: the job ran on every PR, went red on every paused one, and held up
@@ -58,7 +61,7 @@ Job names are the status-check contexts branch protection matches on, so **renam
 job silently stops its check being required** — branch protection goes on waiting for
 a name nothing reports. The E2E contexts are doubly brittle: a called workflow's jobs
 are prefixed with the calling job's name, and a matrix job's name carries its matrix
-values, so `E2E / Firefox latest` breaks if `jobs.e2e` in `ci.yaml` is renamed, if the
+values, so `E2E / Firefox stable` breaks if `jobs.e2e` in `ci.yaml` is renamed, if the
 leg is renamed, or if the matrix changes shape.
 
 Update protection in the same change that renames anything. `CI run full` is the odd
@@ -71,7 +74,7 @@ gh api -X PATCH repos/politeauthority/timed-tabs/branches/main/protection/requir
 {"strict": false,
  "checks": [{"context": "Lint, test & build", "app_id": 15368},
             {"context": "Not paused", "app_id": 15368},
-            {"context": "E2E / Firefox latest", "app_id": 15368},
+            {"context": "E2E / Firefox stable", "app_id": 15368},
             {"context": "E2E / Firefox previous", "app_id": 15368},
             {"context": "CI run full", "app_id": -1}]}
 JSON
@@ -102,22 +105,23 @@ so it is enforced by a required status, **CI run full**, that `full.yaml` posts 
 head commit. The label is a merge requirement, not a test, so a missing one is not a
 failure: the status sits at *pending*, the merge box says "Waiting" and stays locked,
 and nothing on the PR is red for a label nobody has had a reason to add yet. With the
-label on, the E2E scenarios run on the last four Firefox releases — the current one and
-the three majors before it, each resolved from Mozilla's feed the way `E2E` resolves its
-two — and the status goes green once all four have passed. Take the label off and it
-goes back to pending. It is red only when the Firefoxes actually fail.
+label on, the E2E scenarios run on the standard set in both browsers — `nightly`,
+`stable`, `previous` and `previous-2`, each resolved from the browser's own feed the way
+`E2E` resolves its legs — and the status goes green once stable and the two before it
+have passed in both. Each browser is its own segment of the gate's summary with its
+own table and verdict, and the status description names them: "Firefox: passed;
+Chrome: previous-2 failed". Nightly is Firefox Nightly and Chrome Canary, the daily
+builds: they run and are shown in their segment, and a nightly failure is flagged
+there, but it never holds the merge in either browser. Take the label off and the
+status goes back to pending. It is red only when a leg that counts actually fails.
 
-The four legs report as `Full / Firefox latest`, `Full / Firefox previous`,
-`Full / Firefox previous-2` and `previous-3`. On the `feat/chrome-e2e` branch four
-Chrome legs run beside them — `Full / Chrome stable` through `Chrome previous-3`, the
-same majors-back idea read from the Chrome for Testing feed — while Chrome is being
-proven on the runner; every other branch's full run is Firefox-only. None of them is
-required on its own, and
-neither is the `Full run gate` job that posts the status; only the status is, so
-adding or dropping a leg does not touch branch protection.
+The eight legs report as `Full / Firefox nightly` through `Full / Firefox previous-2`
+and `Full / Chrome nightly` through `Full / Chrome previous-2`. None of them is required
+on its own, and neither is the `Full run gate` job that posts the status; only the
+status is, so adding or dropping a leg does not touch branch protection.
 
-The gate's summary is the place to read the result: one table with every leg, the
-Firefox version it resolved to, how many scenarios passed, the scenario time and the
+The gate's summary is the place to read the result: a table per browser with every
+leg, the version it resolved to, how many scenarios passed, the scenario time and the
 job's wall time. A green leg says nothing more than its row. A failed leg gets its
 scenario table and what missed, under the main table and in its own job summary.
 Each leg uploads a small `e2e-leg-<leg>` artifact for this; the gate reads them from
@@ -128,8 +132,8 @@ the PR, so a PR told to merge itself is never left waiting on a label nobody add
 Auto-merge adds it with the `PAT` secret: a label added by `GITHUB_TOKEN` wakes no
 workflow, and the full run would only start on the next push.
 
-Four Firefoxes are four runner jobs, so the workflow is careful about how and when they
-run. Two legs at a time: an earlier ten at once starved one another on the runner node
+Eight browsers are eight runner jobs, so the workflow is careful about how and when they
+run. Three legs at a time: an earlier ten at once starved one another on the runner node
 until three of them saw a single tick in a scenario's whole window and failed on
 timing alone. A later event on a commit that already passed — a review, another label —
 reuses that result instead of running again: "passed" meaning an earlier run's `Full /`

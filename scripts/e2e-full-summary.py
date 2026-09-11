@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""One table for every Firefox leg of a full E2E run.
+"""One table per browser for the legs of a full E2E run.
 
 Each leg of e2e.yaml uploads an `e2e-leg-<leg>` artifact holding `leg.json`:
 which Firefox it resolved, how the scenarios went, and their results. The gate
-job in full.yaml downloads them all and calls this to write its summary: one row
-per leg with the version, the scenario time, the job's wall time and the result,
-then the scenario table only for the legs that failed. A green leg has nothing
-to say beyond its row.
+job in full.yaml downloads them all and calls this to write its summary: a
+segment per browser, one row per leg with the version, the scenario time, the
+job's wall time and the result, then the scenario table only for the legs that
+failed. A green leg has nothing to say beyond its row. Each segment's verdict
+goes to stderr, one line per browser, and the exit code is 3 when a leg that
+counts failed in either; nightly never counts.
 
 Usage: e2e-full-summary.py <legs dir> <jobs.json>
   <legs dir>  one subdirectory per artifact, each holding leg.json
@@ -31,11 +33,19 @@ def clock(seconds):
 
 
 def leg_order(leg):
-    """latest/stable, previous, previous-2, previous-3 ... in that order."""
+    """nightly, stable, previous, previous-2 ... in that order."""
+    if leg == "nightly":
+        return -1
     if leg in ("latest", "stable"):
         return 0
     m = re.fullmatch(r"previous(?:-(\d+))?", leg)
     return int(m.group(1) or 1) if m else 99
+
+
+def counts(record):
+    """Whether a leg holds the merge. Nightly is a daily build: worth watching,
+    not worth blocking on, so it is reported, flagged, and then ignored."""
+    return record.get("leg") != "nightly"
 
 
 def leg_name(record):
@@ -84,39 +94,64 @@ def main():
 
     out = []
     if not records:
-        out.append("_No leg records were uploaded; see the leg jobs on this run._")
+        out.append("_No leg records were uploaded; see the browser jobs on this run._")
         print("\n".join(out))
-        return 0
+        print("no leg records", file=sys.stderr)
+        return 2
 
-    passed = sum(1 for r in records if r["outcome"] == "success")
-    versions = [r["version"] for r in records if r["version"]]
-    # A span only reads as one when every leg is the same browser.
-    one_browser = len({browser_order(r) for r in records}) == 1
-    span = f" ({versions[-1]} → {versions[0]})" if len(versions) > 1 and one_browser else ""
-    out.append(f"**{passed}/{len(records)} legs passed**{span}.\n")
-    out.append("| Leg | Version | Scenarios | Scenario time | Job time | Result |")
-    out.append("|---|---|--:|--:|--:|---|")
-    for r in records:
-        name = leg_name(r)
-        job = jobs.get(name, {})
-        url = job.get("url") or ""
-        leg = f"[`{name}`]({url})" if url else f"`{name}`"
-        scenarios = r.get("scenarios") or []
-        if r.get("skipped"):
-            count, secs = "—", "—"
+    # One segment per browser, each with its own table and its own verdict.
+    # Nightly is advisory in both: shown, flagged when it fails, never counted.
+    any_required_failed = False
+    for browser in ("firefox", "chrome"):
+        segment = [r for r in records if r.get("browser", "firefox") == browser]
+        if not segment:
+            continue
+        label = "Firefox" if browser == "firefox" else "Chrome"
+        emoji = "🦊" if browser == "firefox" else "🌐"
+        passed = sum(1 for r in segment if r["outcome"] == "success")
+        required_failed = [r for r in segment if counts(r) and r["outcome"] != "success"]
+        advisory_failed = [r for r in segment if not counts(r) and r["outcome"] != "success"]
+        any_required_failed = any_required_failed or bool(required_failed)
+
+        if required_failed:
+            verdict = f"{label}: {', '.join(r['leg'] for r in required_failed)} failed"
+        elif advisory_failed:
+            verdict = f"{label}: passed, nightly did not"
         else:
-            count = f"{sum(1 for s in scenarios if s['ok'])}/{len(scenarios)}" if scenarios else "—"
-            secs = clock(sum(s["seconds"] for s in scenarios)) if scenarios else "—"
-        seconds = wall(job)
-        result = f"{ICON.get(r['outcome'], '❓')} {r['outcome']}"
-        if r.get("skipped"):
-            result = f"⏭️ skipped: {r['skipped']}"
-        out.append(
-            f"| {leg} | {r['version'] or '—'} | {count} | {secs} "
-            f"| {clock(seconds) if seconds is not None else '—'} | {result} |"
-        )
+            verdict = f"{label}: passed"
+        print(verdict, file=sys.stderr)
 
-    # Only the legs that failed get their scenario table. Four green tables say
+        out.append(f"#### {emoji} {label} — {'❌' if required_failed else '✅'} {passed}/{len(segment)} legs passed\n")
+        if advisory_failed:
+            names = ", ".join(f"`{leg_name(r)}`" for r in advisory_failed)
+            out.append(f"⚠️ {names} did not pass. Nightly is a daily build and advisory: "
+                       "it is shown here and does not hold the merge.\n")
+        out.append("| Leg | Version | Scenarios | Scenario time | Job time | Result |")
+        out.append("|---|---|--:|--:|--:|---|")
+        for r in segment:
+            name = leg_name(r)
+            job = jobs.get(name, {})
+            url = job.get("url") or ""
+            leg = f"[`{name}`]({url})" if url else f"`{name}`"
+            scenarios = r.get("scenarios") or []
+            if r.get("skipped"):
+                count, secs = "—", "—"
+            else:
+                count = f"{sum(1 for s in scenarios if s['ok'])}/{len(scenarios)}" if scenarios else "—"
+                secs = clock(sum(s["seconds"] for s in scenarios)) if scenarios else "—"
+            seconds = wall(job)
+            result = f"{ICON.get(r['outcome'], '❓')} {r['outcome']}"
+            if r.get("skipped"):
+                result = f"⏭️ skipped: {r['skipped']}"
+            elif not counts(r) and r["outcome"] != "success":
+                result += " (advisory)"
+            out.append(
+                f"| {leg} | {r['version'] or '—'} | {count} | {secs} "
+                f"| {clock(seconds) if seconds is not None else '—'} | {result} |"
+            )
+        out.append("")
+
+    # Only the legs that failed get their scenario table. Eight green tables say
     # nothing a row has not already said.
     for r in records:
         if r["outcome"] == "success" or not r.get("scenarios"):
@@ -127,7 +162,8 @@ def main():
         out.append("\n</details>")
 
     print("\n".join(out))
-    return 0
+    # 3, not 1: a 1 would look like the script itself falling over.
+    return 3 if any_required_failed else 0
 
 
 if __name__ == "__main__":
