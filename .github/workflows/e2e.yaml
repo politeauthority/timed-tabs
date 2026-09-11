@@ -401,14 +401,19 @@ jobs:
           want = os.environ["WANT"]
           url = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json"
           with urllib.request.urlopen(url, timeout=30) as r:
-              stable = json.load(r)["channels"]["Stable"]["version"]
+              channels = json.load(r)["channels"]
+          stable = channels["Stable"]["version"]
           major = int(stable.split(".")[0])
           if want == "stable":
               print(stable)
               sys.exit(0)
-          # Chrome's daily build is Canary; setup-chrome takes the channel name.
+          # Chrome's daily build is Canary. Not by channel name: setup-chrome
+          # installs a named channel from Google's .deb feeds, and there is no
+          # Linux Canary there ("Chrome canary not supported for platform linux").
+          # Chrome for Testing does build Canary for Linux, so hand setup-chrome
+          # today's Canary number and it fetches that build instead.
           if want == "nightly":
-              print("canary")
+              print(channels["Canary"]["version"])
               sys.exit(0)
           m = re.fullmatch(r"previous(?:-([1-9]\d*))?", want)
           if not m:
