@@ -155,8 +155,13 @@ if (IS_DEV_BUILD) {
     .then((r) => r.json())
     .then(async (dev) => {
       if (dev.settings) await api.storage.sync.set(dev.settings);
-      if (dev.rules) await api.storage.local.set({ rules: dev.rules });
-      if (dev.groups) await api.storage.local.set({ siteGroups: dev.groups });
+      // Rules and groups in one write, so they land as one change rather than
+      // two: between two, a tab could be looked at with the rules in and the
+      // groups not, and a group rule is inert without its group.
+      const local = {};
+      if (dev.rules) local.rules = dev.rules;
+      if (dev.groups) local.siteGroups = dev.groups;
+      if (Object.keys(local).length) await api.storage.local.set(local);
       // A tally to start from, so a scenario can check what the panel makes of
       // one without having to live through a fortnight first. The in-memory
       // copy is set too: the first tick may already have loaded and cached an
@@ -165,6 +170,24 @@ if (IS_DEV_BUILD) {
         stats = dev.stats;
         await api.storage.local.set({ [STATS_KEY]: stats });
       }
+      // A resolved set() means the write landed, not that this background has
+      // taken it in: that happens three hops later, when onChanged fires, the
+      // watcher reads the area back, and the queued handler assigns it. Open a
+      // window before then and its tabs get their first look from the old
+      // state -- on a loaded Chrome that was a `square` logged for a tab whose
+      // rule says `dot`, one line before the right answer. So wait for the
+      // module's own variables to show the seed, then drain the queue so the
+      // handlers those changes started have finished too. Bounded: a seed that
+      // never shows up is logged and the scenario goes on, rather than hanging.
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      const absorbed = () =>
+        Object.entries(dev.settings ?? {}).every(([k, v]) => same(settings?.[k], v)) &&
+        (!dev.rules || same(rules, dev.rules)) &&
+        (!dev.groups || same(groups, dev.groups));
+      const deadline = Date.now() + 10_000;
+      while (!absorbed() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 25));
+      if (!absorbed()) console.log("[timed-tabs] dev: seed not absorbed after 10s; opening windows anyway");
+      await serial(async () => {});
       for (const urls of dev.openWindows ?? []) await api.windows.create({ url: urls }).catch(() => {});
       await Promise.all((dev.openUrls ?? []).map((u) => api.tabs.create({ url: api.runtime.getURL(u) })));
       // "navigate": [{ "at": ms, "from": url, "to": url }] sends the tab that is
