@@ -104,7 +104,12 @@ lines the scenarios rely on, all prefixed `[timed-tabs]`, are:
   equals the defaults prints no new line when it navigates, so expect a `look` line
   only where a rule changes something.
 - `expired <tabId> <url> action=<close|discard|reload|none>` when a tab runs out.
+  A tab prints this again when the action changes under it, because the new action
+  has yet to be taken -- `action=none` then `action=close` is one tab, not two.
 - `recorded <url> icon=<yes|no>` when a closed tab is added to Recently expired.
+- `closed <tabId> <url>` once the tab is really gone. `expired action=close` says only
+  that we set out to close it, and `recorded` is written before the tab goes, so this
+  is the line to assert when the question is whether the tab survived.
 - `navigated <tabId> <url>` after a `navigate` entry in the scenario moved a tab.
 - `painted <tabId> <key>` when the toolbar button's icon changes, where the key is
   the mark and its fill — `running:<n>`, `face-running:<n>`, `face-paused:<n>`,
@@ -114,8 +119,10 @@ lines the scenarios rely on, all prefixed `[timed-tabs]`, are:
   `captureVisibleTab` cannot photograph it.
 - `CAPTURE <i>/<n> <data>` chunks of the screenshot, which the runner reassembles.
 
-Two `dev.json` keys exist for scenarios: `navigate` sends the tab that is on one
-address to another at a given time, and `groups` seeds site groups.
+Three `dev.json` keys exist for scenarios: `navigate` sends the tab that is on one
+address to another at a given time, `uiActions` clicks or sets a control in an opened
+extension page (`{"at": 12000, "set": "#f-onExpire", "value": "close"}`), which is how
+a scenario changes a setting mid-run, and `groups` seeds site groups.
 
 ## Writing one
 
