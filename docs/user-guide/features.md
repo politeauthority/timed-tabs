@@ -154,7 +154,10 @@ picks up the other site's rules.
   global settings stay the default; a rule only replaces what it sets.
 
 The rules list is sorted by pattern. A filter box shows only the rules that match an
-address, and **Add rule** starts one for the filtered site and scrolls to it.
+address, and **Add rule** starts one for the filtered site and scrolls to it. While the
+filter is on the matches are reordered into the order they actually apply in — highest
+priority first, so the rule that decides that page is at the top, the same order the
+popup lists them in. Clearing the filter puts the list back into pattern order.
 
 Each rule is a row that can be read without opening it:
 

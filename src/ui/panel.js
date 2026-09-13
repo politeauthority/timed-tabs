@@ -1822,6 +1822,38 @@ function sortedRules() {
   });
 }
 
+/**
+ * The order the rows are shown in, which depends on what the page is being
+ * asked.
+ *
+ * With no filter the list is a catalogue, and alphabetical by pattern is how
+ * you find a rule in one. Filtered to an address -- which is what arriving
+ * from the popup's "Make or edit rules for this page" does -- it is no longer
+ * a catalogue but an answer to "what decides this page", so the matches are
+ * put in the order they actually apply: highest priority first, and among
+ * equal priorities the one that wins, which is the later of the two. The rule
+ * at the top is then the rule that had the last word, exactly as the popup
+ * lists it.
+ *
+ * Rules still being typed stay first either way. One has no pattern yet, so it
+ * matches everything and would otherwise be sorted on a priority it was given
+ * rather than chosen -- and it is the thing the page has just added, which is
+ * reason enough to keep it where it can be seen.
+ */
+function displayOrder(url) {
+  const base = sortedRules();
+  if (!url) return base;
+  // Later wins a tie, so the array's own order is the tiebreak, read backwards.
+  const laid = new Map(rules.map((r, i) => [r.id, i]));
+  const pending = base.filter(isEmptyRule);
+  const rest = base.filter((r) => !isEmptyRule(r));
+  const hit = (r) => matchesRule(r, url, activeGroups());
+  const matching = rest
+    .filter(hit)
+    .sort((a, b) => b.priority - a.priority || laid.get(b.id) - laid.get(a.id));
+  return [...pending, ...matching, ...rest.filter((r) => !hit(r))];
+}
+
 /** "Site group “news”, 4 sites" or why the rule currently matches nothing. */
 function describeGroupTarget(rule) {
   const name = groupNameOf(rule.pattern);
@@ -2050,8 +2082,11 @@ function renderRules() {
     list.replaceChildren(p);
     return;
   }
-  list.replaceChildren(...sortedRules().map(renderRule));
-  if ($("rules-filter").value.trim()) applyRulesFilter();
+  // Built in the order they will be shown in, so a rules change while a filter
+  // is on does not lay the list out twice.
+  const filter = $("rules-filter").value.trim();
+  list.replaceChildren(...displayOrder(filter).map(renderRule));
+  if (filter) applyRulesFilter();
 }
 
 /**
@@ -2699,9 +2734,20 @@ function applyRulesFilter() {
   const url = $("rules-filter").value.trim();
   const note = $("rules-filter-note");
   $("rules-filter-clear").hidden = !url;
-  const rows = [...$("rules-list").querySelectorAll(".rule")];
+  const list = $("rules-list");
+  const rows = [...list.querySelectorAll(".rule")];
   const changed = url !== lastFilter;
   lastFilter = url;
+  // Cards are moved, never rebuilt, so one being edited keeps everything it
+  // holds -- a half-typed pattern, the field the caret is in -- while the
+  // order around it changes. Clearing the filter puts the catalogue back.
+  const byId = new Map(rows.map((el) => [el.dataset.ruleId, el]));
+  // `append` moves a node that is already in the list, so this is a reorder
+  // rather than a rebuild.
+  for (const rule of displayOrder(url)) {
+    const el = byId.get(rule.id);
+    if (el) list.append(el);
+  }
   if (!url) {
     for (const el of rows) el.classList.remove("is-filtered-out");
     note.hidden = true;
