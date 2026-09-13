@@ -26,6 +26,10 @@ export const state = {
   currentTab: null,
   rulesSaving: false,
   groupsSaving: false,
+  /** The pattern a new rule starts from, set by Add rule from the filter box or the test page. */
+  newRuleSeed: "",
+  /** Which editor row to focus on arrival, when a list control asked for one. */
+  editorFocus: null,
 };
 
 /** The stored settings with the page's unsaved changes on top. */

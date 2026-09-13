@@ -1,5 +1,6 @@
 /**
- * Fold state for the page's <details> sections, remembered across opens in localStorage.
+ * Fold state for the page's <details> sections, remembered across opens in
+ * localStorage on the extension origin; wrapped because it can be unavailable.
  */
 
 export function foldGet(key, fallback) {

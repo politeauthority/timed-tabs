@@ -1,5 +1,10 @@
 /**
  * Saying whether a write worked: the toasts, and the one place a storage error is turned into words.
+ *
+ * An outcome with no natural home on the page goes to a toast: a success
+ * fades, a failure stays until it is dismissed. A rule card or a per-tab
+ * control keeps its "Saved" tick instead, since that sits on the thing that
+ * changed, which a message at the bottom of the window cannot do.
  */
 import { isPopup } from "./state.js";
 import { mountToasts } from "./toasts.js";

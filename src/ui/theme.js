@@ -1,5 +1,9 @@
 /**
  * The browser theme, read into CSS variables so the popup and the page match the toolbar they sit under.
+ *
+ * Take the panel's colours from the browser's live theme so the popup and
+ * the page match the chrome around them, including custom themes. Falls
+ * back to the prefers-color-scheme palette in panel.css when unavailable.
  */
 import { api } from "../shared/browser.js";
 import { isPopup } from "./state.js";
