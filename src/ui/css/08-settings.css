@@ -1,0 +1,180 @@
+/* ---- Settings ----------------------------------------------------------------- */
+
+.settings {
+  padding: 0;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--gutter) var(--sp-1);
+}
+
+.jump-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  background: var(--control);
+  cursor: pointer;
+}
+
+.jump-pill:hover {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+/* The group on show. Weight as well as colour, so it still reads as chosen
+   when the accent is hard to see against a theme. */
+.jump-pill.is-selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.jump-pill.is-selected:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.group {
+  /* One group at a time now, so it no longer needs the space that separated
+     it from the next one, nor a scroll margin to clear the pills. */
+  padding: var(--sp-3) var(--gutter) var(--sp-2);
+}
+
+.group-help {
+  margin: 2px 0 var(--sp-1);
+}
+
+/* A subgroup heading inside a sectioned group: quieter than the group title,
+   set off from the rows above it. */
+.group-section-title {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.group-section-title:first-of-type {
+  margin-top: var(--sp-2);
+}
+
+/* A section written in the HTML that trails a rendered group: it carries on
+   from the rows above rather than starting a page of its own. */
+.group-tail {
+  padding-top: 0;
+}
+
+.group-tail > .group-section-title:first-of-type,
+.group-tail > .diag-fold > summary {
+  margin-top: var(--sp-4);
+}
+
+/* Diagnostics folds away: its heading is the summary, chevron first. */
+.diag-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.diag-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.group-section-title + .group-rows .field:first-child,
+.group-section-title + .group-help + .group-rows .field:first-child {
+  border-top: 0;
+}
+
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+body:not([data-context="popup"]) .field {
+  padding: 14px 0;
+}
+
+.field:first-child,
+.group-rows .field:first-child,
+.field[hidden] + .field:not([hidden]):nth-child(2) {
+  border-top: 0;
+}
+
+.field-label {
+  flex: 1 1 14em;
+  min-width: 0;
+}
+
+.field-help {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  max-width: 46em;
+}
+
+.field-control {
+  flex: none;
+  margin-left: auto;
+  max-width: 100%;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.field-suffix {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.field-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding-bottom: 0;
+}
+
+.field-group > .field-label {
+  flex: none;
+}
+
+.field-group-rows .field {
+  padding-left: var(--sp-3);
+}
+
+.notice {
+  margin: 0;
+  padding: 10px var(--gutter);
+  background: var(--warn-wash);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.notice p {
+  margin: 0;
+}

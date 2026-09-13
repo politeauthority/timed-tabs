@@ -1,0 +1,55 @@
+/* ---- Feedback ----------------------------------------------------------------- */
+
+.saved-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-sm);
+  color: var(--green);
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.saved-mark.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+.rule-head > .saved-mark {
+  flex: none;
+}
+
+.tab-actions button + .saved-mark,
+.tab-rule > .saved-mark {
+  margin-left: 6px;
+}
+
+/* The enabled switch keeps the far right of its row; its "Saved" floats up
+   over the head of the section instead of squeezing in beside it. */
+#tab {
+  position: relative;
+}
+
+.tab-never > .saved-mark {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--gutter);
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--green) 18%, var(--ground));
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 18%, transparent);
+  transform: translateY(-4px);
+  z-index: 2;
+}
+
+.tab-never > .saved-mark.is-shown {
+  transform: translateY(0);
+}
+
+.tab-rule > .saved-mark {
+  grid-column: 2;
+}

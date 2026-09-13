@@ -1,0 +1,91 @@
+/* ---- Base --------------------------------------------------------------------- */
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: var(--fs-md) / 1.45 var(--font);
+}
+
+body[data-context="popup"] {
+  width: 320px;
+  /* Once the popup is tall enough for a vertical scrollbar, Firefox lays that
+     scrollbar inside the 320px viewport and leaves about 305px. A rigid 320px
+     body is then wider than the window it sits in, which is a horizontal
+     scrollbar. Letting it give way those few pixels costs nothing and stops
+     the bar appearing whenever the panel grows. */
+  max-width: 100%;
+}
+
+body[data-context="options"] #app {
+  max-width: 560px;
+  padding: var(--sp-2) var(--sp-1) var(--sp-6);
+}
+
+body[data-context="page"] #app {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: var(--sp-6) var(--gutter) 48px;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+section + section,
+.notice + section,
+section + details,
+details + details {
+  border-top: 1px solid var(--line);
+}
+
+/* Icons: currentColor line art from the sprite. */
+.icon {
+  width: var(--icon);
+  height: var(--icon);
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -3px;
+}
+
+/* Chevron and check marks for CSS-only spots, tinted by currentColor. */
+.chev::before,
+.saved-mark::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  mask: center / contain no-repeat;
+  -webkit-mask: center / contain no-repeat;
+}
+
+.chev::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  transition: transform 0.15s;
+}
+
+[open] > .chev::before,
+.chev.is-open::before {
+  transform: rotate(90deg);
+}
+
+.saved-mark::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5 6.5 12 13 4.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5 6.5 12 13 4.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}

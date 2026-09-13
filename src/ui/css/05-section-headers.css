@@ -1,0 +1,48 @@
+/* ---- Section headers ---------------------------------------------------------- */
+
+.section-head,
+.rules-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+}
+
+.settings-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+body:not([data-context="popup"]) .settings-title {
+  font-size: var(--fs-lg);
+}
+
+.section-help,
+.rules-help,
+.group-help,
+.overview-legend,
+.overview-tools {
+  margin: var(--sp-1) 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 60em;
+}
+
+.rules-help code {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--control);
+}
+
+.count {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}

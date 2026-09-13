@@ -53,3 +53,13 @@ The split follows the section markers `panel.js` had when it was one 4,200-line 
 a feature that touches one page edits one module and two features on different pages do
 not collide. The move was mechanical: every declaration kept its name and body, and the
 six page captures matched the previous build pixel for pixel.
+
+## The stylesheet
+
+`panel.css` is a list of `@import` lines, one per section, in the order the sections
+had when it was one file, so the cascade is unchanged. The files live in `src/ui/css/`
+with a number prefix that is that order: tokens, base, controls, header, section
+headers, popup, lists, settings, rules page, rules rows, backup, feedback, toasts,
+version, motion, statistics, rule editor, rule test. Add to a section in its file; a new
+section is a new file and a new import line, placed where it belongs in the cascade.
+The options page shares the stylesheet unchanged.

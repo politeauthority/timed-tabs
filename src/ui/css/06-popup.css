@@ -1,0 +1,363 @@
+/* ---- This tab (mini UI) ------------------------------------------------------- */
+
+.tab {
+  padding: var(--sp-2) var(--gutter) var(--sp-4);
+}
+
+.tab-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 18px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.tab-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.tab-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.readout {
+  margin: var(--sp-2) 0 var(--sp-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.readout-time {
+  font-size: var(--fs-display);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.readout-note {
+  color: var(--ink-2);
+}
+
+/* The fuse: the whole ramp stays visible, the marker shows where the tab
+   sits, and the burnt part behind it fades. */
+.fuse {
+  position: relative;
+  height: 10px;
+  margin: var(--sp-1) 0 var(--sp-4);
+  touch-action: none;
+}
+
+.fuse.is-disabled {
+  cursor: default;
+}
+
+/* The ring belongs on the bar; the range itself is invisible. */
+.fuse:has(.fuse-range:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Invisible, but it is the thing you actually drag. The descendant selector
+   is deliberate: it has to outrank the shared input[type="range"] sizing. */
+.fuse .fuse-range {
+  position: absolute;
+  /* Reaches past the 10px bar so the pointer has something to grab. */
+  inset: -5px 0;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+.fuse .fuse-range:disabled {
+  cursor: default;
+}
+
+/* Nothing should lag behind the pointer mid-drag. */
+.fuse.is-dragging .fuse-burnt,
+.fuse.is-dragging .fuse-marker {
+  transition: none;
+}
+
+.fuse.is-dragging .fuse-marker {
+  width: 6px;
+  margin-left: -3px;
+}
+
+.fuse-track {
+  position: absolute;
+  inset: 3px 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
+}
+
+.fuse-burnt {
+  position: absolute;
+  inset: 3px auto 3px 0;
+  width: 0;
+  border-radius: 2px 0 0 2px;
+  background: var(--ground);
+  opacity: 0.72;
+  transition: width 0.4s ease-out;
+}
+
+.fuse-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 10px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: left 0.4s ease-out;
+}
+
+.tab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+/* Square, icon-sized: the label is in the tooltip. */
+.icon-btn {
+  flex: none;
+  width: var(--control-h);
+  padding: 0;
+}
+
+/* What just happened, said once and then faded out. */
+.act-flash {
+  font-size: var(--fs-sm);
+  color: var(--green);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+.act-flash.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+/* Sits on the action row beside Restart and Snooze. */
+.tab-never {
+  flex: none;
+  margin-left: auto;
+  align-self: center;
+}
+
+/* This tab never expires: nothing else in the popup applies, so only the
+   readout with its switch stays, over the footer. */
+body[data-never="on"] #fuse,
+body[data-never="on"] #tab-paused-note,
+body[data-never="on"] .tab-actions,
+body[data-never="on"] #tab-settings,
+body[data-never="on"] #tab-rules {
+  display: none;
+}
+
+/* A page left alone has no clock to show or act on either; the rules stay,
+   since one of them may be the reason and "Ignore all rules" the way back. */
+body[data-unmanaged="on"] #fuse,
+body[data-unmanaged="on"] #tab-paused-note,
+body[data-unmanaged="on"] .tab-actions {
+  display: none;
+}
+
+.tab-actions .act-flash {
+  margin-left: auto;
+}
+
+/* A small count beside a heading. Zero is shown, just quieter. */
+.count-badge {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-left: var(--sp-1);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: center;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-badge.is-zero {
+  opacity: 0.6;
+}
+
+.section-head .icon-btn {
+  margin-left: auto;
+}
+
+/* Sits under the fuse, above the actions, only when the timer both pauses
+   here and restarts on return. */
+.tab-paused-note {
+  margin: 0 0 var(--sp-3);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+/* Why this page is left alone, and the way to what decided it. */
+.tab-why {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-card);
+  background: var(--warn-wash);
+  font-size: var(--fs-sm);
+}
+
+.tab-why-text {
+  margin: 0;
+}
+
+.tab-why > .quiet {
+  min-height: 0;
+  padding: 2px 8px;
+  font-size: var(--fs-sm);
+}
+
+/* The one rule at fault, as a row of its own: badge, name, pattern, and what
+   it sets. The whole row is the way to its page. */
+.tab-why-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--sp-1) var(--sp-2);
+  width: 100%;
+  min-height: 0;
+  padding: var(--sp-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--ink);
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+}
+
+.tab-why-rule:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.tab-why-rule .rule-pattern-static {
+  flex: 0 1 auto;
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+
+/* Left alone, the rules section says nothing the card does not; it goes too. */
+body[data-unmanaged="on"] #tab-rules {
+  display: none;
+}
+
+/* Rules for this page. */
+.tab-rules-section {
+  padding-top: var(--sp-3);
+}
+
+.override.is-stacked .field-control {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
+.override.is-stacked .override-control {
+  display: flex;
+  width: 100%;
+}
+
+.override-indicators {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding-left: calc(13px + var(--sp-2));
+}
+
+.override-indicator {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.tab-rules-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--sp-1);
+}
+
+.tab-rule {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--sp-3);
+  align-items: start;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.tab-rule:first-child {
+  border-top: 0;
+}
+
+.tab-rule .switch-track {
+  margin-top: 1px;
+}
+
+.tab-rule-name {
+  font-weight: 600;
+}
+
+.tab-rule-name small {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.tab-rule-sets {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.tab-rule.is-ignored .tab-rule-name,
+.tab-rule.is-ignored .tab-rule-sets {
+  color: var(--ink-2);
+  text-decoration: line-through;
+}
+
+.tab-rule.is-masked {
+  opacity: 0.55;
+}
+
+.tab-rules-empty,
+.tab-rules-note {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.tab-rules-section .tab-never {
+  width: 100%;
+  margin: var(--sp-2) 0 0;
+}
