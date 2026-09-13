@@ -1744,7 +1744,7 @@ const RULE_FIELD_TEXT = {
     help: "What to do with {tab} once it runs out of time in the background.",
   },
   resetOnActivate: {
-    label: "Restart on focus",
+    label: "Timer resets on focus",
     help: "Switching to {tab} gives it a full lifetime again.",
   },
   pauseWhileActive: {
