@@ -203,6 +203,25 @@ export function effectiveSettings(settings, rules, url, groups = []) {
   return out;
 }
 
+/**
+ * Is a tab one Timed Tabs acts on at all?
+ *
+ * With `requireRuleMatch` off, every tab is: the globals are the whole answer
+ * and a rule only refines them. With it on, the rules are the guest list, and
+ * a tab no rule speaks for is left alone as completely as the master switch
+ * leaves everything -- no clock, no expiry, no marks.
+ *
+ * `inForce` is the rules actually applying to the tab, not merely the ones
+ * that match its address: a page whose only rule the tab has switched off has
+ * switched itself out along with it, which is the same sentence read twice.
+ *
+ * Pure and settings-shaped, so the background and the UI can agree on the
+ * answer without either asking the other.
+ */
+export function managesTab(settings, inForce) {
+  return settings?.requireRuleMatch !== true || (inForce?.length ?? 0) > 0;
+}
+
 /** Suggested pattern for "this site": every page on the host. Empty for addresses without a host. */
 export function patternForUrl(url) {
   try {

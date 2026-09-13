@@ -111,6 +111,19 @@ describe("dialShapes", () => {
     expect(arcs(dialShapes({ progress: 1 })).filter((a) => a.alpha === undefined)).toHaveLength(0);
   });
 
+  it("draws an untimed tab as the empty dial: the track, and hands as faint", () => {
+    const shapes = dialShapes({ state: "inactive" });
+    // Nothing filling it, whatever progress says: there is no progress to say.
+    expect(arcs(shapes).filter((a) => a.alpha === undefined)).toHaveLength(0);
+    expect(arcs(shapes)).toHaveLength(1);
+    const faint = hands(shapes);
+    expect(faint).toHaveLength(2);
+    for (const hand of faint) expect(hand.alpha).toBe(arcs(shapes)[0].alpha);
+    // It is the drained ring with muted hands, and says so in one word.
+    expect(shapes).toEqual(dialShapes({ progress: 1, mutedHands: true }));
+    expect(dialShapes({ state: "inactive", progress: 0.2 })).toEqual(shapes);
+  });
+
   it("swaps the ring for a solid disc when flashing or expired", () => {
     expect(dialShapes({ state: "flash" })).toEqual([expect.objectContaining({ kind: "disc" })]);
     const expired = dialShapes({ state: "expired" });
@@ -121,7 +134,7 @@ describe("dialShapes", () => {
 
   it("stays inside the grid", () => {
     for (const size of [16, 128]) {
-      for (const state of ["running", "flash", "expired"]) {
+      for (const state of ["running", "flash", "expired", "inactive"]) {
         for (const shape of dialShapes({ progress: 0.4, size, state })) {
           const edges = [];
           if (shape.kind === "disc") edges.push(shape.cx - shape.r, shape.cx + shape.r, shape.cy - shape.r, shape.cy + shape.r);
@@ -189,6 +202,18 @@ describe("faceShapes", () => {
     const shapes = faceShapes({ state: "exempt" });
     expect(wedges(shapes)).toHaveLength(0);
     expect(shapes.filter((s) => s.kind === "capsule")).toHaveLength(2);
+  });
+
+  it("draws an untimed tab as a face that never filled, apart from a hollow one", () => {
+    const shapes = faceShapes({ state: "inactive" });
+    // The drained face: the track behind it, nothing in front of it, and the
+    // hands still cut out, whatever progress it is handed.
+    expect(wedges(shapes).filter((w) => w.alpha === undefined)).toHaveLength(0);
+    expect(cutOut(shapes)).toHaveLength(2);
+    expect(shapes).toEqual(faceShapes({ progress: 1 }));
+    expect(faceShapes({ state: "inactive", progress: 0.2 })).toEqual(shapes);
+    // A tab that never expires is hollow; one nothing is watching is not.
+    expect(shapes).not.toEqual(faceShapes({ state: "exempt" }));
   });
 
   it("blinks and expires the same way the ring does", () => {

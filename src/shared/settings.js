@@ -13,6 +13,12 @@ export const DEFAULTS = Object.freeze({
    * nothing expires, and every visible mark it made is taken back off.
    */
   tabManagement: true,
+  /**
+   * Narrows the master switch to the pages you have written a rule for.
+   * On, a tab no rule matches is left alone exactly as if Timed Tabs were
+   * switched off, and the toolbar button says so with an empty clock.
+   */
+  requireRuleMatch: false,
   /** Seconds a tab may stay open before it is considered expired. */
   tabLifetimeSeconds: 30 * 60,
   /** One press of Snooze adds this share of the tab's own lifetime. */
@@ -53,12 +59,12 @@ export const DEFAULTS = Object.freeze({
 /** Settings page sections, in order. Each FIELDS entry names its group. */
 export const GROUPS = [
   {
-    id: "master",
-    emoji: "🔌",
-    title: "Timed Tabs",
+    id: "general",
+    emoji: "⚙️",
+    title: "General",
     // `short` names the pill, where there is no room for a sentence.
-    short: "On / off",
-    help: "Whether Timed Tabs does anything to your tabs at all.",
+    short: "General",
+    help: "Whether Timed Tabs does anything to your tabs, and which tabs it does it to.",
   },
   { id: "timing", emoji: "⏳", title: "Timing", short: "Timing", help: "How long tabs live and when the clock runs." },
   { id: "expiry", emoji: "🚪", title: "When a tab expires", short: "Expiry", help: "What happens to a background tab once its time is up." },
@@ -79,10 +85,18 @@ export const GROUPS = [
 export const FIELDS = [
   {
     key: "tabManagement",
-    group: "master",
+    group: "general",
     type: "toggle",
     label: "Manage tabs",
     help: "Turn this off and Timed Tabs leaves your tabs completely alone: no timers, nothing closed, no colours or badges. Turn it back on and every tab starts its life afresh from that moment.",
+  },
+  {
+    key: "requireRuleMatch",
+    group: "general",
+    type: "toggle",
+    label: "Only manage tabs a rule matches",
+    help: "Timed Tabs works on the pages you have written a rule for and leaves every other tab alone: no timer, nothing closed, no colours. The toolbar button shows an empty clock on a page nothing is watching. With no rules at all, nothing is managed.",
+    showWhen: (s) => s.tabManagement !== false,
   },
   {
     key: "tabLifetimeSeconds",
