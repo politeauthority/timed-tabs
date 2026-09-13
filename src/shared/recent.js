@@ -4,6 +4,38 @@
  */
 
 /**
+ * How long a tab that has run out of time keeps its place in the window list.
+ *
+ * An expired tab that was not closed sits in its window with a dead clock, and
+ * a profile with a few of them is mostly dead rows -- which is the state the
+ * list is least useful in, since the tabs still running are the ones you can
+ * still do something about. Five minutes is long enough to see what has just
+ * gone and press Restart on it. After that the tab is still open and still
+ * yours; it is simply listed under "Recently expired" instead.
+ */
+export const EXPIRED_GRACE_SECONDS = 5 * 60;
+
+/**
+ * Whether a tab still belongs in its window's list, given when it expired.
+ * A tab that has not expired carries no stamp and always belongs.
+ */
+export function withinExpiredGrace(expiredAt, now = Date.now(), graceSeconds = EXPIRED_GRACE_SECONDS) {
+  if (!expiredAt) return true;
+  return now - expiredAt < graceSeconds * 1000;
+}
+
+/**
+ * Whether an expiry is worth writing down.
+ *
+ * Everything but a reload. A reloaded tab never stopped being a live tab --
+ * its clock restarts and it goes on running -- so a row saying it expired
+ * would be written once a lifetime, for ever, and say nothing.
+ */
+export function recordsExpiry(action) {
+  return action !== "reload";
+}
+
+/**
  * A tab whose address and title must not outlive its window.
  *
  * Browsers do not run extensions in private windows unless the user allows it,

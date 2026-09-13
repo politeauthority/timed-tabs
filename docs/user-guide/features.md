@@ -39,7 +39,8 @@ action is, it never touches the active tab.
 Settings, When a tab expires, has one action for every background tab that runs
 out of time:
 
-- **Leave it open.** The colours show it has expired; nothing else changes.
+- **Leave it open.** The colours show it has expired; the tab leaves its window's
+  list after five minutes and is listed under Recently expired instead.
 - **Reload it, restart the timer.** Useful for dashboards and feeds.
 - **Unload it.** The tab stays in the strip but frees its memory.
 - **Close it.** The tab goes, and lands in the Recently expired list.
@@ -111,10 +112,16 @@ restart-on-focus, and close it. Closing asks for a second click.
 **Order by** sorts within each window by tab order, time left or percent left, and
 the choice is remembered.
 
-**Recently expired** lists the tabs Timed Tabs closed, for a day by default. Each row
-keeps the site's icon and can be reopened. A page that keeps expiring shows once
-with a count and the time it was last closed. Rows can be removed one at a time, or
-the whole list cleared.
+A tab that has expired keeps its place for five minutes, long enough to see what has
+just gone and restart it. After that it drops out of its window's list, and the count
+reads "2 of 8 tabs" so it is clear the tab is held back rather than gone. The tab
+itself is untouched: leaving the list is not closing it.
+
+**Recently expired** lists every tab that ran out of time, for a day by default —
+the ones Timed Tabs closed and the ones it left open alike. Each row keeps the site's
+icon. A row whose tab is still open offers **Go to tab**; one whose tab was closed
+offers **Reopen**. A page that keeps expiring shows once with a count and the time it
+last did. Rows can be removed one at a time, or the whole list cleared.
 
 **Statistics** is behind the **Statistics** feature flag — see
 [feature-flags.md](feature-flags.md#statistics). The tally is kept whether the flag is

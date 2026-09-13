@@ -11,7 +11,7 @@ import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
 import { createNotifier } from "./notify.js";
-import { recordFor } from "../shared/recent.js";
+import { recordFor, recordsExpiry, withinExpiredGrace } from "../shared/recent.js";
 import { clearStats, emptyStats, record as recordStat, restoreKilled, summarise } from "../shared/stats.js";
 import { findIndicators } from "./indicators/index.js";
 import { lastOutcome as faviconOutcome } from "./indicators/favicon.js";
@@ -75,11 +75,13 @@ const serial = queue();
 const serialStore = queue();
 let active = [];
 /**
- * Tabs whose time is already up, mapped to the action that was taken -- not a
- * bare set, because "already dealt with" is only true of the action that dealt
- * with it. A tab that ran out under "Leave it open" must expire again the
- * moment the action becomes "Close it", or every tab that aged past its
- * lifetime under the default would be immune to the setting for good.
+ * Tabs whose time is already up, against the action that was taken and the
+ * moment it was. Not a bare set, twice over: "already dealt with" is only true
+ * of the action that dealt with it, so a tab that ran out under "Leave it
+ * open" must expire again the moment the action becomes "Close it"; and the
+ * stamp is what lets the window list hold an expired tab for a while and then
+ * let it go. In memory on purpose: a background that restarts has forgotten
+ * every clock anyway, and the tick works the tabs out again from scratch.
  */
 const expired = new Map();
 /**
@@ -89,7 +91,7 @@ const expired = new Map();
 const dormant = new Set();
 const diag = { ticks: 0, lastTick: null, lastError: null, lastSnapshot: [] };
 
-/** Tabs closed by expiry, newest first, persisted in storage.local and pruned by retention. */
+/** Tabs that expired, closed or not, newest first, persisted in storage.local and pruned by retention. */
 const RECENT_KEY = "recentExpired";
 const RECENT_MAX = 200;
 let recent = null;
@@ -107,6 +109,21 @@ async function loadRecent() {
   }
   return recent;
 }
+/**
+ * The recent list, each row told whether the tab it names is still open.
+ *
+ * The stored `action` is not enough to say so. A tab we closed is gone; a tab
+ * merely left to expire may have been closed by the user since, or reloaded
+ * onto something else. Tab ids also start over when the browser does, so an id
+ * on its own could point at a stranger -- the address has to match it before a
+ * row offers to take you there.
+ */
+async function liveRecent() {
+  const [list, tabs] = await Promise.all([loadRecent(), api.tabs.query({})]);
+  const urlById = new Map(tabs.map((t) => [t.id, t.url ?? ""]));
+  return list.map((r) => ({ ...r, open: Boolean(r.url) && urlById.get(r.tabId) === r.url }));
+}
+
 function recordExpired(tab, action) {
   return serialStore(() => recordExpiredNow(tab, action));
 }
@@ -448,7 +465,7 @@ api.runtime.onMessage.addListener((msg) => {
     case "timed-tabs:all-tabs":
       return allTabs();
     case "timed-tabs:recent":
-      return loadRecent().then((list) => list.slice());
+      return liveRecent();
     case "timed-tabs:recent-remove": {
       // One entry by id, or every entry in a grouped row by its ids.
       const ids = new Set(Array.isArray(msg.ids) ? msg.ids : [msg.id]);
@@ -534,9 +551,18 @@ async function tabState(tabId, tab) {
   };
 }
 
-/** Timer state for every tab, grouped by window, for the overview list. */
+/**
+ * Timer state for every tab, grouped by window, for the overview list.
+ *
+ * A tab that expired more than its grace ago is counted in its window's
+ * `total` but left out of `tabs`: it is still open, and "Recently expired"
+ * has it, but the window list is for tabs there is still time to do
+ * something about. The panel shows both numbers, so a short list under a
+ * larger count reads as tabs held back rather than tabs lost.
+ */
 async function allTabs() {
   if (!settings) return [];
+  const now = Date.now();
   const [tabs, windows, lastFocused] = await Promise.all([
     api.tabs.query({}),
     api.windows.getAll(),
@@ -544,13 +570,18 @@ async function allTabs() {
   ]);
   // "Active" is the window the user last worked in, even if another app has focus now.
   const activeId = lastFocused?.id ?? windows.find((w) => w.focused)?.id;
-  const byWindow = new Map(windows.map((w) => [w.id, { windowId: w.id, focused: w.id === activeId, tabs: [] }]));
+  const blank = (id, focused) => ({ windowId: id, focused, tabs: [], total: 0 });
+  const byWindow = new Map(windows.map((w) => [w.id, blank(w.id, w.id === activeId)]));
   for (const tab of tabs) {
-    const state = await tabState(tab.id, tab);
-    const group = byWindow.get(tab.windowId) ?? { windowId: tab.windowId, focused: false, tabs: [] };
+    const group = byWindow.get(tab.windowId) ?? blank(tab.windowId, false);
     byWindow.set(tab.windowId, group);
+    group.total += 1;
+    const expiredAt = expired.get(tab.id)?.at ?? null;
+    if (!withinExpiredGrace(expiredAt, now)) continue;
+    const state = await tabState(tab.id, tab);
     group.tabs.push({
       ...state,
+      expiredAt,
       title: tab.title || tab.url || "",
       url: tab.url,
       favIconUrl: tab.favIconUrl,
@@ -681,7 +712,14 @@ async function tick() {
       // spent on a page nothing was watching is not time the tab sat unread,
       // and nothing should expire the instant a rule is written. The other
       // direction needs nothing; a held-back tab's clock is never read.
-      if (eff.unmanaged) dormant.add(tab.id);
+      // A tab that falls out of rule coverage drops its expiry with the rest
+      // of its clock. It would otherwise stay held back from the window list
+      // for an expiry that no longer means anything -- the row beside it says
+      // "no rule", and a tab nothing is watching is not one to hide.
+      if (eff.unmanaged) {
+        dormant.add(tab.id);
+        expired.delete(tab.id);
+      }
       else if (dormant.delete(tab.id)) {
         await tracker.reset(tab.id, now);
         expired.delete(tab.id);
@@ -754,20 +792,24 @@ async function tick() {
 
 const expiring = new Set();
 async function expire(tab, onExpire) {
-  if (expired.get(tab.id) === onExpire || expiring.has(tab.id)) return;
+  if (expired.get(tab.id)?.action === onExpire || expiring.has(tab.id)) return;
   expiring.add(tab.id);
   if (isDevBuild) console.log(`[timed-tabs] expired ${tab.id} ${tab.url} action=${onExpire}`);
   try {
-    if (onExpire === "close") {
-      // Only tabs we actually close are worth listing. The favicon indicator
-      // may have replaced the icon with its own painting, so ask the page's
-      // content script for the original; unreachable pages get a fallback.
+    // Written down whatever we then do with the tab, because the list is where
+    // an expired tab goes once its window has let it go -- a tab left open is
+    // as worth finding again as one we closed. The favicon indicator may have
+    // replaced the icon with its own painting, so ask the page's content
+    // script for the original; unreachable pages get a fallback.
+    if (recordsExpiry(onExpire)) {
       const originalIcon = await withTimeout(
         api.tabs.sendMessage(tab.id, { type: "timed-tabs:original-icon" }),
         1500,
         "original-icon",
       ).catch(() => "");
-      await recordExpired({ ...tab, originalIcon }, "close").catch(() => {});
+      await recordExpired({ ...tab, originalIcon }, onExpire).catch(() => {});
+    }
+    if (onExpire === "close") {
       await api.tabs.remove(tab.id);
       // Past this line the tab is gone, which is the only thing worth
       // asserting: deciding to close one and closing it are two events, and
@@ -789,8 +831,9 @@ async function expire(tab, onExpire) {
     bumpStats({ type: "expired", action: onExpire });
     // Done, and not to be done again until the clock restarts or the action
     // changes under it. A reload has just restarted the clock; the others
-    // record what was done so the tab is left alone while the answer holds.
-    if (onExpire !== "reload") expired.set(tab.id, onExpire);
+    // record what was done, and when, so the tab is left alone while the
+    // answer holds and its window keeps it listed for the grace.
+    if (onExpire !== "reload") expired.set(tab.id, { action: onExpire, at: Date.now() });
   } catch {
     // Tab may already be gone or not discardable: try again next tick.
   } finally {

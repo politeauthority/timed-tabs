@@ -18,9 +18,14 @@ anyone who needs one, is the [privacy policy](../../PRIVACY.md).
 
 ## 🕯️ The recently expired list
 
-When Timed Tabs closes a tab, it keeps a record so you can get the tab back: the
-page's **address, title and icon**, plus when it was closed. The Tabs page lists them
+When a tab runs out of time, Timed Tabs keeps a record so you can find it again: the
+page's **address, title and icon**, plus when it expired. The Tabs page lists them
 under **Recently expired**.
+
+This is written for every tab that expires, not only the ones that get closed — a
+tab left open or unloaded is recorded too, because it leaves its window's list after
+five minutes and this is where it is then listed. A tab that is reloaded on expiry is
+the exception: its clock simply starts again, so nothing is written down.
 
 That record is a list of pages you had open, stored on disk. It is never sent
 anywhere and it is not included in a backup, but it does survive closing the browser,
@@ -29,8 +34,8 @@ so it is worth deciding how long you want it.
 Three controls, all on the Tabs page or in Settings:
 
 - **Keep recently expired tabs for** — Settings, under 🚪 Expiry. Anything older is
-  dropped. One day by default; set it to an hour if you only ever reopen things you
-  closed a moment ago.
+  dropped. One day by default; set it to an hour if you only ever go back to things
+  that expired a moment ago.
 - **Remove one row** — the ✕ on any row in the Recently expired list.
 - **Clear list** — the button at the foot of that list empties it now.
 
