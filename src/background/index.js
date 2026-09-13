@@ -374,7 +374,8 @@ function settingsFor(tab, tabState) {
   // as completely as the switch leaves every tab. Read off the rules in
   // force, not the ones that merely match, so a tab that has switched its
   // rules off has switched itself out with them.
-  eff.unmanaged = !managesTab(settings, active);
+  // A rule can say the same for the pages it matches: "Manage tabs" off.
+  eff.unmanaged = !managesTab(settings, active) || eff.manageTabs === false;
   if (tabState?.resetOnActivate !== null && tabState?.resetOnActivate !== undefined) {
     eff.resetOnActivate = tabState.resetOnActivate;
   }
@@ -577,7 +578,7 @@ async function allTabs() {
     byWindow.set(tab.windowId, group);
     group.total += 1;
     const expiredAt = expired.get(tab.id)?.at ?? null;
-    if (!withinExpiredGrace(expiredAt, now)) continue;
+    if (!withinExpiredGrace(expiredAt, now, settings.expiredGraceSeconds)) continue;
     const state = await tabState(tab.id, tab);
     group.tabs.push({
       ...state,

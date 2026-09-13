@@ -3,6 +3,7 @@
  *
  * A rule: {
  *   id: string,
+ *   name: string,                     // short label the rule goes by; empty means "use the pattern"
  *   description: string,              // free text: what the rule is for
  *   pattern: string,                  // "github.com/*", "https://mail.google.com/"
  *   match: "wildcard" | "prefix",
@@ -20,9 +21,18 @@
  * site-groups feature flag switches such rules off.
  */
 import { groupForRule, isGroupRef } from "./groups.js";
+import { featureOn } from "./flags.js";
+
+/**
+ * Whether Timed Tabs acts on matching tabs at all. A rule setting this off
+ * leaves them alone exactly as the global "Manage tabs" switch off would:
+ * no timer, nothing closed, no colours, an empty clock on the toolbar.
+ * Rule-only, like `neverExpire` was; the global answer is `tabManagement`.
+ */
+export const RULE_MANAGE_FIELD = "manageTabs";
 
 /** Timer settings a rule may override, in display order. */
-export const RULE_TIMING_FIELDS = ["tabLifetimeSeconds", "onExpire", "resetOnActivate", "pauseWhileActive", "neverExpire"];
+export const RULE_TIMING_FIELDS = ["tabLifetimeSeconds", "onExpire", "resetOnActivate", "pauseWhileActive"];
 
 /** Appearance settings a rule may override, in display order. */
 export const RULE_VISUAL_FIELDS = [
@@ -34,8 +44,31 @@ export const RULE_VISUAL_FIELDS = [
   "flashLead",
 ];
 
-/** Everything a rule may override. */
-export const RULE_FIELDS = [...RULE_TIMING_FIELDS, ...RULE_VISUAL_FIELDS];
+/**
+ * Everything a rule may override. `neverExpire` stays for the tab's own
+ * "Never expire" switch, which the popup explains through the same table;
+ * rules no longer set it (an old rule's `neverExpire` reads as `manageTabs`
+ * off, see settings.js migrateSettingKeys).
+ */
+export const RULE_FIELDS = [RULE_MANAGE_FIELD, ...RULE_TIMING_FIELDS, ...RULE_VISUAL_FIELDS, "neverExpire"];
+
+/**
+ * The fields a rule may set right now: everything, or with the
+ * "rules-appearance" flag off, everything but the appearance fields. A rule's
+ * appearance overrides are kept in storage either way; they are simply not
+ * read while the flag is off, the way a group rule matches nothing while
+ * site groups are off. Per-tab overrides are not gated by this.
+ */
+export function ruleFieldsInForce(settings) {
+  return featureOn(settings, "rules-appearance") ? RULE_FIELDS : RULE_FIELDS.filter((k) => !RULE_VISUAL_FIELDS.includes(k));
+}
+
+/** A field's global value: the two rule-only switches have no setting of their own. */
+export function baseValue(settings, key) {
+  if (key === "neverExpire") return false;
+  if (key === RULE_MANAGE_FIELD) return settings?.tabManagement !== false;
+  return settings?.[key];
+}
 
 /**
  * How one overriding value combines with the value underneath it.
@@ -52,9 +85,9 @@ function isSet(v) {
 }
 
 /** `eff` with the defined entries of `overrides` layered on top, restricted to RULE_FIELDS. */
-export function applyOverrides(eff, overrides) {
+export function applyOverrides(eff, overrides, keys = RULE_FIELDS) {
   if (!overrides) return eff;
-  for (const key of RULE_FIELDS) {
+  for (const key of keys) {
     if (key in overrides && isSet(overrides[key])) eff[key] = overrideValue(key, eff[key], overrides[key]);
   }
   return eff;
@@ -73,12 +106,12 @@ export function applyOverrides(eff, overrides) {
 export function explainSettings(settings, matched = [], overrides = {}) {
   const out = {};
   for (const key of RULE_FIELDS) {
-    const base = settings?.[key] ?? (key === "neverExpire" ? false : undefined);
-    out[key] = { value: base, from: "global", rule: null };
+    out[key] = { value: baseValue(settings, key), from: "global", rule: null };
   }
+  const ruleKeys = ruleFieldsInForce(settings);
   for (const rule of matched) {
     if (rule?.ignored) continue;
-    for (const key of RULE_FIELDS) {
+    for (const key of ruleKeys) {
       const set = rule?.set ?? {};
       if (key in set && isSet(set[key])) {
         out[key] = { value: overrideValue(key, out[key].value, set[key]), from: "rule", rule };
@@ -98,12 +131,42 @@ export const MAX_PRIORITY = 10;
 export function newRule(partial = {}) {
   return {
     id: partial.id ?? `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    name: typeof partial.name === "string" ? partial.name.trim() : "",
     description: typeof partial.description === "string" ? partial.description : "",
     pattern: partial.pattern ?? "",
     match: partial.match === "prefix" ? "prefix" : "wildcard",
     priority: clampPriority(partial.priority ?? 5),
     set: { ...(partial.set ?? {}) },
   };
+}
+
+/**
+ * What a rule is called wherever one is named: its name, else its description
+ * from before rules had names, else the pattern itself.
+ */
+export function ruleName(rule) {
+  return rule?.name || rule?.description || rule?.pattern || "a rule";
+}
+
+/** The fields of a rule an editor can change, compared one by one by ruleChanges. */
+const RULE_TOP_FIELDS = ["name", "description", "pattern", "match", "priority"];
+
+/**
+ * What differs between two rules, as row keys: a top-level field's name, or
+ * `set:<key>` for an override added, removed or changed. Pure; the editor uses
+ * it to say which rows are unsaved and whether there is anything to save.
+ */
+export function ruleChanges(before, after) {
+  const out = [];
+  for (const k of RULE_TOP_FIELDS) {
+    if ((before?.[k] ?? "") !== (after?.[k] ?? "")) out.push(k);
+  }
+  const a = before?.set ?? {};
+  const b = after?.set ?? {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) out.push(`set:${k}`);
+  }
+  return out;
 }
 
 export function clampPriority(n) {
@@ -179,7 +242,9 @@ export function applicableRules(rules, url, groups = []) {
  */
 export function wantedIndicatorIds(settings, rules, tabOverrides = [], groups = []) {
   const ids = new Set(settings?.indicators ?? []);
-  for (const rule of rules ?? []) {
+  // A rule's indicator list is only read while rules may set appearance.
+  const rulesMaySet = ruleFieldsInForce(settings).includes("indicators");
+  for (const rule of rulesMaySet ? (rules ?? []) : []) {
     if (!(rule.priority > 0)) continue;
     // A group rule whose group is not in force can never match, so it
     // should not start an indicator either.
@@ -197,8 +262,9 @@ export function wantedIndicatorIds(settings, rules, tabOverrides = [], groups = 
 export function effectiveSettings(settings, rules, url, groups = []) {
   const matched = applicableRules(rules, url, groups);
   const out = {};
-  for (const key of RULE_FIELDS) out[key] = settings[key] ?? (key === "neverExpire" ? false : undefined);
-  for (const rule of matched) applyOverrides(out, rule.set);
+  for (const key of RULE_FIELDS) out[key] = baseValue(settings, key);
+  const keys = ruleFieldsInForce(settings);
+  for (const rule of matched) applyOverrides(out, rule.set, keys);
   out.matched = matched;
   return out;
 }
@@ -220,6 +286,18 @@ export function effectiveSettings(settings, rules, url, groups = []) {
  */
 export function managesTab(settings, inForce) {
   return settings?.requireRuleMatch !== true || (inForce?.length ?? 0) > 0;
+}
+
+/**
+ * Whether typed text finds a rule by what it is called: its name, its
+ * description or its pattern, case-insensitively. The Rules page filter uses
+ * this beside address matching, so "docs" finds the rule named Docs as well
+ * as every rule that catches https://docs.example.com/.
+ */
+export function ruleMentions(rule, text) {
+  const q = String(text ?? "").trim().toLowerCase();
+  if (!q) return false;
+  return [rule?.name, rule?.description, rule?.pattern].some((v) => typeof v === "string" && v.toLowerCase().includes(q));
 }
 
 /** Suggested pattern for "this site": every page on the host. Empty for addresses without a host. */

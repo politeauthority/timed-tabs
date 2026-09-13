@@ -13,9 +13,9 @@ describe("settings declarations agree with each other", () => {
       expect(f.options.map((o) => o.value)).toContain(DEFAULTS[f.key]);
     }
   });
-  it("every rule field is a declared field, except the rule-only timer switch", () => {
+  it("every rule field is a declared field, except the two rule-only switches", () => {
     const keys = new Set(FIELDS.map((f) => f.key));
-    for (const k of RULE_FIELDS) if (k !== "neverExpire") expect(keys.has(k)).toBe(true);
+    for (const k of RULE_FIELDS) if (k !== "neverExpire" && k !== "manageTabs") expect(keys.has(k)).toBe(true);
   });
   it("every numeric default sits inside its own range", () => {
     for (const f of FIELDS.filter((f) => f.type === "percent" || f.type === "duration")) {
@@ -34,6 +34,9 @@ describe("coerceSetting", () => {
     expect(coerceSetting("quietStart", " 600s ")).toBe("600s");
     expect(coerceSetting("quietStart", 40)).toBeUndefined();
     expect(coerceSetting("tickSeconds", 0.001)).toBeUndefined();
+    expect(coerceSetting("expiredGraceSeconds", 3601)).toBeUndefined();
+    expect(coerceSetting("expiredGraceSeconds", 3600)).toBe(3600);
+    expect(coerceSetting("expiredGraceSeconds", 4)).toBeUndefined();
     expect(coerceSetting("tabLifetimeSeconds", -5)).toBeUndefined();
   });
   it("rejects the wrong type and keeps the right one", () => {

@@ -32,8 +32,12 @@
     <main id="app">
       <header class="topbar">
         <span class="topbar-title">
-          <svg class="icon" aria-hidden="true"><use href="#i-logo" /></svg>
-          <span>Timed Tabs</span>
+          <!-- The name is the way home: the Tabs page, in the full page's own
+               tab from the popup. -->
+          <a href="#tabs" id="home-link" class="home-link" title="Tabs page">
+            <svg class="icon" aria-hidden="true"><use href="#i-logo" /></svg>
+            <span>Timed Tabs</span>
+          </a>
           <span id="channel-badge" class="channel-badge" hidden></span>
           <!-- Every view, while the "Beta features" switch is on: a small
                reminder that this profile is not running the documented
@@ -206,6 +210,7 @@
           <h2 class="settings-title">📋 Rules</h2>
           <span class="rules-head-actions">
             <button type="button" id="rules-remove-empty" class="danger" hidden><svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg>Remove empty rules</button>
+            <a href="#test" class="button-like" id="rules-test-link" title="Type an address and see which rules catch it and what each setting ends up as">🧪 Test an address</a>
             <button type="button" id="rule-add" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>Add rule</button>
           </span>
         </header>
@@ -216,7 +221,7 @@
           without deleting it.
         </p>
         <div class="rules-filter">
-          <input type="url" id="rules-filter" placeholder="🔍 Show rules matching an address, e.g. https://github.com/foo" aria-label="Show rules matching an address" />
+          <input type="text" id="rules-filter" placeholder="🔍 Find rules by name, or by an address they catch, e.g. https://github.com/foo" aria-label="Find rules by name or by an address they catch" />
           <button type="button" id="rules-filter-clear" hidden>Show all</button>
         </div>
         <p id="rules-filter-note" class="rules-help" hidden></p>
@@ -238,6 +243,42 @@
         <div id="groups-list" class="rules-list"></div>
       </section>
 
+      <!-- One rule, full width: where a rule is made or changed. Nothing here
+           is stored until Save; the bar at the foot says what is waiting. -->
+      <section id="rule-editor" class="rules rule-editor" data-pages="rule" data-page-only>
+        <header class="rules-head">
+          <a href="#rules" class="rule-editor-back" id="rule-editor-back">‹ Rules</a>
+          <h2 class="settings-title" id="rule-editor-title">📋 Edit rule</h2>
+        </header>
+        <div id="rule-editor-form" class="rule-editor-form"></div>
+        <div id="rule-editor-bar" class="save-bar" role="status" hidden>
+          <span class="save-bar-dot" aria-hidden="true"></span>
+          <span id="rule-editor-bar-text">Unsaved changes</span>
+          <span class="rules-head-actions">
+            <button type="button" id="rule-editor-discard">Discard</button>
+            <button type="button" id="rule-editor-save" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>Save rule</button>
+          </span>
+        </div>
+      </section>
+
+      <!-- Rule test: an address in, the rules that catch it and every setting's
+           source out, each source a link into the rule that set it. -->
+      <section id="rule-test" class="rules rule-test" data-pages="test" data-page-only>
+        <header class="rules-head">
+          <a href="#rules" class="rule-editor-back">‹ Rules</a>
+          <h2 class="settings-title">🧪 Rule test</h2>
+        </header>
+        <p class="rules-help">
+          Type an address, or pick an open tab, to see which rules catch it and what every setting
+          ends up as. The rule that decides a setting is a link: click it to adjust that rule.
+        </p>
+        <div class="rules-filter rule-test-input">
+          <input type="url" id="rule-test-url" placeholder="https://example.com/some/page" aria-label="Address to test" />
+          <select id="rule-test-tabs" aria-label="Or pick an open tab"><option value="">Open tabs…</option></select>
+        </div>
+        <div id="rule-test-result"></div>
+      </section>
+
       <!-- Settings page -->
       <div id="permission-warning" class="notice" data-pages="settings" hidden>
         <p>Site access is off, so favicons cannot be coloured.</p>
@@ -248,6 +289,15 @@
 
       <section id="settings" class="settings" data-pages="settings" data-page-only>
         <div id="fields" class="fields"></div>
+        <!-- Settings are staged, not stored, until this bar's Save. -->
+        <div id="settings-bar" class="save-bar" role="status" hidden>
+          <span class="save-bar-dot" aria-hidden="true"></span>
+          <span id="settings-bar-text">Unsaved changes</span>
+          <span class="rules-head-actions">
+            <button type="button" id="settings-discard">Discard</button>
+            <button type="button" id="settings-save" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>Save settings</button>
+          </span>
+        </div>
       </section>
 
       <!-- Backup and Diagnostics are pills on the Settings page like the groups above,

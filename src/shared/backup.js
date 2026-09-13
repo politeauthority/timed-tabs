@@ -165,6 +165,7 @@ export function parseBundle(text, currentVersion = "") {
 function cleanRule(r) {
   const rule = newRule({
     id: typeof r.id === "string" && r.id ? r.id : undefined,
+    name: r.name,
     description: r.description,
     pattern: r.pattern,
     match: r.match,
@@ -175,7 +176,8 @@ function cleanRule(r) {
   const set = {};
   for (const [k, v] of Object.entries(migrateSettingKeys(r.set ?? {}))) {
     if (!RULE_FIELDS.includes(k)) continue;
-    if (k === "neverExpire") {
+    // The rule-only switch has no DEFAULTS entry for coerceSetting to check against.
+    if (k === "manageTabs") {
       if (typeof v === "boolean") set[k] = v;
       continue;
     }

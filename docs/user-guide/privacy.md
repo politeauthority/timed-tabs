@@ -24,7 +24,7 @@ under **Recently expired**.
 
 This is written for every tab that expires, not only the ones that get closed — a
 tab left open or unloaded is recorded too, because it leaves its window's list after
-five minutes and this is where it is then listed. A tab that is reloaded on expiry is
+a while (a minute by default) and this is where it is then listed. A tab that is reloaded on expiry is
 the exception: its clock simply starts again, so nothing is written down.
 
 That record is a list of pages you had open, stored on disk. It is never sent

@@ -100,6 +100,18 @@ Two things follow from that, both worth knowing before you leave it off:
   particular tab — so there is nothing in it to leak whether you are reading it or
   not. [privacy.md](privacy.md#-statistics) sets out exactly what it holds.
 
+### Appearance in rules
+
+Lets a rule change how the tabs it matches look, not only how long they live:
+which indicators show, the favicon style, the quiet period and the flashing.
+Every rule's page gains a **How matching tabs look** section, its chips appear
+in the list, and the Rule test page gets those rows in its table.
+
+While the flag is off, those parts of a rule are kept but ignored — the timer
+settings still apply, the appearance ones do not — so turning it off loses
+nothing and turning it back on brings them straight back. A tab's own
+overrides from the popup's Page settings are not affected by this flag.
+
 ### Interactive toolbar clock
 
 Changes what the Timed Tabs button draws. Normally it is a ring that drains

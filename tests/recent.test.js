@@ -100,13 +100,14 @@ describe("withinExpiredGrace", () => {
     expect(withinExpiredGrace(now - grace - 1000, now)).toBe(false);
   });
 
-  it("takes a grace of its own, so the rule can be tested without waiting five minutes", () => {
+  it("takes a grace of its own, which is how the setting reaches it", () => {
     expect(withinExpiredGrace(now - 5000, now, 10)).toBe(true);
     expect(withinExpiredGrace(now - 5000, now, 1)).toBe(false);
+    expect(withinExpiredGrace(now - 3599_000, now, 3600)).toBe(true);
   });
 
-  it("is five minutes", () => {
-    expect(EXPIRED_GRACE_SECONDS).toBe(300);
+  it("defaults to a minute, the same as the setting", () => {
+    expect(EXPIRED_GRACE_SECONDS).toBe(60);
   });
 });
 

@@ -41,10 +41,19 @@ import {
   matchesRule,
   newRule,
   patternForUrl,
+  ruleName,
+  ruleChanges,
+  RULE_MANAGE_FIELD,
+  baseValue,
+  applicableRules,
+  managesTab,
+  isRuleableUrl,
+  ruleMentions,
+  ruleFieldsInForce,
 } from "../shared/rules.js";
 import { exportText, parseBundle } from "../shared/backup.js";
 import { compareVersions, getDisplayVersion } from "../shared/version.js";
-import { EXPIRED_GRACE_SECONDS, groupRecent } from "../shared/recent.js";
+import { groupRecent } from "../shared/recent.js";
 import { formatDuration, formatRemaining, formatSpan, snoozeSeconds, toUnit } from "../shared/time.js";
 import { formatLead, parseLead } from "../shared/lead.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
@@ -70,7 +79,9 @@ const PAGES = ["tabs", "rules", "settings"];
 
 function pageFromHash() {
   const h = location.hash.replace(/^#/, "");
-  if (h.startsWith("rule-")) return "rules";
+  // One rule on a page of its own: #rule-<id> to edit it, #rule-new to make one.
+  if (h.startsWith("rule-")) return "rule";
+  if (h === "test") return "test";
   if (PAGES.includes(h)) return h;
   // Backup was a page of its own once; an old link to it lands on its pill.
   if (h === "backup") return "settings";
@@ -82,7 +93,9 @@ function route() {
   const page = pageFromHash();
   document.body.dataset.page = page;
   for (const a of document.querySelectorAll("[data-page-link]")) {
-    if (a.dataset.pageLink === page) a.setAttribute("aria-current", "page");
+    // The rule editor is part of Rules as far as the nav is concerned.
+    const on = a.dataset.pageLink === page || ((page === "rule" || page === "test") && a.dataset.pageLink === "rules");
+    if (on) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
   onPageShown(page);
@@ -146,6 +159,14 @@ function svgIcon(name) {
 }
 
 let settings = { ...DEFAULTS };
+/**
+ * Settings changed on the page but not yet stored, by key. The controls show
+ * `draftSettings()`, the stored values with these on top; Save writes them
+ * and Discard drops them. Nothing else on the page reads the draft: what the
+ * background and the popup do follows what is stored.
+ */
+let settingsDraft = {};
+const draftSettings = () => ({ ...settings, ...settingsDraft });
 
 // ---- All tabs -------------------------------------------------------------
 
@@ -194,6 +215,7 @@ function renderFields() {
   updateFieldVisibility(false);
   renderGroupTabs();
   showGroup(currentGroup());
+  refreshSettingsDirty();
 }
 
 /**
@@ -402,7 +424,7 @@ function makeLeadControl(current, lifetime, onChange) {
 function updateFieldVisibility(animate = true) {
   for (const row of $("fields").querySelectorAll(".field[data-key]")) {
     const field = FIELDS.find((f) => f.key === row.dataset.key);
-    setRevealed(row, !(field?.showWhen && !field.showWhen(settings)), animate);
+    setRevealed(row, !(field?.showWhen && !field.showWhen(draftSettings())), animate);
   }
 }
 
@@ -430,7 +452,7 @@ function renderField(field) {
   control.className = "field-control";
   row.append(control);
 
-  const value = settings[field.key];
+  const value = draftSettings()[field.key];
 
   if (field.type === "toggle") {
     const sw = makeSwitch(Boolean(value), async (checked) => {
@@ -441,13 +463,7 @@ function renderField(field) {
         sw.input.checked = false;
         return;
       }
-      await save({ [field.key]: checked });
-      // Switching notifications on sends one straight away: the quickest way
-      // to find out whether the operating system lets them through.
-      if (checked && field.key === "notifyOnExpire") {
-        const r = await api.runtime.sendMessage({ type: "timed-tabs:notify-test" }).catch((e) => ({ ok: false, error: String(e) }));
-        if (r && !r.ok) console.warn("[timed-tabs] test notification failed:", r.error);
-      }
+      stage({ [field.key]: checked });
     });
     sw.input.id = `f-${field.key}`;
     label.htmlFor = sw.input.id;
@@ -460,7 +476,7 @@ function renderField(field) {
       select.add(new Option(opt.label, opt.value));
     select.value = value;
     select.addEventListener("change", () =>
-      save({ [field.key]: select.value }),
+      stage({ [field.key]: select.value }),
     );
     control.append(select);
   } else if (field.type === "duration") {
@@ -483,17 +499,22 @@ function renderField(field) {
     }
     units.value = String(unit);
     const commit = () => {
-      const seconds = Math.max(
-        field.min ?? 1,
-        Math.round(Number(num.value) * Number(units.value)),
-      );
-      if (Number.isFinite(seconds)) save({ [field.key]: seconds });
+      const raw = Math.round(Number(num.value) * Number(units.value));
+      if (!Number.isFinite(raw)) return;
+      // Kept inside the field's range, and the control shows what was kept.
+      const seconds = Math.min(field.max ?? Infinity, Math.max(field.min ?? 1, raw));
+      if (seconds !== raw) {
+        const u = toUnit(seconds);
+        num.value = String(u.value);
+        units.value = String(u.unit);
+      }
+      stage({ [field.key]: seconds });
     };
     num.addEventListener("change", commit);
     units.addEventListener("change", commit);
     control.append(num, units);
   } else if (field.type === "lead") {
-    const lead = makeLeadControl(value, () => settings.tabLifetimeSeconds, (v) => save({ [field.key]: v }));
+    const lead = makeLeadControl(value, () => draftSettings().tabLifetimeSeconds, (v) => stage({ [field.key]: v }));
     lead.num.id = `f-${field.key}`;
     label.htmlFor = lead.num.id;
     lead.units.setAttribute("aria-label", `${field.label} unit`);
@@ -516,7 +537,7 @@ function renderField(field) {
     show();
     // Follow the thumb while dragging, but only write once it is let go.
     range.addEventListener("input", show);
-    range.addEventListener("change", () => save({ [field.key]: Number(range.value) }));
+    range.addEventListener("change", () => stage({ [field.key]: Number(range.value) }));
     control.append(range, out);
   } else if (field.type === "percent") {
     const num = document.createElement("input");
@@ -532,7 +553,7 @@ function renderField(field) {
       if (!Number.isFinite(n)) return;
       const clamped = Math.min(field.max ?? 100, Math.max(field.min ?? 0, n));
       num.value = String(clamped);
-      save({ [field.key]: clamped });
+      stage({ [field.key]: clamped });
     });
     const suffix = document.createElement("span");
     suffix.className = "field-suffix";
@@ -552,9 +573,8 @@ function renderField(field) {
         const checked = new Set([...list.querySelectorAll("input:checked")].map((i) => i.value));
         const ids = indicators
           .map((i) => i.id)
-          .filter((id) => (shown.some((i) => i.id === id) ? checked.has(id) : settings.indicators.includes(id)));
-        await save({ indicators: ids }, ind.label);
-        markSaved(sub);
+          .filter((id) => (shown.some((i) => i.id === id) ? checked.has(id) : draftSettings().indicators.includes(id)));
+        stage({ indicators: ids });
       });
       sw.input.value = ind.id;
       sw.input.disabled = !ind.supported();
@@ -566,6 +586,8 @@ function renderField(field) {
         sw.el,
       );
       sub.querySelector(".field-label").htmlFor = sw.input.id;
+      // So the unsaved mark can land on the one switch that moved.
+      sub.dataset.subKey = `indicators:${ind.id}`;
       list.append(sub);
     }
     row.append(list);
@@ -583,18 +605,18 @@ function renderField(field) {
     const syncDependents = (animate = true) => {
       for (const [id, entry] of switches) {
         const parent = flagRequires(id);
-        setRevealed(entry.row, !(parent && !flagOn(settings, parent)), animate);
+        setRevealed(entry.row, !(parent && !flagOn(draftSettings(), parent)), animate);
       }
     };
     for (const flag of FLAGS) {
-      const sw = makeSwitch(value?.[flag.id] === true, async (checked) => {
-        await save({ featureFlags: { ...settings.featureFlags, [flag.id]: checked } });
+      const sw = makeSwitch(value?.[flag.id] === true, (checked) => {
+        stage({ featureFlags: { ...draftSettings().featureFlags, [flag.id]: checked } });
         syncDependents();
-        markSaved(sub);
       });
       sw.input.id = `f-flag-${flag.id}`;
       const sub = settingRow(flag.label, flag.help, sw.el);
       sub.querySelector(".field-label").htmlFor = sw.input.id;
+      sub.dataset.subKey = `featureFlags:${flag.id}`;
       if (flag.requires) sub.classList.add("flag-dependent");
       switches.set(flag.id, { input: sw.input, row: sub });
       list.append(sub);
@@ -637,6 +659,77 @@ function applyManagementState() {
 // enough for the full page would cover most of it.
 const toasts = mountToasts(document.body, isPopup ? { max: 2 } : {});
 
+/**
+ * Put a change on the page without storing it. A key set back to its stored
+ * value leaves the draft, so undoing an edit by hand is as good as Discard.
+ */
+function stage(partial) {
+  for (const [key, value] of Object.entries(partial)) {
+    if (JSON.stringify(value) === JSON.stringify(settings[key])) delete settingsDraft[key];
+    else settingsDraft[key] = value;
+  }
+  updateFieldVisibility();
+  refreshSettingsDirty();
+}
+
+/**
+ * Mark the rows whose value is not what is stored and show the bar with the
+ * count. A list row (indicators, flags) marks the one switch that moved
+ * rather than the whole list.
+ */
+function refreshSettingsDirty() {
+  const root = $("fields");
+  let n = 0;
+  for (const row of root.querySelectorAll(".field[data-key]:not(.field-group)")) {
+    const on = row.dataset.key in settingsDraft;
+    setRowChanged(row, on);
+    if (on && !row.hidden) n += 1;
+  }
+  const draft = draftSettings();
+  for (const sub of root.querySelectorAll(".field[data-sub-key]")) {
+    const [key, id] = sub.dataset.subKey.split(":");
+    const on =
+      key === "indicators"
+        ? settings.indicators.includes(id) !== draft.indicators.includes(id)
+        : Boolean(settings.featureFlags?.[id]) !== Boolean(draft.featureFlags?.[id]);
+    setRowChanged(sub, on);
+    if (on) n += 1;
+  }
+  const bar = $("settings-bar");
+  bar.hidden = n === 0;
+  $("settings-bar-text").textContent = `${n} unsaved change${n === 1 ? "" : "s"}`;
+}
+
+/** Store every staged change at once, then redraw from what is stored. */
+async function saveSettingsDraft() {
+  const partial = { ...settingsDraft };
+  const keys = Object.keys(partial);
+  if (!keys.length) return;
+  const what = keys.length === 1 ? `“${fieldLabel(keys[0])}”` : `${keys.length} settings`;
+  const ok = await write(() => saveSettings(partial), { what, key: "settings" });
+  if (!ok) return;
+  const before = settings;
+  settings = { ...settings, ...partial };
+  settingsDraft = {};
+  if ("tabManagement" in partial) applyManagementState();
+  if ("featureFlags" in partial) renderFlagged();
+  renderFields();
+  toasts.success("Saved", what, "settings");
+  // Switching notifications on sends one straight away: the quickest way to
+  // find out whether the operating system lets them through.
+  if (partial.notifyOnExpire && !before.notifyOnExpire) {
+    const r = await api.runtime.sendMessage({ type: "timed-tabs:notify-test" }).catch((e) => ({ ok: false, error: String(e) }));
+    if (r && !r.ok) console.warn("[timed-tabs] test notification failed:", r.error);
+  }
+  if ($("overview").open) refreshOverview();
+}
+
+$("settings-save").addEventListener("click", saveSettingsDraft);
+$("settings-discard").addEventListener("click", () => {
+  settingsDraft = {};
+  renderFields();
+});
+
 /** The label of a settings field, for naming what was just saved. */
 function fieldLabel(key) {
   const f = FIELDS.find((f) => f.key === key);
@@ -674,6 +767,11 @@ async function write(run, { what, key = null, note = "Nothing was changed." }) {
   }
 }
 
+/**
+ * Store a change at once. The Settings page no longer goes through here (it
+ * stages, see `stage`); what does is the odd control elsewhere that has no
+ * bar to wait for: the tab sort, "Turn it back on", a permission revoked.
+ */
 async function save(partial, label = null) {
   const keys = Object.keys(partial);
   // `label` names the row that was touched when the key alone cannot: the
@@ -713,6 +811,8 @@ async function save(partial, label = null) {
 function markSaved(el, container = null) {
   if (!el) return;
   if ($("fields").contains(el)) return;
+  // The rule editor stores nothing until Save, so a row there has nothing to confirm.
+  if ($("rule-editor").contains(el)) return;
   container ??= el.querySelector(":scope > .field-control") ?? el;
   let mark = container.querySelector(":scope > .saved-mark");
   if (!mark) {
@@ -848,9 +948,9 @@ function renderTabRules() {
       const text = document.createElement("span");
       const name = document.createElement("span");
       name.className = "tab-rule-name";
-      name.textContent = r.description || r.pattern;
+      name.textContent = ruleName(r);
       const meta = document.createElement("small");
-      meta.textContent = ` · priority ${r.priority}${r.description ? ` · ${r.pattern}` : ""}`;
+      meta.textContent = ` · priority ${r.priority}${ruleName(r) !== r.pattern ? ` · ${r.pattern}` : ""}`;
       name.append(meta);
       const sets = document.createElement("span");
       sets.className = "tab-rule-sets";
@@ -939,7 +1039,7 @@ function thisTabBadge(onClear) {
 /** How a rule that changed a value names itself, for the row's tooltip. */
 function ruleSourceText(entry) {
   const r = entry.rule;
-  const name = r?.description || r?.pattern || "a rule";
+  const name = ruleName(r);
   return `Set by ${name}${r?.priority !== undefined ? ` (priority ${r.priority})` : ""}.`;
 }
 
@@ -1234,6 +1334,7 @@ function rememberFold(details, key, fallbackOpen) {
 // ---- All open tabs ---------------------------------------------------------
 
 let overviewTimer = null;
+let matchesTimer = null;
 
 let overviewSeq = 0;
 async function refreshOverview() {
@@ -1255,7 +1356,7 @@ async function refreshOverview() {
     const empty = document.createElement("p");
     empty.className = "overview-empty";
     empty.textContent = open
-      ? `Every open tab expired more than ${formatSpan(EXPIRED_GRACE_SECONDS)} ago. They are under "Recently expired".`
+      ? `Every open tab expired more than ${formatSpan(settings.expiredGraceSeconds)} ago. They are under "Recently expired".`
       : "No tabs are being timed.";
     list.replaceChildren(empty);
     return;
@@ -1299,7 +1400,7 @@ function countLabel(shown, total) {
 }
 
 function heldBackLabel(n) {
-  return `${n} expired more than ${formatSpan(EXPIRED_GRACE_SECONDS)} ago and ${n === 1 ? "is" : "are"} under "Recently expired"`;
+  return `${n} expired more than ${formatSpan(settings.expiredGraceSeconds)} ago and ${n === 1 ? "is" : "are"} under "Recently expired"`;
 }
 
 function renderTabRow(t) {
@@ -1349,7 +1450,7 @@ function renderTabRow(t) {
       .reverse()
       .map(
         (r) =>
-          `${r.description ? r.description + " — " : ""}${r.pattern} (${r.priority})\n${describeRule(r)}`,
+          `${ruleName(r) !== r.pattern ? ruleName(r) + " — " : ""}${r.pattern} (${r.priority})\n${describeRule(r)}`,
       )
       .join("\n\n");
     row.append(tag);
@@ -1868,6 +1969,9 @@ function onPageShown(page) {
   overviewTimer = null;
   clearInterval(recentTimer);
   recentTimer = null;
+  clearInterval(matchesTimer);
+  matchesTimer = null;
+  if (page !== "rule") editorMatches = null;
   if (page === "tabs") {
     if ($("overview").open) {
       refreshOverview();
@@ -1884,6 +1988,12 @@ function onPageShown(page) {
   } else if (page === "rules") {
     renderRules();
     applyRulesFilter();
+  } else if (page === "test") {
+    renderRuleTest();
+  } else if (page === "rule") {
+    renderRuleEditor(location.hash.replace(/^#rule-/, ""));
+    // Tabs open and close while the page is up; the match list follows.
+    matchesTimer = setInterval(refreshEditorMatches, 5000);
   } else if (page === "settings") {
     renderFields();
     // `#backup` was a page of its own once. It still opens the Backup pill,
@@ -1902,6 +2012,10 @@ let rules = [];
 /** Site groups (shared/groups.js). Needs its own flag and beta features both on. */
 let groups = [];
 const groupsOn = () => featureOn(settings, "site-groups");
+/** Whether rules may change how tabs look (flag "rules-appearance"). */
+const rulesAppearanceOn = () => featureOn(settings, "rules-appearance");
+/** The rule overrides worth showing: all, or with appearance off, the rest. */
+const shownOverrides = (set) => Object.entries(set ?? {}).filter(([k]) => ruleFieldsInForce(settings).includes(k));
 /**
  * The emoji of the settings group a rule field belongs to, so a rule's chips
  * and its override headings read like the Settings page: ⏳ for timing, 🚪 for
@@ -1909,13 +2023,39 @@ const groupsOn = () => featureOn(settings, "site-groups");
  */
 function fieldEmoji(key) {
   const def = RULE_FIELD_DEFS.find((f) => f.key === key);
-  const group = def?.group ?? (key === "neverExpire" ? "timing" : "appearance");
+  const group = def?.group ?? (key === "neverExpire" ? "timing" : key === RULE_MANAGE_FIELD ? "general" : "appearance");
   return GROUPS.find((g) => g.id === group)?.emoji ?? "";
 }
 
 const activeGroups = () => (groupsOn() ? groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
-const expandedRules = new Set();
+/**
+ * Edits in progress, by rule id ("new" for a rule not yet stored). A draft
+ * outlives leaving the editor: the list marks the rule, and coming back finds
+ * the edits where they were. Only Save writes any of it.
+ */
+const ruleDrafts = new Map();
+/** The pattern a new rule starts from, set by Add rule from the filter box. */
+let newRuleSeed = "";
+/** Which editor row to focus on arrival, when a list control asked for one. */
+let editorFocus = null;
+
+function openRuleEditor(id, focus = null) {
+  editorFocus = focus;
+  location.hash = `#rule-${id}`;
+}
+
+/** Whether a draft differs from what is stored (a new rule always does). */
+function draftDirty(id) {
+  const draft = ruleDrafts.get(id);
+  if (!draft) return false;
+  const saved = rules.find((r) => r.id === id);
+  return !saved || ruleChanges(saved, draft).length > 0;
+}
+
+window.addEventListener("beforeunload", (e) => {
+  if ([...ruleDrafts.keys()].some(draftDirty) || Object.keys(settingsDraft).length) e.preventDefault();
+});
 /**
  * The priority a rule had before its on/off switch zeroed it, so switching it
  * back on restores what the user chose rather than a default. Only for this
@@ -1955,6 +2095,11 @@ const RULE_FIELD_TEXT = {
     label: "Count background time only",
     short: "Background time only",
     help: "The clock stops while you are looking at {tab}.",
+  },
+  manageTabs: {
+    label: "Manage tabs",
+    short: "Managed",
+    help: "Off, Timed Tabs leaves {tabs} alone: no timer, nothing closed, no colours, and an empty clock on the toolbar button. Nothing else in the rule applies.",
   },
   neverExpire: {
     label: "Timer off",
@@ -2056,6 +2201,7 @@ const RULE_CHIP_TOGGLE_TEXT = {
   resetOnActivate: { on: "Restarts on focus", off: "No restart on focus" },
   pauseWhileActive: { on: "Background time only", off: "Counts time while active" },
   neverExpire: { on: "Timer off", off: "Timer on" },
+  manageTabs: { on: "Managed", off: "Left alone" },
   hideWhileGreen: { on: "Quiet until near expiry", off: "Shows from the start" },
   flashBeforeExpiry: { on: "Flashes before expiry", off: "No flash" },
 };
@@ -2216,7 +2362,7 @@ function renderGroup(group) {
   const meta = document.createElement("p");
   meta.className = "group-meta";
   meta.textContent = users.length
-    ? `Rules that use this group: ${users.map((r) => r.description || groupRef(group.name)).join(", ")}. Point a rule at “Group: ${group.name}” in its target picker.`
+    ? `Rules that use this group: ${users.map((r) => ruleName(r)).join(", ")}. Point a rule at “Group: ${group.name}” in its target picker.`
     : `No rule uses this group yet. Pick “Group: ${group.name}” as a rule's target to apply it.`;
   body.append(patterns, meta);
   el.append(body);
@@ -2253,10 +2399,33 @@ function renderRules() {
     p.textContent =
       "No rules yet. Add one here, or open “Make / edit rules for this page” from the popup.";
     list.replaceChildren(p);
+    if (ruleDrafts.has("new")) list.prepend(renderNewDraftRow(ruleDrafts.get("new")));
     return;
   }
   list.replaceChildren(...sortedRules().map(renderRule));
   if ($("rules-filter").value.trim()) applyRulesFilter();
+  // A rule begun but not saved is not in the list yet; say so at the top.
+  if (ruleDrafts.has("new")) list.prepend(renderNewDraftRow(ruleDrafts.get("new")));
+}
+
+function renderNewDraftRow(draft) {
+  const el = document.createElement("div");
+  el.className = "rule is-collapsed";
+  const summary = document.createElement("button");
+  summary.type = "button";
+  summary.className = "rule-summary";
+  summary.style.paddingLeft = "var(--sp-2)";
+  const chip = document.createElement("span");
+  chip.className = "rule-chip is-draft";
+  chip.textContent = "✎ new rule, not saved";
+  const meta = document.createElement("span");
+  meta.className = "rule-meta";
+  meta.textContent = ruleName(draft);
+  summary.append(chip, meta);
+  summary.title = "Continue the new rule";
+  summary.addEventListener("click", () => openRuleEditor("new"));
+  el.append(summary);
+  return el;
 }
 
 /**
@@ -2264,6 +2433,24 @@ function renderRules() {
  * every "*" in its own colour. An input cannot colour part of its value, so
  * the input's own text is transparent and only its caret and selection show.
  */
+/** The first `max` characters of a note, with an ellipsis where it was cut. */
+function snippet(text, max) {
+  const t = String(text).trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 20))}…`;
+}
+
+/** A pattern as spans, every "*" in its own so it can be coloured. */
+function wildcardSpans(pattern) {
+  return pattern.split(/(\*)/).filter(Boolean).map((part) => {
+    const s = document.createElement("span");
+    if (part === "*") s.className = "wildcard";
+    s.textContent = part;
+    return s;
+  });
+}
+
 function mirrorWildcards(input) {
   const wrap = document.createElement("span");
   wrap.className = "rule-pattern-wrap";
@@ -2273,14 +2460,7 @@ function mirrorWildcards(input) {
   const text = document.createElement("span");
   mirror.append(text);
   const paint = () => {
-    text.replaceChildren(
-      ...input.value.split(/(\*)/).filter(Boolean).map((part) => {
-        const s = document.createElement("span");
-        if (part === "*") s.className = "wildcard";
-        s.textContent = part;
-        return s;
-      }),
-    );
+    text.replaceChildren(...wildcardSpans(input.value));
     text.style.marginLeft = `-${input.scrollLeft}px`;
   };
   input.addEventListener("input", paint);
@@ -2296,7 +2476,7 @@ function mirrorWildcards(input) {
  * no room for a worded button, so it is an icon that grows the word only once
  * armed; an icon on its own cannot say "armed".
  */
-function ruleDeleteButton(rule) {
+function ruleDeleteButton(rule, after = null) {
   const del = document.createElement("button");
   del.type = "button";
   del.className = "rule-delete quiet icon-btn";
@@ -2324,7 +2504,10 @@ function ruleDeleteButton(rule) {
     }
     disarm();
     rules = rules.filter((r) => r.id !== rule.id);
-    persistRules();
+    ruleDrafts.delete(rule.id);
+    persistRules().then((ok) => {
+      if (ok) after?.();
+    });
   });
   del.addEventListener("blur", () => {
     if (armed) setTimeout(disarm, 200);
@@ -2338,54 +2521,39 @@ function ruleDeleteButton(rule) {
  * and the on/off switch, which is what turns the card into a row that can be
  * read without opening it.
  */
-function ruleHead(rule, el, targetsGroup, open) {
+function ruleHead(rule, targetsGroup) {
   const head = document.createElement("div");
   head.className = "rule-head";
   const toggle = document.createElement("button");
   toggle.type = "button";
-  toggle.className = "rule-toggle chev";
-  toggle.classList.toggle("is-open", open);
-  toggle.setAttribute("aria-expanded", String(open));
-  toggle.setAttribute("aria-label", open ? "Collapse rule" : "Expand rule");
-  toggle.title = open ? "Collapse" : "Expand";
-  toggle.addEventListener("click", () =>
-    setRuleExpanded(rule.id, !expandedRules.has(rule.id)),
-  );
+  toggle.className = "rule-toggle icon-btn";
+  toggle.replaceChildren(svgIcon("edit"));
+  toggle.setAttribute("aria-label", "Edit rule");
+  toggle.title = "Edit";
+  toggle.addEventListener("click", () => openRuleEditor(rule.id));
 
-  const pattern = document.createElement("input");
-  pattern.className = "rule-pattern";
-  pattern.placeholder = "Type an address pattern, e.g. example.com/*";
-  pattern.value = rule.pattern;
-  pattern.setAttribute("aria-label", "Address pattern");
-  pattern.addEventListener("change", () =>
-    updateRule(rule.id, { pattern: pattern.value.trim() }, true, "head"),
-  );
-  const patternWrap = mirrorWildcards(pattern);
-  // Hidden only when the picker below stands in for it: with site groups
-  // off there is no picker, and the field is the one way to retarget the rule.
-  patternWrap.hidden = targetsGroup && groupsOn();
-
-  // With site groups on, the head gets a picker: an address, or one of the groups.
-  let target = null;
-  if (groupsOn()) {
-    target = document.createElement("select");
-    target.className = "rule-target";
-    target.setAttribute("aria-label", "What this rule applies to");
-    // A target carries the same mark as the rest of the UI: 🔗 for an
-    // address, 🗂️ for a site group (its page heading's emoji).
-    target.add(new Option("🔗 Address", ""));
-    for (const g of groups) target.add(new Option(`🗂️ ${g.name}`, groupRef(g.name)));
-    const current = targetsGroup ? groupRef(groupNameOf(rule.pattern)) : "";
-    if (targetsGroup && !findGroup(groups, groupNameOf(rule.pattern))) {
-      const missing = groupNameOf(rule.pattern);
-      target.add(new Option(`🗂️ ${missing} (missing)`, current));
-    }
-    target.value = current;
-    target.addEventListener("change", () => {
-      const next = target.value || NEW_RULE_PATTERN;
-      updateRule(rule.id, { pattern: next, match: "wildcard" }, true, "head");
-    });
-  }
+  // The row is read-only: the pattern (or the group it targets) is text that
+  // opens the editor, where the rule is actually changed.
+  const patternWrap = document.createElement("button");
+  patternWrap.type = "button";
+  patternWrap.className = "rule-pattern-static";
+  patternWrap.title = "Edit rule";
+  // A named rule leads with its name; the pattern follows, smaller. Without
+  // a name the pattern is the headline, as it always was.
+  const patternText = document.createElement("span");
+  patternText.className = "rule-head-pattern";
+  if (targetsGroup) patternText.textContent = `🗂️ ${groupNameOf(rule.pattern)}`;
+  else if (!rule.pattern.trim()) patternText.textContent = "(no pattern yet)";
+  else patternText.append(...wildcardSpans(rule.pattern));
+  if (rule.name) {
+    const nameText = document.createElement("span");
+    nameText.className = "rule-head-name";
+    nameText.textContent = rule.name;
+    patternWrap.classList.add("has-name");
+    patternWrap.append(nameText, patternText);
+  } else patternWrap.append(patternText);
+  patternWrap.addEventListener("click", () => openRuleEditor(rule.id));
+  const target = null;
 
   // Priority decides which rule wins, and the list is ordered by pattern
   // rather than by it, so it has to be readable without opening a card.
@@ -2398,10 +2566,7 @@ function ruleHead(rule, el, targetsGroup, open) {
       ? "Priority 0: this rule is switched off. Click to change it."
       : `Priority ${rule.priority}: when two rules disagree, the higher number wins. Click to change it.`;
   prio.setAttribute("aria-label", prio.title);
-  prio.addEventListener("click", () => {
-    setRuleExpanded(rule.id, true);
-    el.querySelector('[data-row-key="priority"] input')?.focus();
-  });
+  prio.addEventListener("click", () => openRuleEditor(rule.id, "priority"));
 
   // A group rule hides the pattern box, so the head says how big the group is
   // in its place; without it the row would be a bare picker.
@@ -2449,8 +2614,8 @@ function ruleSummary(rule, targetsGroup) {
   const summary = document.createElement("button");
   summary.type = "button";
   summary.className = "rule-summary";
-  summary.title = "Expand rule";
-  summary.addEventListener("click", () => setRuleExpanded(rule.id, true));
+  summary.title = "Edit rule";
+  summary.addEventListener("click", () => openRuleEditor(rule.id));
 
   const meta = document.createElement("span");
   meta.className = "rule-meta";
@@ -2458,7 +2623,8 @@ function ruleSummary(rule, targetsGroup) {
   if (isEmptyRule(rule)) metaParts.push("No pattern yet, so this rule matches nothing");
   const problem = targetsGroup ? groupTargetProblem(rule) : null;
   if (problem) metaParts.push(problem);
-  if (rule.description) metaParts.push(rule.description);
+  // A bit of the description, the rest on the rule's page.
+  if (rule.description) metaParts.push(snippet(rule.description, 90));
   if (!targetsGroup) metaParts.push(rule.match === "prefix" ? "starts with" : "wildcard");
   meta.textContent = metaParts.join(" \u00b7 ");
   meta.hidden = !metaParts.length;
@@ -2466,7 +2632,14 @@ function ruleSummary(rule, targetsGroup) {
 
   const chips = document.createElement("span");
   chips.className = "rule-chips";
-  const sets = Object.entries(rule.set ?? {});
+  const sets = shownOverrides(rule.set);
+  if (draftDirty(rule.id)) {
+    const draft = document.createElement("span");
+    draft.className = "rule-chip is-draft";
+    draft.textContent = "✎ unsaved edits";
+    draft.title = "This rule has edits that are not saved yet. Open it to save or discard them.";
+    chips.append(draft);
+  }
   if (!sets.length) {
     const none = document.createElement("span");
     none.className = "rule-chip is-empty";
@@ -2486,105 +2659,594 @@ function ruleSummary(rule, targetsGroup) {
 
 function renderRule(rule) {
   const el = document.createElement("div");
-  el.className = "rule";
+  el.className = "rule is-collapsed";
   el.dataset.ruleId = rule.id;
   el.classList.toggle("is-disabled", rule.priority === 0);
-
-  const open = expandedRules.has(rule.id);
-  el.classList.toggle("is-collapsed", !open);
   el.classList.toggle("is-just-added", rule.id === justAddedRuleId);
-
   const targetsGroup = isGroupRef(rule.pattern);
-  el.append(ruleHead(rule, el, targetsGroup, open));
+  el.append(ruleHead(rule, targetsGroup));
   el.append(ruleSummary(rule, targetsGroup));
+  return el;
+}
 
-  const body = document.createElement("div");
-  body.className = "rule-body";
-  el.append(body);
+// ---- The rule editor page -------------------------------------------------
 
-  if (targetsGroup) {
-    const note = document.createElement("p");
-    note.className = "rule-group-note";
-    note.textContent = describeGroupTarget(rule) + ".";
-    body.append(note);
+/** The rule the editor is showing: its id ("new" until stored) and a redraw. */
+let editorState = null;
+
+// ---- Rule test --------------------------------------------------------------
+
+/** The address last tested, so the page comes back to it. */
+let ruleTestUrl = "";
+
+async function renderRuleTest() {
+  const input = $("rule-test-url");
+  const picker = $("rule-test-tabs");
+  if (input.value !== ruleTestUrl) input.value = ruleTestUrl;
+  // The open tabs, for picking one instead of typing. Extension and browser
+  // pages are left out: no rule can target them.
+  const tabs = await api.tabs.query({}).catch(() => []);
+  picker.replaceChildren(new Option("Open tabs…", ""));
+  for (const t of tabs) {
+    if (!t.url || !isRuleableUrl(t.url)) continue;
+    const label = (t.title || t.url).slice(0, 60);
+    picker.add(new Option(label, t.url));
   }
+  renderRuleTestResult();
+}
 
-  const descWrap = document.createElement("div");
-  descWrap.className = "rule-description-wrap";
-  const desc = document.createElement("input");
-  desc.className = "rule-description";
-  desc.placeholder = "What is this rule for? (optional)";
-  desc.value = rule.description ?? "";
-  desc.setAttribute("aria-label", "Description");
-  desc.addEventListener("change", async () => {
-    await updateRule(rule.id, { description: desc.value.trim() }, false);
-    markSaved(descWrap, descWrap);
+function renderRuleTestResult() {
+  const out = $("rule-test-result");
+  const url = ruleTestUrl.trim();
+  out.replaceChildren();
+  if (!url) return;
+  if (!isRuleableUrl(url)) {
+    const p = document.createElement("p");
+    p.className = "rules-help";
+    p.textContent = "That is not an address rules can target. Try a web page, starting with https://.";
+    out.append(p);
+    return;
+  }
+  const inForce = applicableRules(rules, url, activeGroups());
+  const parked = rules.filter((r) => r.priority === 0 && matchesRule(r, url, activeGroups()));
+  const explained = explainSettings(settings, inForce);
+  const unmanaged = !managesTab(settings, inForce) || explained.manageTabs.value === false;
+
+  // The verdict first: is this a tab Timed Tabs acts on at all, and why not.
+  const verdict = document.createElement("p");
+  verdict.className = "rule-test-verdict";
+  verdict.classList.toggle("is-unmanaged", unmanaged);
+  const why = document.createElement("small");
+  if (settings.tabManagement === false) {
+    verdict.textContent = "Left alone: Manage tabs is off for every tab.";
+  } else if (explained.manageTabs.from === "rule") {
+    verdict.textContent = `Left alone: “${ruleName(explained.manageTabs.rule)}” switches Manage tabs off for this address.`;
+  } else if (unmanaged) {
+    verdict.textContent = "Left alone: “Only manage tabs a rule matches” is on and no rule catches this address.";
+  } else {
+    verdict.textContent = inForce.length
+      ? `Managed, with ${inForce.length} rule${inForce.length === 1 ? "" : "s"} applied.`
+      : "Managed, at your defaults: no rule catches this address.";
+  }
+  why.textContent = unmanaged ? "No timer, nothing closed, no colours, an empty clock on the toolbar button." : "";
+  if (why.textContent) verdict.append(why);
+  out.append(verdict);
+
+  // A rule for this address, started with its site filled in. The pattern is
+  // the whole host, the same suggestion Add rule makes from the filter box.
+  const actions = document.createElement("p");
+  actions.className = "rule-test-actions";
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "primary";
+  add.append(svgIcon("plus"), document.createTextNode(`Add a rule for ${patternForUrl(url)}`));
+  add.title = "Start a new rule with this address's pattern filled in";
+  add.addEventListener("click", () => {
+    // A new rule already on the go keeps its edits; otherwise start from here.
+    if (!ruleDrafts.has("new")) newRuleSeed = patternForUrl(url);
+    openRuleEditor("new", "pattern");
   });
-  descWrap.append(desc);
-  body.append(descWrap);
+  actions.append(add);
+  out.append(actions);
 
-  // How it matches, and how strongly.
+  // The rules that caught it, the one that wins first.
+  const heading = document.createElement("p");
+  heading.className = "rule-overrides-title";
+  heading.textContent = `📋 Rules that catch this address (${inForce.length})`;
+  out.append(heading);
+  const list = document.createElement("div");
+  list.className = "rules-list";
+  for (const r of [...inForce].reverse()) list.append(renderRuleTestRule(r, false));
+  for (const r of parked) list.append(renderRuleTestRule(r, true));
+  if (!inForce.length && !parked.length) {
+    const p = document.createElement("p");
+    p.className = "rules-empty";
+    p.textContent = "No rule matches. Add rule on the Rules page starts one from an address.";
+    list.append(p);
+  }
+  out.append(list);
+
+  // What every setting ends up as, and who decided.
+  const th = document.createElement("p");
+  th.className = "rule-overrides-title";
+  th.textContent = "⚙️ What applies to this address";
+  out.append(th);
+  const table = document.createElement("table");
+  table.className = "rule-test-table";
+  const head = table.createTHead().insertRow();
+  for (const t of ["Setting", "Value", "Decided by"]) {
+    const cell = document.createElement("th");
+    cell.textContent = t;
+    head.append(cell);
+  }
+  const body = table.createTBody();
+  // The tab's own switch has no place here: this is an address, not a tab.
+  const keys = [RULE_MANAGE_FIELD, ...RULE_TIMING_FIELDS, ...(rulesAppearanceOn() ? RULE_VISUAL_FIELDS : [])];
+  const layered = Object.fromEntries(keys.map((k) => [k, explained[k]?.value]));
+  for (const key of keys) {
+    const def = RULE_FIELD_DEFS.find((d) => d.key === key);
+    // A dependent row (flash lead, favicon style) only means something while its parent is on.
+    if (def?.showWhen && !def.showWhen({ ...settings, ...layered })) continue;
+    const entry = explained[key];
+    const tr = body.insertRow();
+    tr.classList.toggle("is-rule", entry.from === "rule");
+    const name = tr.insertCell();
+    const emoji = fieldEmoji(key);
+    name.textContent = `${emoji ? emoji + " " : ""}${ruleFieldLabel(key)}`;
+    const value = tr.insertCell();
+    value.textContent = formatRuleValue(key, entry.value);
+    const from = tr.insertCell();
+    if (entry.from === "rule") {
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "rule-test-source";
+      link.textContent = `${ruleName(entry.rule)} (${entry.rule.priority})`;
+      link.title = `Open “${ruleName(entry.rule)}” at this setting`;
+      link.addEventListener("click", () => openRuleEditor(entry.rule.id, key));
+      from.append(link);
+    } else {
+      const d = document.createElement("span");
+      d.className = "rule-test-default";
+      d.textContent = key === RULE_MANAGE_FIELD ? "Manage tabs switch" : "Your defaults";
+      from.append(d);
+    }
+  }
+  out.append(table);
+}
+
+/** One caught rule as a row that opens its editor. `parked`: priority 0, so it did not apply. */
+function renderRuleTestRule(r, parked) {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "rule-test-rule";
+  el.classList.toggle("is-ignored", parked);
+  el.title = "Edit this rule";
+  el.addEventListener("click", () => openRuleEditor(r.id));
+  const prio = document.createElement("span");
+  prio.className = "rule-priority";
+  prio.textContent = parked ? "off" : String(r.priority);
+  const name = document.createElement("span");
+  name.className = "rule-name-text";
+  name.textContent = ruleName(r);
+  const pattern = document.createElement("span");
+  pattern.className = "rule-pattern-static";
+  if (isGroupRef(r.pattern)) pattern.textContent = `🗂️ ${groupNameOf(r.pattern)}`;
+  else pattern.append(...wildcardSpans(r.pattern));
+  el.append(prio, name);
+  if (ruleName(r) !== r.pattern) el.append(pattern);
+  if (parked) {
+    const note = document.createElement("span");
+    note.className = "rule-meta";
+    note.textContent = "matches, but is switched off";
+    el.append(note);
+  }
+  const chips = document.createElement("span");
+  chips.className = "rule-chips";
+  for (const [k, v] of shownOverrides(r.set)) {
+    const chip = document.createElement("span");
+    chip.className = "rule-chip";
+    const emoji = fieldEmoji(k);
+    chip.textContent = emoji ? `${emoji} ${ruleChipText(k, v)}` : ruleChipText(k, v);
+    chips.append(chip);
+  }
+  if (chips.childElementCount) el.append(chips);
+  return el;
+}
+
+$("rule-test-url").addEventListener("input", () => {
+  ruleTestUrl = $("rule-test-url").value;
+  renderRuleTestResult();
+});
+$("rule-test-tabs").addEventListener("change", () => {
+  const url = $("rule-test-tabs").value;
+  if (!url) return;
+  ruleTestUrl = url;
+  $("rule-test-url").value = url;
+  renderRuleTestResult();
+});
+
+/**
+ * Draw one rule, full width. Every control writes to a draft; nothing reaches
+ * storage until Save. Rows whose value differs from the stored rule are
+ * marked, and the bar at the foot counts them.
+ */
+function renderRuleEditor(id) {
+  const isNew = id === "new";
+  const saved = isNew ? null : rules.find((r) => r.id === id);
+  if (!isNew && !saved) {
+    // A link to a rule that is gone lands on the list rather than a blank page.
+    history.replaceState(null, "", "#rules");
+    route();
+    return;
+  }
+  let draft = ruleDrafts.get(id);
+  if (!draft) {
+    draft = isNew
+      ? newRule({ pattern: newRuleSeed || NEW_RULE_PATTERN, priority: DEFAULT_RULE_PRIORITY })
+      : structuredClone(saved);
+    ruleDrafts.set(id, draft);
+  }
+  // What "changed" is measured against: the stored rule, or for a new one the
+  // blank it started from, so only what was typed lights up.
+  const baseline = saved ?? newRule({ id: draft.id, pattern: newRuleSeed || NEW_RULE_PATTERN, priority: DEFAULT_RULE_PRIORITY });
+  editorState = { id, isNew, draft, baseline };
+
+  const form = $("rule-editor-form");
+  const rows = [];
+  const row = (key, r) => {
+    withKey(key, r);
+    rows.push(r);
+    return r;
+  };
+  const textField = (key, label, help, placeholder, maxLength) => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = draft[key] ?? "";
+    input.placeholder = placeholder;
+    if (maxLength) input.maxLength = maxLength;
+    input.className = "rule-editor-text";
+    input.addEventListener("input", () => {
+      draft[key] = input.value;
+      refreshEditorDirty();
+    });
+    input.addEventListener("change", () => {
+      draft[key] = input.value.trim();
+      input.value = draft[key];
+      refreshEditorDirty();
+    });
+    return row(key, settingRow(label, help, input));
+  };
+
+  form.replaceChildren();
+
+  // On or off, first: the same switch as the list row, but staged like the
+  // rest. Off is priority 0; on brings back the priority the rule had.
+  const enableHelp = () =>
+    draft.priority > 0
+      ? "On. Switch off to park the rule without deleting it."
+      : "Off. The rule is kept but changes nothing; switch on to use it again.";
+  const enable = makeSwitch(draft.priority > 0, (on) => {
+    if (!on && draft.priority > 0) offPriorities.set(id, draft.priority);
+    draft.priority = on ? (offPriorities.get(id) || DEFAULT_RULE_PRIORITY) : 0;
+    prioInput.value = String(draft.priority);
+    prioRow.querySelector(".field-help").textContent = prioHelp();
+    enableRow.querySelector(".field-help").textContent = enableHelp();
+    refreshEditorDirty();
+  });
+  enable.input.setAttribute("aria-label", "Rule on");
+  const enableRow = row("enabled", settingRow("Rule on", enableHelp(), enable.el));
+  form.append(enableRow);
+
+  form.append(
+    textField("name", "Name", "What the rule is called in the list and the popup. Empty, the pattern stands in.", "e.g. Slow docs", 60),
+    textField("description", "Description", "A note to yourself about what the rule is for.", "optional", 200),
+  );
+
+  // The target: an address pattern, or with site groups on, one of the groups.
+  const targetsGroup = () => isGroupRef(draft.pattern);
+  let targetSelect = null;
+  if (groupsOn()) {
+    targetSelect = document.createElement("select");
+    targetSelect.className = "rule-target";
+    targetSelect.add(new Option("🔗 Address", ""));
+    for (const g of groups) targetSelect.add(new Option(`🗂️ ${g.name}`, groupRef(g.name)));
+    const current = targetsGroup() ? groupRef(groupNameOf(draft.pattern)) : "";
+    if (targetsGroup() && !findGroup(groups, groupNameOf(draft.pattern))) {
+      targetSelect.add(new Option(`🗂️ ${groupNameOf(draft.pattern)} (missing)`, current));
+    }
+    targetSelect.value = current;
+    targetSelect.addEventListener("change", () => {
+      draft.pattern = targetSelect.value || (lastAddress || NEW_RULE_PATTERN);
+      draft.match = "wildcard";
+      syncTarget();
+      refreshEditorDirty();
+      refreshEditorMatches();
+    });
+    form.append(row("target", settingRow("Applies to", "An address pattern, or every site in a group.", targetSelect)));
+  }
+  // Under a group target, how big the group is and whether it exists.
+  const groupNote = document.createElement("p");
+  groupNote.className = "rule-group-note";
+  form.append(groupNote);
+
+  const pattern = document.createElement("input");
+  pattern.className = "rule-pattern";
+  pattern.placeholder = "Type an address pattern, e.g. example.com/*";
+  pattern.setAttribute("aria-label", "Address pattern");
+  let lastAddress = targetsGroup() ? "" : draft.pattern;
+  pattern.value = lastAddress;
+  pattern.addEventListener("input", () => {
+    draft.pattern = pattern.value;
+    lastAddress = pattern.value;
+    refreshEditorDirty();
+    refreshEditorMatches();
+  });
+  pattern.addEventListener("change", () => {
+    draft.pattern = pattern.value.trim();
+    pattern.value = draft.pattern;
+    lastAddress = draft.pattern;
+    refreshEditorDirty();
+  });
+  const patternRow = row(
+    "pattern",
+    settingRow("Address pattern", "Use * as a wildcard; a pattern without https:// matches any scheme.", mirrorWildcards(pattern)),
+  );
+  patternRow.classList.add("rule-editor-pattern-row");
+  form.append(patternRow);
+
   const match = document.createElement("select");
   match.add(new Option("Wildcard", "wildcard"));
   match.add(new Option("Starts with", "prefix"));
-  match.value = rule.match;
-  match.addEventListener("change", () =>
-    updateRule(rule.id, { match: match.value }, true, "match"),
-  );
-  const matchRow = withKey(
-    "match",
-    settingRow(
-      "Match",
-      rule.match === "prefix"
-        ? "The address must begin with the pattern."
-        : "The whole address must fit the pattern. * stands for anything.",
-      match,
-    ),
-  );
-  // A group's entries are always wildcards, so the mode has nothing to say.
-  matchRow.hidden = targetsGroup;
-  body.append(matchRow);
+  match.value = draft.match;
+  match.addEventListener("change", () => {
+    draft.match = match.value;
+    matchRow.querySelector(".field-help").textContent = matchHelp();
+    refreshEditorDirty();
+    refreshEditorMatches();
+  });
+  const matchHelp = () =>
+    draft.match === "prefix"
+      ? "The address must begin with the pattern."
+      : "The whole address must fit the pattern. * stands for anything.";
+  const matchRow = row("match", settingRow("Match", matchHelp(), match));
+  form.append(matchRow);
+
+  const syncTarget = () => {
+    const g = targetsGroup();
+    patternRow.hidden = g;
+    matchRow.hidden = g;
+    groupNote.hidden = !g;
+    if (g) groupNote.textContent = describeGroupTarget(draft) + ".";
+    if (!g) {
+      pattern.value = draft.pattern;
+      pattern.dispatchEvent(new Event("input", { bubbles: false }));
+    }
+  };
 
   const prioInput = document.createElement("input");
   prioInput.type = "number";
   prioInput.min = "0";
   prioInput.max = String(MAX_PRIORITY);
   prioInput.step = "1";
-  prioInput.value = String(rule.priority);
-  prioInput.addEventListener("change", () =>
-    updateRule(
-      rule.id,
-      { priority: clampPriority(prioInput.value) },
-      true,
-      "priority",
-    ),
-  );
-  body.append(
-    withKey(
-      "priority",
-      settingRow(
-        "Priority",
-        rule.priority === 0
-          ? "0: this rule is switched off."
-          : "When two rules disagree, the higher number wins. 0 switches a rule off.",
-        prioInput,
-      ),
-    ),
-  );
+  prioInput.value = String(draft.priority);
+  const prioHelp = () =>
+    draft.priority === 0
+      ? "0: this rule is switched off."
+      : "When two rules disagree, the higher number wins. 0 switches a rule off.";
+  prioInput.addEventListener("change", () => {
+    draft.priority = clampPriority(prioInput.value);
+    prioInput.value = String(draft.priority);
+    prioRow.querySelector(".field-help").textContent = prioHelp();
+    enable.input.checked = draft.priority > 0;
+    enableRow.querySelector(".field-help").textContent = enableHelp();
+    refreshEditorDirty();
+  });
+  const prioRow = row("priority", settingRow("Priority", prioHelp(), prioInput));
+  form.append(prioRow);
+
+  // Which open tabs the pattern catches, as it is typed: the quickest way to
+  // see whether "*" landed where it was meant to.
+  const matches = document.createElement("div");
+  matches.className = "rule-matches";
+  const matchesTitle = document.createElement("p");
+  matchesTitle.className = "rule-overrides-title";
+  const matchesList = document.createElement("div");
+  matchesList.className = "rule-matches-list";
+  matches.append(matchesTitle, matchesList);
+  form.append(matches);
+  editorMatches = { draft, title: matchesTitle, list: matchesList };
+  refreshEditorMatches();
 
   const store = {
     get set() {
-      return rules.find((r) => r.id === rule.id)?.set ?? {};
+      return draft.set;
     },
-    base: (key) => settings[key],
-    commit: (set) => updateRule(rule.id, { set }, false),
+    base: (key) => baseValue(settings, key),
+    commit: (set) => {
+      draft.set = set;
+      refreshEditorDirty();
+      foldForManage();
+    },
   };
-  body.append(
-    renderOverrideGroup("⏳ Timer settings this rule changes", defsFor(RULE_TIMING_FIELDS), store),
-    renderOverrideGroup("🎨 How matching tabs look", defsFor(RULE_VISUAL_FIELDS), store),
-  );
-  return el;
+  // "Manage tabs" first, on its own: switched off by the rule, nothing under
+  // it applies, so the groups fold away behind a line saying so.
+  const manageBlock = document.createElement("div");
+  manageBlock.className = "rule-overrides rule-manage";
+  manageBlock.append(renderOverride(defsFor([RULE_MANAGE_FIELD])[0], store));
+  const leftAlone = document.createElement("p");
+  leftAlone.className = "rule-group-note rule-left-alone";
+  leftAlone.textContent = "Matching tabs are left alone, so nothing below applies while this is off.";
+  const timing = renderOverrideGroup("⏳ Timer settings this rule changes", defsFor(RULE_TIMING_FIELDS), store);
+  // Appearance is behind the "rules-appearance" flag: without it the section
+  // is not drawn, and whatever the rule holds there stays put, unread.
+  const visual = rulesAppearanceOn() ? renderOverrideGroup("🎨 How matching tabs look", defsFor(RULE_VISUAL_FIELDS), store) : null;
+  const foldForManage = (animate = true) => {
+    const off = draft.set[RULE_MANAGE_FIELD] === false;
+    setRevealed(leftAlone, off, animate);
+    setRevealed(timing, !off, animate);
+    if (visual) setRevealed(visual, !off, animate);
+  };
+  form.append(manageBlock, leftAlone, timing, ...(visual ? [visual] : []));
+  foldForManage(false);
+
+  if (!isNew) {
+    const danger = document.createElement("div");
+    danger.className = "rule-editor-danger";
+    const del = ruleDeleteButton(saved, () => {
+      ruleDrafts.delete(id);
+      location.hash = "#rules";
+    });
+    del.classList.remove("icon-btn");
+    del.replaceChildren(svgIcon("trash"), document.createTextNode("Delete rule"));
+    danger.append(del);
+    form.append(danger);
+  }
+
+  // Draw the unsaved state, then put the caret where the list sent it.
+  syncTarget();
+  refreshEditorDirty();
+  const focusKey = editorFocus ?? (isNew ? "pattern" : null);
+  editorFocus = null;
+  if (focusKey) {
+    const rowEl = form.querySelector(`[data-row-key="${focusKey}"], .override[data-key="${focusKey}"]`);
+    const target = rowEl?.querySelector("input, select");
+    rowEl?.scrollIntoView({ block: "center" });
+    target?.focus();
+    if (focusKey === "pattern" && target && !newRuleSeed) target.setSelectionRange(target.value.length, target.value.length);
+  }
+  newRuleSeed = "";
 }
+
+/**
+ * Mark the rows that differ from the stored rule and show or hide the bar.
+ * The stored rule is compared afresh each time, so an edit that goes back to
+ * the stored value stops counting.
+ */
+function refreshEditorDirty() {
+  if (!editorState) return;
+  const { id, isNew, draft, baseline } = editorState;
+  const saved = isNew ? baseline : (rules.find((r) => r.id === id) ?? baseline);
+  const changed = new Set(ruleChanges(saved, draft));
+  const form = $("rule-editor-form");
+  for (const r of form.querySelectorAll("[data-row-key]")) {
+    const key = r.dataset.rowKey;
+    // The target picker changes the pattern; it lights up with it. The on/off
+    // switch is the priority crossing zero.
+    const on =
+      key === "target"
+        ? changed.has("pattern")
+        : key === "enabled"
+          ? (saved.priority > 0) !== (draft.priority > 0)
+          : changed.has(key);
+    setRowChanged(r, on);
+  }
+  for (const r of form.querySelectorAll(".override[data-key]")) {
+    setRowChanged(r, changed.has(`set:${r.dataset.key}`));
+  }
+  const dirty = isNew || changed.size > 0;
+  const bar = $("rule-editor-bar");
+  bar.hidden = !dirty;
+  const n = changed.size;
+  $("rule-editor-bar-text").textContent = isNew
+    ? "New rule, not saved yet"
+    : `${n} unsaved change${n === 1 ? "" : "s"}`;
+  const usable = isGroupRef(draft.pattern) || draft.pattern.trim().length > 0;
+  $("rule-editor-save").disabled = !usable;
+  $("rule-editor-save").title = usable ? "" : "Give the rule an address pattern first.";
+  $("rule-editor-title").textContent = isNew ? "📋 New rule" : `📋 Edit rule · ${ruleName(draft)}`;
+}
+
+/** The editor's open-tabs block, and the draft it matches against. */
+let editorMatches = null;
+let editorMatchSeq = 0;
+const MATCHES_SHOWN = 12;
+
+async function refreshEditorMatches() {
+  if (!editorMatches) return;
+  const { draft, title, list } = editorMatches;
+  const seq = ++editorMatchSeq;
+  const tabs = await api.tabs.query({}).catch(() => []);
+  // A slower earlier query must not paint over a newer one.
+  if (seq !== editorMatchSeq || editorMatches?.draft !== draft) return;
+  const usable = isGroupRef(draft.pattern) || draft.pattern.trim().length > 0;
+  const hits = usable ? tabs.filter((t) => t.url && matchesRule(draft, t.url, activeGroups())) : [];
+  title.textContent = `🪟 Open tabs this rule matches (${hits.length})`;
+  list.replaceChildren();
+  if (!hits.length) {
+    const p = document.createElement("p");
+    p.className = "rule-matches-empty";
+    p.textContent = usable ? "None right now. The rule still applies to tabs opened later." : "Type an address pattern to see which open tabs it catches.";
+    list.append(p);
+    return;
+  }
+  for (const t of hits.slice(0, MATCHES_SHOWN)) {
+    const row = document.createElement("div");
+    row.className = "rule-match";
+    const icon = document.createElement("img");
+    icon.className = "rule-match-icon";
+    icon.alt = "";
+    if (t.favIconUrl) icon.src = t.favIconUrl;
+    const name = document.createElement("span");
+    name.className = "rule-match-title";
+    name.textContent = t.title || t.url;
+    const url = document.createElement("span");
+    url.className = "rule-match-url";
+    url.textContent = t.url;
+    row.title = t.url;
+    row.append(icon, name, url);
+    list.append(row);
+  }
+  if (hits.length > MATCHES_SHOWN) {
+    const more = document.createElement("p");
+    more.className = "rule-matches-empty";
+    more.textContent = `and ${hits.length - MATCHES_SHOWN} more`;
+    list.append(more);
+  }
+}
+
+function setRowChanged(rowEl, on) {
+  rowEl.classList.toggle("is-changed", on);
+  const label = rowEl.querySelector(".field-label-text") ?? rowEl.querySelector(".field-label");
+  if (!label) return;
+  let mark = label.querySelector(":scope > .changed-mark");
+  if (on && !mark) {
+    mark = document.createElement("span");
+    mark.className = "changed-mark";
+    mark.textContent = "unsaved";
+    // On the label's first line: before the help, where there is help.
+    const help = label.querySelector(":scope > .field-help");
+    if (help) help.before(mark);
+    else label.append(mark);
+  } else if (!on && mark) mark.remove();
+}
+
+$("rule-editor-save").addEventListener("click", async () => {
+  if (!editorState) return;
+  const { id, isNew, draft } = editorState;
+  const clean = newRule({ ...draft, set: { ...draft.set } });
+  const before = rules;
+  rules = rules.some((r) => r.id === clean.id) ? rules.map((r) => (r.id === clean.id ? clean : r)) : [...rules, clean];
+  const ok = await persistRules(false);
+  if (!ok) {
+    rules = before;
+    return;
+  }
+  ruleDrafts.delete(id);
+  editorState = null;
+  toasts.success("Saved", `“${ruleName(clean)}”`, "rules");
+  markJustAdded(clean.id);
+  location.hash = "#rules";
+  void isNew;
+});
+
+$("rule-editor-discard").addEventListener("click", () => {
+  if (!editorState) return;
+  const { id, isNew } = editorState;
+  ruleDrafts.delete(id);
+  editorState = null;
+  if (isNew) location.hash = "#rules";
+  else renderRuleEditor(id);
+});
 
 /**
  * A titled block of override rows. `store` is { set, base(key), commit(set) }:
@@ -2608,21 +3270,6 @@ function renderOverrideGroup(title, defs, store) {
   for (const [, row] of rows) group.append(row);
   applyVisibility();
   return group;
-}
-
-function setRuleExpanded(id, open) {
-  if (open) expandedRules.add(id);
-  else expandedRules.delete(id);
-  const card = $("rules-list").querySelector(
-    `[data-rule-id="${CSS.escape(id)}"]`,
-  );
-  if (!card) return;
-  card.classList.toggle("is-collapsed", !open);
-  const t = card.querySelector(".rule-toggle");
-  t.classList.toggle("is-open", open);
-  t.setAttribute("aria-expanded", String(open));
-  t.setAttribute("aria-label", open ? "Collapse rule" : "Expand rule");
-  t.title = open ? "Collapse" : "Expand";
 }
 
 function withKey(key, row) {
@@ -2868,72 +3515,45 @@ $("rules-remove-empty").addEventListener("click", async () => {
   await persistRules();
 });
 
-$("rule-add").addEventListener("click", async () => {
+$("rule-add").addEventListener("click", () => {
   // With an address filter active, start the new rule from that site.
   const site = $("rules-filter").value.trim();
   const pattern = site ? patternForUrl(site) : "";
-  // Don't pile up blank rules: reuse one that is still empty, or one with the same pattern.
-  const existing = rules.find((r) =>
-    pattern ? r.pattern === pattern : isEmptyRule(r),
-  );
-  let rule = existing;
-  if (!rule) {
-    rule = newRule({ pattern: pattern || NEW_RULE_PATTERN, priority: DEFAULT_RULE_PRIORITY });
-    rules = [...rules, rule];
-    expandedRules.add(rule.id);
-    // Draw the eye to the card that was just set up for this click; renders
-    // triggered by the save keep the mark until it times out.
-    markJustAdded(rule.id);
-    await persistRules();
-  } else {
-    markJustAdded(rule.id);
-    setRuleExpanded(rule.id, true);
-  }
-  const card = $("rules-list").querySelector(
-    `[data-rule-id="${CSS.escape(rule.id)}"]`,
-  );
-  if (card) {
-    card.classList.remove("is-filtered-out");
-    // The expanded card is tall: align its top so the pattern field stays on screen.
-    card.scrollIntoView({ block: "start", behavior: "smooth" });
-    card.classList.add("is-just-added");
-    const input = card.querySelector(".rule-pattern");
-    if (input) {
-      input.focus();
-      // A fresh "https://" stub: park the caret at the end, ready for the host.
-      if (!existing && !pattern) input.setSelectionRange(input.value.length, input.value.length);
-    }
-  }
+  // Don't pile up blank rules: open one that is still empty, or one with the same pattern.
+  const existing = rules.find((r) => (pattern ? r.pattern === pattern : isEmptyRule(r)));
+  if (existing) return openRuleEditor(existing.id);
+  // A new rule already on the go keeps its edits; a fresh one starts from the filter.
+  if (!ruleDrafts.has("new")) newRuleSeed = pattern;
+  openRuleEditor("new", "pattern");
 });
 
-/** Show only rules that match the address typed in the filter box. Matches open up; they can still be folded. */
-let lastFilter = "";
+/** Show only rules that match the address typed in the filter box. */
 function applyRulesFilter() {
   const url = $("rules-filter").value.trim();
   const note = $("rules-filter-note");
   $("rules-filter-clear").hidden = !url;
   const rows = [...$("rules-list").querySelectorAll(".rule")];
-  const changed = url !== lastFilter;
-  lastFilter = url;
   if (!url) {
     for (const el of rows) el.classList.remove("is-filtered-out");
     note.hidden = true;
     return;
   }
+  // An address finds the rules that catch it; any other text finds rules by
+  // name, description or pattern. Both, when the text could be either.
   let shown = 0;
   for (const el of rows) {
     const rule = rules.find((r) => r.id === el.dataset.ruleId);
-    const hit = rule ? matchesRule(rule, url, activeGroups()) || !rule.pattern.trim() : false;
+    const hit = rule ? matchesRule(rule, url, activeGroups()) || ruleMentions(rule, url) || !rule.pattern.trim() : false;
     el.classList.toggle("is-filtered-out", !hit);
-    if (hit) {
-      shown += 1;
-      if (changed) setRuleExpanded(rule.id, true);
-    }
+    if (hit) shown += 1;
   }
+  const isAddress = isRuleableUrl(url);
   note.hidden = false;
   note.textContent = shown
-    ? `${shown} of ${rules.length} rule${rules.length === 1 ? "" : "s"} match this address. Disabled rules (priority 0) are included.`
-    : `No rules match this address. Add rule starts one for ${patternForUrl(url) || "it"}.`;
+    ? `${shown} of ${rules.length} rule${rules.length === 1 ? "" : "s"} ${isAddress ? "catch this address or are named like it" : "are named or patterned like this"}. Disabled rules (priority 0) are included.`
+    : isAddress
+      ? `No rules catch this address. Add rule starts one for ${patternForUrl(url) || "it"}.`
+      : "No rule is named or patterned like this.";
 }
 
 $("rules-filter").addEventListener("input", applyRulesFilter);
@@ -2948,6 +3568,8 @@ watchRules((next) => {
   if (rulesSaving || JSON.stringify(next) === JSON.stringify(rules)) return;
   rules = next;
   if (!isPopup) renderRules();
+  if (!isPopup && document.body.dataset.page === "rule") refreshEditorDirty();
+  if (!isPopup && document.body.dataset.page === "test") renderRuleTestResult();
   if (isPopup) refreshTab();
 });
 
@@ -2960,6 +3582,9 @@ watchRules((next) => {
 watchSettings((next) => {
   if (JSON.stringify(next) === JSON.stringify(settings)) return;
   settings = next;
+  for (const [key, value] of Object.entries(settingsDraft)) {
+    if (JSON.stringify(value) === JSON.stringify(settings[key])) delete settingsDraft[key];
+  }
   applyManagementState();
   renderFields();
   // `?group=` picks the Settings group to arrive on -- what the flags note's
@@ -3028,6 +3653,10 @@ function renderFlagged() {
     renderGroups();
     renderRules();
     renderStats();
+    // A flag can add or take away a section of the rule editor and a column
+    // of the rule test; redraw whichever is up.
+    if (document.body.dataset.page === "rule") renderRuleEditor(location.hash.replace(/^#rule-/, ""));
+    if (document.body.dataset.page === "test") renderRuleTestResult();
   }
   if (isPopup) renderTab();
 }
@@ -3418,6 +4047,12 @@ async function openPageView(hash = "", extraParams = {}) {
 }
 
 $("open-page").addEventListener("click", () => openPageView("#tabs"));
+// The popup has no pages of its own, so its title opens the full page instead.
+$("home-link").addEventListener("click", (e) => {
+  if (!isPopup) return;
+  e.preventDefault();
+  openPageView("#tabs");
+});
 
 /** The Settings group the flags row lives in, asked rather than assumed. */
 const FLAGS_GROUP = FIELDS.find((f) => f.key === "featureFlags")?.group;

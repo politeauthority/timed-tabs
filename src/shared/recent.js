@@ -9,11 +9,12 @@
  * An expired tab that was not closed sits in its window with a dead clock, and
  * a profile with a few of them is mostly dead rows -- which is the state the
  * list is least useful in, since the tabs still running are the ones you can
- * still do something about. Five minutes is long enough to see what has just
- * gone and press Restart on it. After that the tab is still open and still
- * yours; it is simply listed under "Recently expired" instead.
+ * still do something about. A minute is long enough to see what has just
+ * gone and press Restart on it; the `expiredGraceSeconds` setting lengthens
+ * it, up to an hour. After that the tab is still open and still yours; it is
+ * simply listed under "Recently expired" instead.
  */
-export const EXPIRED_GRACE_SECONDS = 5 * 60;
+export const EXPIRED_GRACE_SECONDS = 60;
 
 /**
  * Whether a tab still belongs in its window's list, given when it expired.

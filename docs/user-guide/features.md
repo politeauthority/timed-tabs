@@ -40,7 +40,8 @@ Settings, When a tab expires, has one action for every background tab that runs
 out of time:
 
 - **Leave it open.** The colours show it has expired; the tab leaves its window's
-  list after five minutes and is listed under Recently expired instead.
+  list after a minute (a setting, up to an hour) and is listed under Recently
+  expired instead.
 - **Reload it, restart the timer.** Useful for dashboards and feeds.
 - **Unload it.** The tab stays in the strip but frees its memory.
 - **Close it.** The tab goes, and lands in the Recently expired list.
@@ -112,8 +113,9 @@ restart-on-focus, and close it. Closing asks for a second click.
 **Order by** sorts within each window by tab order, time left or percent left, and
 the choice is remembered.
 
-A tab that has expired keeps its place for five minutes, long enough to see what has
-just gone and restart it. After that it drops out of its window's list, and the count
+A tab that has expired keeps its place for a minute, long enough to see what has
+just gone and restart it; **Keep expired tabs in their window's list for**, under
+General, makes that anything up to an hour. After that it drops out of its window's list, and the count
 reads "2 of 8 tabs" so it is clear the tab is held back rather than gone. The tab
 itself is untouched: leaving the list is not closing it.
 
@@ -165,14 +167,38 @@ rules become the guest list and a page no rule covers is left alone entirely.
 The rules list is sorted by pattern. A filter box shows only the rules that match an
 address, and **Add rule** starts one for the filtered site and scrolls to it.
 
-Each rule is a row that can be read without opening it:
+Each rule is a row that can be read without opening it. Clicking the row, its
+pencil or its pattern opens the rule on a page of its own, and so does Add rule.
+Nothing on that page is stored until you press Save: rows you have changed wear
+an "unsaved" mark, and a bar at the foot follows you down the page counting the
+changes, with Save and Discard. Leaving the page keeps the edits waiting; the row
+in the list says "unsaved edits" until you come back and save or discard them.
+
+On the rule's page, **Manage tabs** sits above everything else. Switched off by the
+rule, the pages it matches are left alone exactly as the master switch would leave
+every tab, and the rest of the rule folds away since none of it applies. It replaces
+the old "Timer off" switch; a rule that had that reads as Manage tabs off.
+
+**Test an address**, beside Add rule, opens a page where you type an address or pick
+an open tab. It says whether Timed Tabs manages that address and why, lists the rules
+that catch it with the winner first (a parked rule that would match is shown too),
+and then every setting with its value and who decided it: your defaults, or a rule.
+The rule is a link that opens it at that very setting. **Add a rule for** the
+address's site starts a new rule with that pattern already filled in.
+
+The row itself:
 
 - **Priority** is a badge at the left of the rule, so the list says which rule wins
   at a glance. Clicking the badge opens that rule at its priority field.
 - **A switch** at the right parks a rule without deleting it. Switching it off sets
   the priority to 0; switching it back on restores the priority the rule had.
-- **What the rule changes** is a chip per setting, and the description and match mode
-  sit on the line above them.
+- **The headline** is the rule's name, with its pattern beside it; a rule with no
+  name goes by its pattern, here and wherever it is mentioned (the popup, a tab's
+  rule count, a group's list of users).
+- **What the rule changes** is a chip per setting, and the start of the description
+  and the match mode sit on the line above them.
+- **The search box** finds rules by name, description or pattern, and by an address:
+  type a page's address and the rules that would catch it are the ones left.
 - **Delete** is an icon, and takes two clicks.
 - A rule targeting a site group shows how many sites the group holds.
 
@@ -223,14 +249,17 @@ Some details worth knowing:
 
 ![The Settings page](../../assets/screenshots/settings.png)
 
-Settings save as soon as they change and say so in a message that slides in at the
-bottom of the window, naming what you changed. A success fades after a few seconds,
-with a line burning down the bottom of it; a failure stays until you dismiss it and
-says what went wrong, because a setting that could not be written is one you would
-otherwise go on believing you had changed. Resting the pointer on a message holds
-every countdown. Rules and the per-tab controls keep their **Saved** tick instead —
-it sits on the row you edited, which a message at the bottom of the window cannot do.
-Settings sync through the browser's extension storage; rules are kept locally.
+Nothing on the Settings page is stored until you press **Save settings**. A row you
+have changed wears an "unsaved" mark, and a bar at the foot of the page follows you
+down it, counting the changes, with **Discard** beside Save. Changing a value back by
+hand takes it out of the count. Saving says so in a message that slides in at the
+bottom of the window; a success fades after a few seconds, with a line burning down
+the bottom of it, while a failure stays until you dismiss it and says what went
+wrong, because a setting that could not be written is one you would otherwise go on
+believing you had changed. Resting the pointer on a message holds every countdown.
+The per-tab controls in the popup keep their **Saved** tick instead — it sits on the
+row you edited. Settings sync through the browser's extension storage; rules are
+kept locally.
 
 - **Manage tabs** is the master switch. Off leaves every tab alone, with no timers,
   no closing and no colours, and undoes every mark already made. Back on, every tab

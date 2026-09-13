@@ -10,6 +10,7 @@ import {
   newRule,
   patternForUrl,
   wantedIndicatorIds,
+  ruleName,
 } from "../src/shared/rules.js";
 import * as rulesModule from "../src/shared/rules.js";
 
@@ -73,6 +74,20 @@ describe("patternForUrl", () => {
   });
 });
 
+describe("name", () => {
+  it("is kept on new rules, trimmed, and defaults to empty", () => {
+    expect(newRule({ name: "  Slow docs " }).name).toBe("Slow docs");
+    expect(newRule({}).name).toBe("");
+    expect(newRule({ name: 5 }).name).toBe("");
+  });
+  it("names a rule by name, then description, then pattern", () => {
+    expect(ruleName({ name: "Docs", description: "d", pattern: "a.b/*" })).toBe("Docs");
+    expect(ruleName({ name: "", description: "d", pattern: "a.b/*" })).toBe("d");
+    expect(ruleName({ pattern: "a.b/*" })).toBe("a.b/*");
+    expect(ruleName(null)).toBe("a rule");
+  });
+});
+
 describe("description", () => {
   it("is kept on new rules and defaults to empty", () => {
     expect(newRule({ description: "Docs I read slowly" }).description).toBe("Docs I read slowly");
@@ -101,6 +116,7 @@ describe("re-evaluation on navigation", () => {
 
 describe("visual overrides", () => {
   const base = {
+    featureFlags: { "beta-features": true, "rules-appearance": true },
     tabLifetimeSeconds: 1800,
     onExpire: "none",
     resetOnActivate: false,
@@ -154,6 +170,8 @@ describe("visual overrides", () => {
 
 describe("explainSettings", () => {
   const globals = {
+    // Rules may set appearance here; the flag's own tests cover it off.
+    featureFlags: { "beta-features": true, "rules-appearance": true },
     tabLifetimeSeconds: 1800,
     onExpire: "none",
     resetOnActivate: false,
@@ -248,7 +266,7 @@ describe("wildcardMatch", () => {
 
 describe("wantedIndicatorIds with overrides and inert groups", () => {
   const { wantedIndicatorIds } = rulesModule;
-  const base = { indicators: ["favicon"] };
+  const base = { indicators: ["favicon"], featureFlags: { "beta-features": true, "rules-appearance": true } };
   it("unions per-tab overrides", () => {
     expect(wantedIndicatorIds(base, [], [{ indicators: ["badge"] }, {}]).sort()).toEqual(["badge", "favicon"]);
   });
@@ -282,5 +300,74 @@ describe("managesTab", () => {
   it("takes anything but a true as off, the way an older profile stores it", () => {
     expect(managesTab({ requireRuleMatch: undefined }, [])).toBe(true);
     expect(managesTab(null, [])).toBe(true);
+  });
+});
+
+describe("ruleChanges", () => {
+  const base = newRule({ id: "x", name: "A", pattern: "a.b/*", priority: 5, set: { tabLifetimeSeconds: 60, flashBeforeExpiry: false } });
+  it("is empty for an identical copy", () => {
+    expect(rulesModule.ruleChanges(base, structuredClone(base))).toEqual([]);
+  });
+  it("names each top-level field that differs", () => {
+    const after = { ...base, name: "B", priority: 0 };
+    expect(rulesModule.ruleChanges(base, after)).toEqual(["name", "priority"]);
+  });
+  it("names an override added, removed or changed", () => {
+    const after = { ...base, set: { tabLifetimeSeconds: 120, indicators: ["favicon"] } };
+    expect(rulesModule.ruleChanges(base, after).sort()).toEqual(["set:flashBeforeExpiry", "set:indicators", "set:tabLifetimeSeconds"]);
+  });
+  it("treats a missing field and an empty one alike", () => {
+    expect(rulesModule.ruleChanges({ pattern: "a" }, { pattern: "a", name: "" })).toEqual([]);
+  });
+});
+
+describe("manageTabs", () => {
+  const globals = { tabManagement: true, tabLifetimeSeconds: 1800 };
+  it("reads as the global master switch until a rule says otherwise", () => {
+    expect(effectiveSettings(globals, [], "https://a.b/").manageTabs).toBe(true);
+    expect(effectiveSettings({ ...globals, tabManagement: false }, [], "https://a.b/").manageTabs).toBe(false);
+    expect(rulesModule.baseValue(globals, "manageTabs")).toBe(true);
+  });
+  it("a rule switches it off for the pages it matches", () => {
+    const rules = [r("a.b/*", { set: { manageTabs: false } })];
+    expect(effectiveSettings(globals, rules, "https://a.b/x").manageTabs).toBe(false);
+    expect(effectiveSettings(globals, rules, "https://c.d/").manageTabs).toBe(true);
+    expect(explainSettings(globals, rules).manageTabs.from).toBe("rule");
+  });
+});
+
+describe("ruleMentions", () => {
+  const rule = newRule({ name: "Slow docs", description: "Reference pages", pattern: "docs.example.com/*" });
+  it("finds a rule by name, description or pattern, ignoring case", () => {
+    expect(rulesModule.ruleMentions(rule, "slow")).toBe(true);
+    expect(rulesModule.ruleMentions(rule, "REFERENCE")).toBe(true);
+    expect(rulesModule.ruleMentions(rule, "example.com")).toBe(true);
+    expect(rulesModule.ruleMentions(rule, "mail")).toBe(false);
+  });
+  it("finds nothing for blank text", () => {
+    expect(rulesModule.ruleMentions(rule, "  ")).toBe(false);
+    expect(rulesModule.ruleMentions(rule, undefined)).toBe(false);
+  });
+});
+
+describe("the rules-appearance flag", () => {
+  const globals = { tabLifetimeSeconds: 1800, indicators: ["favicon"], faviconStyle: "square", flashBeforeExpiry: true };
+  const rules = [r("a.b/*", { set: { tabLifetimeSeconds: 60, faviconStyle: "ring", indicators: ["badge"] } })];
+  it("off, a rule's appearance overrides are kept but not read", () => {
+    const eff = effectiveSettings(globals, rules, "https://a.b/x");
+    expect(eff.tabLifetimeSeconds).toBe(60);
+    expect(eff.faviconStyle).toBe("square");
+    expect(explainSettings(globals, rules).faviconStyle.from).toBe("global");
+    expect(rulesModule.wantedIndicatorIds(globals, rules)).toEqual(["favicon"]);
+    expect(rulesModule.ruleFieldsInForce(globals)).not.toContain("faviconStyle");
+  });
+  it("on, they apply like any other override", () => {
+    const on = { ...globals, featureFlags: { "beta-features": true, "rules-appearance": true } };
+    expect(effectiveSettings(on, rules, "https://a.b/x").faviconStyle).toBe("ring");
+    expect(explainSettings(on, rules).faviconStyle.from).toBe("rule");
+    expect(rulesModule.wantedIndicatorIds(on, rules).sort()).toEqual(["badge", "favicon"]);
+  });
+  it("does not gate a tab's own overrides", () => {
+    expect(explainSettings(globals, [], { faviconStyle: "dot" }).faviconStyle.from).toBe("tab");
   });
 });
