@@ -131,6 +131,21 @@ to start, pages a few more, and a lifetime rule needs its lifetime plus a tick.
 Run one scenario with `npm run e2e -- <name>`. Set `FIREFOX=/path/to/firefox` to use a
 particular binary; without it, web-ext finds the installed one.
 
+Anchor an `expectNot` on something the scenario itself put on screen, not on the tab
+the browser was already showing. The dev hook writes its settings *after* the
+background has started, so that first tab gets one tick under the profile's own
+settings — `about:blank` in Chrome, `about:debugging` in Firefox — and is logged as
+managed for a moment before the next tick corrects it. A real profile has its settings
+before the first tick, so this is an artefact of seeding and nothing to assert about.
+A back-reference is the way to tie an expectation to one tab: `look (\d+)
+https://example\.com/ [^\n]*[\s\S]*painted \1 inactive` says "the tab that is on
+this page never gets that mark afterwards", which no startup tick can trip.
+
+Run the same scenario in Chrome before pushing if it touches anything browser-shaped:
+`CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm run
+e2e:chrome -- <name>`. Chrome is advisory in CI, so a scenario that only fails there
+is easy to miss.
+
 ## The CI job
 
 `.github/workflows/e2e.yaml` is a reusable workflow with no triggers of its own.
