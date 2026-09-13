@@ -1,0 +1,71 @@
+/* ---- Tokens ---------------------------------------------------------------- */
+
+:root {
+  color-scheme: light dark;
+
+  /* Ground and ink mirror Firefox's light theme until panel.js overrides them. */
+  --ground: #f9f9fb;
+  --ink: #15141a;
+
+  /* Derived neutrals. */
+  --ink-2: color-mix(in srgb, var(--ink) 62%, var(--ground));
+  --ink-3: color-mix(in srgb, var(--ink) 40%, var(--ground));
+  --line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --line-strong: color-mix(in srgb, var(--ink) 22%, transparent);
+  --raised: color-mix(in srgb, var(--ink) 4%, transparent);
+  --control: color-mix(in srgb, var(--ink) 7%, transparent);
+  --control-hover: color-mix(in srgb, var(--ink) 12%, transparent);
+  --control-active: color-mix(in srgb, var(--ink) 18%, transparent);
+
+  /* Semantic colour. */
+  --accent: #0060df;
+  --accent-ink: #ffffff;
+  --focus: var(--accent);
+  --green: #2ecc71;
+  --yellow: #f1c40f;
+  --red: #e74c3c;
+  --danger: var(--red);
+  --danger-wash: color-mix(in srgb, var(--red) 18%, transparent);
+  --warn-wash: color-mix(in srgb, var(--yellow) 22%, transparent);
+
+  /* Type scale. */
+  --font: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, Menlo, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 20px;
+  --fs-display: 30px;
+
+  /* Space and shape. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --gutter: var(--sp-4);
+  /* The one width every page view shares. Tabs, Rules, Settings and Backup
+     all sit in the same column, so switching pages never shifts the header
+     or the edges of the content. Prose inside keeps its own measure through
+     per-element max-widths, so a wide column does not mean long lines. */
+  --page-width: 960px;
+  --r-control: 6px;
+  --r-card: 8px;
+  --r-pill: 999px;
+  --control-h: 28px;
+  --icon: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #2b2a33;
+    --ink: #fbfbfe;
+    --control: color-mix(in srgb, var(--ink) 9%, transparent);
+    --control-hover: color-mix(in srgb, var(--ink) 15%, transparent);
+    --control-active: color-mix(in srgb, var(--ink) 22%, transparent);
+    --accent: #00ddff;
+    --accent-ink: #15141a;
+  }
+}

@@ -1,0 +1,84 @@
+/* ---- Rules page: the row controls ---------------------------------------------
+
+   A collapsed rule is a row: priority badge, pattern, on/off switch and a quiet
+   delete across the head, then the description and one chip per setting below
+   it, hanging under the pattern. */
+
+/* The "Saved" tick lands at the end of the head row. */
+.rule-head .saved-mark {
+  flex: none;
+}
+
+/* Priority, where the list can be scanned for it. The list is ordered by
+   pattern, so nothing else says which rule wins. */
+.rule-priority {
+  flex: none;
+  min-width: 26px;
+  height: 22px;
+  min-height: 0;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule-priority:hover {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+.rule-group-count {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.rule-group-count.is-problem {
+  color: var(--danger);
+}
+
+/* Held right whether or not a pattern box is there to push it. */
+.rule-enable {
+  flex: none;
+  margin-left: auto;
+}
+
+/* Everything the card holds hangs under the pattern. */
+.rule-body {
+  padding-left: var(--rule-indent);
+}
+
+.rule-meta {
+  color: var(--ink-2);
+}
+
+.rule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+/* One chip per setting the rule changes, so the list can be read for what a
+   rule does rather than parsed out of a sentence. Chips are the same pill as
+   the page's badges. */
+.rule-chip {
+  padding: 1px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--control);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.rule-chip.is-empty {
+  background: transparent;
+  border-color: var(--line);
+  border-style: dashed;
+  color: var(--ink-2);
+  font-style: italic;
+}

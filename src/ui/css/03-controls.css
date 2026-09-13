@@ -1,0 +1,240 @@
+/* ---- Controls ----------------------------------------------------------------- */
+
+button,
+.button-like {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-h);
+  padding: 0 var(--sp-3);
+  font: inherit;
+  color: inherit;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--control);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button:hover,
+.button-like:hover {
+  background: var(--control-hover);
+}
+
+button:active {
+  background: var(--control-active);
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+button.primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--ink-2);
+}
+
+button.quiet:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+button.danger.is-armed,
+.qtoggle-close.is-armed,
+.rule-delete.is-armed {
+  color: var(--danger);
+  background: var(--danger-wash);
+}
+
+/* Icon-only buttons: square, quiet, label in title/aria-label. */
+.icon-btn,
+.qtoggle,
+.rule-toggle {
+  width: var(--control-h);
+  height: var(--control-h);
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.icon-btn:hover,
+.qtoggle:hover,
+.rule-toggle:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.qtoggle[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--control-hover);
+}
+
+.qtoggle.is-inherited[aria-pressed="true"] {
+  background: var(--control);
+}
+
+.qtoggle-close:hover,
+.trow-remove:hover {
+  color: var(--danger);
+}
+
+.qtoggle-close.is-armed {
+  width: auto;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+input[type="number"],
+input[type="url"],
+input[type="text"],
+select,
+textarea {
+  min-height: var(--control-h);
+  font: inherit;
+  color: inherit;
+  background: var(--control);
+  border: 0;
+  border-radius: var(--r-control);
+  padding: 0 var(--sp-2);
+}
+
+input[type="number"] {
+  width: 4.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Slider. The pseudo-elements cannot be grouped across engines: one unknown
+   selector in a list drops the whole rule, so Gecko and Blink get their own. */
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 8.5em;
+  max-width: 100%;
+  height: var(--control-h);
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+}
+
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  margin-top: -5px;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+/* Held steady so the row does not shuffle as the number changes width. */
+.field-readout {
+  min-width: 3em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+textarea {
+  padding: var(--sp-2) var(--sp-3);
+}
+
+/* Switch on a native checkbox, so keyboard and screen readers work. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  background: var(--control-hover);
+  transition: background 0.15s;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ground);
+  transition: transform 0.15s;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--green);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(12px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.switch input:disabled ~ * {
+  opacity: 0.5;
+  cursor: default;
+}

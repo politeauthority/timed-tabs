@@ -1,0 +1,269 @@
+/* ---- Lists: open tabs and recently expired ------------------------------------ */
+
+.overview {
+  padding: 0 var(--gutter);
+}
+
+.overview > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+body:not([data-context="popup"]) .overview > summary {
+  font-size: var(--fs-lg);
+}
+
+.overview > summary::-webkit-details-marker {
+  display: none;
+}
+
+.overview > summary > span:first-of-type {
+  flex: 1;
+}
+
+.overview-count {
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+  margin: 0 0 var(--sp-2);
+}
+
+/* Alone on its row now, and still pushed right by the auto margin. */
+.overview-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.overview-sort select {
+  min-height: 24px;
+  font-size: var(--fs-sm);
+}
+
+.overview-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0 var(--gutter) var(--sp-3);
+}
+
+body:not([data-context="popup"]) .overview-list {
+  max-height: none;
+}
+
+/* Window groups fold independently. */
+.window-group {
+  margin-top: var(--sp-2);
+}
+
+.window-group > summary.window-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 32px;
+  cursor: pointer;
+  list-style: none;
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.window-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.window-group > summary .window-name {
+  flex: 1 1 auto;
+}
+
+/* One row pattern for open tabs. */
+.trow {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto auto auto auto auto;
+  grid-template-areas:
+    "icon title rules time snooze timer focus close"
+    "icon fuse  fuse  fuse snooze timer focus close";
+  column-gap: var(--sp-2);
+  row-gap: var(--sp-1);
+  align-items: center;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+body:not([data-context="popup"]) .trow {
+  padding: 10px 0;
+}
+
+.trow:first-of-type {
+  border-top: 0;
+}
+
+.trow.is-active .trow-title {
+  font-weight: 600;
+}
+
+.trow.is-off .trow-time,
+.trow.is-off .trow-fuse {
+  opacity: 0.4;
+}
+
+.trow.is-expired .trow-title,
+.trow.is-expired .trow-time,
+.trow.is-expired .trow-icon,
+.trow.is-expired .trow-fuse,
+.trow.is-expired .trow-rules {
+  opacity: 0.3;
+}
+
+.trow-icon {
+  grid-area: icon;
+  width: 16px;
+  height: 16px;
+}
+
+.trow-icon:not([src]) {
+  visibility: hidden;
+}
+
+.trow-title {
+  grid-area: title;
+  min-width: 0;
+  min-height: 0;
+  justify-content: flex-start;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: block;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  border-radius: 2px;
+}
+
+.trow-title:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.trow-time {
+  grid-area: time;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trow-fuse {
+  grid-area: fuse;
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
+}
+
+.trow-fuse::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--pct, 0%);
+  border-radius: 2px;
+  background: var(--ground);
+  opacity: 0.72;
+}
+
+.trow-rules {
+  grid-area: rules;
+  justify-self: end;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--control);
+  cursor: default;
+}
+
+.trow-rules.is-ignored {
+  text-decoration: line-through;
+}
+
+.qtoggle-snooze {
+  grid-area: snooze;
+}
+
+.qtoggle-timer {
+  grid-area: timer;
+}
+
+.qtoggle-focus {
+  grid-area: focus;
+}
+
+.qtoggle-close {
+  grid-area: close;
+}
+
+.overview-empty {
+  margin: var(--sp-1) 0 var(--sp-2);
+  color: var(--ink-2);
+}
+
+/* Recently expired rows. */
+.recent .trow {
+  grid-template-columns: 16px 1fr auto auto auto;
+  grid-template-areas:
+    "icon title when reopen remove"
+    "icon url   url  reopen remove";
+}
+
+.trow-count {
+  display: inline-block;
+  margin-right: var(--sp-1);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.trow-when {
+  grid-area: when;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.trow-url {
+  grid-area: url;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trow-reopen {
+  grid-area: reopen;
+}
+
+.trow-remove {
+  grid-area: remove;
+}
+
+.recent-actions {
+  margin: var(--sp-2) 0 var(--sp-1);
+}

@@ -1,0 +1,221 @@
+/* ---- Rule editor and the Settings page's save bar -----------------------------
+
+   A rule on a page of its own. Rows are the Settings page's rows, and both
+   pages stage their edits: a row whose value differs from what is stored wears
+   an accent bar and a small "unsaved" mark, and the bar at the foot follows the
+   scroll until Save or Discard. */
+
+.rule-editor-back {
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: var(--fs-md);
+  padding: 0 var(--sp-1);
+}
+
+.rule-editor-back:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.rule-editor-form {
+  margin-top: var(--sp-2);
+}
+
+.rule-editor-form .rule-overrides {
+  margin-top: var(--sp-4);
+}
+
+/* Outranks the page view's own `.field` padding, which would zero the left. */
+.field.is-changed,
+body:not([data-context="popup"]) .field.is-changed {
+  position: relative;
+  padding-left: var(--sp-3);
+}
+
+.field.is-changed::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--sp-2);
+  bottom: var(--sp-2);
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* The Settings page's bar keeps to the page gutter like the rows above it. */
+.settings > .save-bar {
+  margin: var(--sp-4) var(--gutter) 0;
+}
+
+.changed-mark {
+  display: inline-block;
+  margin-left: var(--sp-2);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* Text the user writes gets room: a name, a note, an address. */
+.rule-editor-form .rule-editor-text,
+.rule-editor-form .rule-pattern-wrap {
+  width: 26em;
+  max-width: 100%;
+}
+
+.rule-editor-form .rule-pattern-wrap .rule-pattern {
+  width: 100%;
+}
+
+.rule-editor-danger {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--ground) 92%, var(--accent));
+  box-shadow: 0 -6px 18px color-mix(in srgb, var(--ink) 12%, transparent);
+  font-weight: 600;
+}
+
+.save-bar-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* The list row is a link to the editor: the pattern is text, not a field. */
+.rule-pattern-static {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  padding: 0 var(--sp-1);
+  text-align: left;
+  justify-content: flex-start;
+  background: none;
+  color: var(--ink);
+  min-height: 0;
+}
+
+.rule-pattern-static:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.rule-pattern-static.has-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-family: var(--font);
+}
+
+.rule-head-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.has-name .rule-head-pattern {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.rule-pattern-static .wildcard {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rule-chip.is-draft {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* The rule's master switch sits above the groups, without a heading of its own. */
+.rule-manage {
+  margin-top: var(--sp-3);
+}
+
+.rule-left-alone {
+  margin: var(--sp-2) 0 0;
+}
+
+/* Open tabs the draft pattern catches, refreshed as the pattern is typed. */
+.rule-matches {
+  margin-top: var(--sp-3);
+}
+
+.rule-matches-list {
+  margin-top: var(--sp-1);
+}
+
+.rule-match {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  align-items: center;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+
+.rule-match:first-child {
+  border-top: 0;
+}
+
+.rule-match-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.rule-match-icon:not([src]) {
+  visibility: hidden;
+}
+
+.rule-match-title,
+.rule-match-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-match-url {
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+}
+
+.rule-matches-empty {
+  margin: var(--sp-1) 0 0;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}

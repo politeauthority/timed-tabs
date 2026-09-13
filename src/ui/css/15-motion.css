@@ -1,0 +1,21 @@
+/* ---- Motion ------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .fuse-burnt,
+  .fuse-marker,
+  .chev::before,
+  .saved-mark,
+  .toast,
+  .switch-track,
+  .switch-track::after {
+    transition: none;
+    transform: none;
+  }
+
+  /* The fuse still has to run: it is the countdown, not decoration. Without
+     the sweep it steps down instead, which says the same thing without
+     motion across the screen. */
+  .toast-fuse.is-burning {
+    animation-timing-function: steps(12, end);
+  }
+}

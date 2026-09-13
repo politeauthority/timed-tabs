@@ -1,0 +1,65 @@
+/* ---- Backup and diagnostics --------------------------------------------------- */
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
+}
+
+.backup-file input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.backup-file input:focus-visible + .button-like {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.backup-text {
+  display: block;
+  width: 100%;
+  font: var(--fs-sm) / 1.45 var(--mono);
+  resize: vertical;
+}
+
+.diagnostics {
+  color: var(--ink-2);
+}
+
+.diag-actions {
+  margin: var(--sp-2) 0;
+  display: flex;
+  gap: var(--sp-2);
+}
+
+#diag-summary {
+  margin: 0 0 var(--sp-2);
+  white-space: pre-wrap;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+#diag-tabs {
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+#diag-tabs th,
+#diag-tabs td {
+  text-align: left;
+  padding: 2px var(--sp-2) 2px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

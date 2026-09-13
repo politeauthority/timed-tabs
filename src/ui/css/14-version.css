@@ -1,0 +1,50 @@
+/* ---- Version ------------------------------------------------------------------ */
+
+.version {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-context="page"] .version {
+  font-size: var(--fs-sm);
+  align-self: flex-end;
+  margin-bottom: 3px;
+}
+
+.version-mini {
+  flex: none;
+  align-self: center;
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-xs);
+}
+
+/* Link to the repository: an icon in the popup footer, a line at the foot of the page view. */
+.repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.repo-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.page-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  margin-top: var(--sp-5);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+body[data-context="popup"] .topbar .version {
+  display: none;
+}

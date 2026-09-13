@@ -1,0 +1,520 @@
+/* ---- Header and navigation ---------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--gutter) 0;
+  color: var(--ink-2);
+}
+
+.topbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.topbar-title .icon {
+  color: var(--ink-2);
+}
+
+/* The real icon is a picture, not a stroked sprite: no stroke to inherit. */
+.logo-img {
+  stroke: none;
+  border-radius: 50%;
+}
+
+/* Beta and dev builds: a solid badge beside the title, hard to miss in either view. */
+.channel-badge {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #15141a;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+}
+
+body[data-channel="dev"] .channel-badge {
+  background: var(--ink-2);
+  color: var(--ground);
+}
+
+/* "Beta features" on: a small outlined pill beside the title, on every view.
+   Outlined rather than solid so it is not mistaken for the build badge next
+   to it, which says what was installed; this one says what was switched on. */
+.beta-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  padding: 0 6px;
+  border: 1px solid var(--yellow);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.beta-badge .icon {
+  width: 10px;
+  height: 10px;
+  color: var(--yellow);
+}
+
+.beta-badge:hover {
+  background: color-mix(in srgb, var(--yellow) 18%, transparent);
+}
+
+/* The popup is 320px wide, and a dev or beta build already wears one badge
+   there. Two words of badge push "Timed Tabs" onto two lines, so beside a
+   build badge the beta pill keeps its flag and drops its word: the tooltip
+   still says what it is, and the page view has room for both. */
+/* Reads as a link, since it is one: the accent, underlined, back to Tabs. */
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  border-radius: var(--r-control);
+}
+
+.home-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.home-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.home-link > span {
+  white-space: nowrap;
+}
+
+.topbar-title > span:first-of-type {
+  white-space: nowrap;
+}
+
+body[data-context="popup"][data-channel] .beta-badge-text {
+  display: none;
+}
+
+body:not([data-context="popup"]) .topbar {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+}
+
+body[data-context="page"] .topbar-title {
+  font-size: var(--fs-xl);
+}
+
+body[data-context="page"] .topbar-title .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.topbar-link {
+  min-height: 24px;
+  padding: 0 var(--sp-2);
+  background: none;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.topbar-link:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+body[data-context="options"] .tab,
+body[data-context="page"] .tab,
+body[data-context="page"] .topbar-link,
+body[data-context="options"] .topbar-link {
+  display: none;
+}
+
+/* Page nav: a segmented control with icons. */
+.pages {
+  display: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-control);
+  background: var(--raised);
+}
+
+body:not([data-context="popup"]) .pages {
+  display: flex;
+}
+
+.pages a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 var(--sp-3);
+  border-radius: 5px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.pages a:hover {
+  background: var(--control);
+  color: var(--ink);
+}
+
+.pages a[aria-current="page"] {
+  background: var(--ground);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Page settings: where each value comes from, next to its label. */
+/* A tab override reads like the panel's other markers -- the count badge, the
+   rule meta -- and not like a primary action. The accent stays reserved for
+   those: at full strength on a dark theme it is #00ddff, which made a marker
+   the loudest thing on the panel. */
+.setting-source {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--ink-2);
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--control);
+  cursor: default;
+  white-space: nowrap;
+}
+
+/* Stays the wrapping flex row the rest of the settings use. At popup width
+   there is no room for checkbox, label and help beside a badge and a control:
+   forcing them onto one line squeezes the label into a ladder of single words
+   and overruns the badge. The value wraps to its own line instead. */
+/* One line per setting: label, source, value. The help is the row's tooltip,
+   which is what buys the room for the value to sit beside the label instead of
+   wrapping under a sentence. */
+.tab-settings-list .field {
+  flex-wrap: nowrap;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+}
+
+/* Compact rows: the label is a single line with the text shrinking first
+   (ellipsis, tooltip) and the "this tab" pill kept whole beside it. This
+   overrides the grid the full-size override rows use for their checkbox. */
+.tab-settings-list .field {
+  min-height: calc(var(--control-h) + 2px);
+}
+
+.tab-settings-list .field-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.tab-settings-list .field-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-settings-list .field-label .setting-source {
+  flex: none;
+  margin-left: 0;
+  /* A pill, not a button-sized block: it must not crowd the label out. */
+  min-height: 0;
+  height: auto;
+  padding: 1px 7px;
+  line-height: 1.4;
+  font-size: var(--fs-xs);
+}
+
+/* The "set on this tab" marker in the popup: a dot before the label. It is
+   still the button that hands the setting back; the tooltip says so. */
+.tab-settings-list .setting-source.is-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--green);
+  font-size: 0;
+  line-height: 0;
+}
+
+.tab-settings-list .setting-source.is-dot::after {
+  content: none;
+}
+
+.tab-settings-list .setting-source.is-dot:hover,
+.tab-settings-list .setting-source.is-dot:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* The Saved mark floats beside the value instead of taking a slot in the
+   column, so a control never shifts when its row is confirmed. */
+.tab-settings-list .field-control {
+  position: relative;
+}
+
+.tab-settings-list .field-control > .saved-mark {
+  position: absolute;
+  right: 100%;
+  margin-right: var(--sp-2);
+  white-space: nowrap;
+}
+
+/* The badge leads the control column, so a row reads label - source - value. */
+/* A fixed-width value column, right-aligned: a switch, a select and a number
+   field all sit on the same right edge, and taking a setting over or handing
+   it back changes nothing about where the control is. */
+.tab-settings-list .field-control {
+  flex: none;
+  gap: var(--sp-2);
+  min-width: 9.5em;
+  justify-content: flex-end;
+}
+
+.tab-settings-list .override-control {
+  transition: opacity 0.15s ease-out;
+}
+
+/* Fold a popup section away: the chevron and the title both toggle it. The
+   section head stays, everything under it goes. */
+.section-toggle {
+  flex: none;
+  width: 22px;
+  min-height: 0;
+  height: 22px;
+  padding: 0;
+  background: none;
+  color: var(--ink-2);
+}
+
+.section-head .settings-title[data-toggles] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab.is-collapsed > :not(.section-head) {
+  display: none;
+}
+
+/* No rules match: the heading and its 0 are the whole section. The chevron
+   keeps its slot so the title sits where it does when there are rules, but
+   it is not shown and the title is not a toggle. */
+.tab.is-empty > .section-head > .section-toggle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tab.is-empty > .section-head > .settings-title[data-toggles] {
+  cursor: default;
+}
+
+.section-head .section-action {
+  margin-left: auto;
+  min-height: 0;
+  padding: 4px 8px;
+  font-size: var(--fs-sm);
+}
+
+/* Nothing in the value column may push the row wider than the popup. The
+   label shrinks first: it has an ellipsis and a tooltip, and a clipped value
+   is a lie where a clipped label is only terse. */
+.tab-settings-list select {
+  max-width: 9.5em;
+}
+
+.tab-settings-list input[type="number"] {
+  /* Room for two digits and the spinner; 3.2em clipped "40" to "4". */
+  width: 4.2em;
+}
+
+/* The indicator list is a column of rows, so it takes the full width and its
+   badge rides with the label instead of floating beside the column. */
+.tab-settings-list .field.is-stacked {
+  flex-wrap: wrap;
+}
+
+.tab-settings-list .field.is-stacked .field-label {
+  width: 100%;
+  white-space: normal;
+}
+
+.tab-settings-list .field.is-stacked .field-control {
+  width: 100%;
+}
+
+/* A tab override can be handed back by clicking its badge. The cross is there
+   at rest but invisible, so revealing it costs no reflow and the badge does
+   not jump under the pointer. */
+button.setting-source {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The cross appears on hover without reserving room for itself at rest. */
+button.setting-source::after {
+  content: "";
+}
+
+button.setting-source:hover,
+button.setting-source:focus-visible {
+  background: var(--control-hover);
+  color: var(--ink);
+}
+
+button.setting-source:hover::after,
+button.setting-source:focus-visible::after {
+  content: " \00d7";
+}
+
+.tab-rules-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* Mini UI footer: the version and a way to the source, nothing to navigate. */
+.mini-foot {
+  display: none;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+
+body[data-context="popup"] .mini-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Pages: the page and preferences views show one page at a time. */
+/* The master switch is off: say so, and hide the readouts that would
+   otherwise keep counting down for tabs nothing is going to act on. */
+.off-banner {
+  display: none;
+}
+
+body[data-managing="off"] .off-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-card);
+  background: var(--warn-wash);
+  line-height: 1.4;
+}
+
+.off-banner button {
+  margin-left: auto;
+  flex: none;
+}
+
+/*
+ * Why the UI in front of you is not the UI in the docs. Quieter than the
+ * off-banner: nothing is wrong, something is merely different, and it is
+ * shown on every view for as long as a beta feature is on -- so it has to be
+ * bearable to look at rather than something to dismiss.
+ *
+ * It sits at the foot of the view, under the thing it is talking about rather
+ * than in front of it. In the popup the markup already puts it there, above
+ * the version line; a page view has its own footer at the very end, so the
+ * two below reorder it down to just above that. `#app` is a flex column, and
+ * everything else in it is at the default order 0, which is what lets one
+ * element be last in both views without the markup carrying it twice.
+ */
+.flags-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-card);
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+/* A page view's #app carries the gutter, so the note is already inset there.
+   The popup's does not: without this the note runs to both edges and has its
+   corners clipped by the window, a hand's width from a version line that is
+   inset. */
+body[data-context="popup"] .flags-note {
+  margin-inline: var(--gutter);
+}
+
+body:not([data-context="popup"]) .flags-note {
+  order: 1;
+}
+
+body:not([data-context="popup"]) .page-foot {
+  order: 2;
+}
+
+.flags-note .icon {
+  flex: none;
+  opacity: 0.75;
+}
+
+.flags-note button {
+  margin-left: auto;
+  flex: none;
+}
+
+/* The master switch takes the page; nothing under it is in force anyway. */
+body[data-managing="off"] .flags-note {
+  display: none;
+}
+
+body[data-managing="off"] #tab,
+body[data-managing="off"] #overview {
+  display: none;
+}
+
+body:not([data-context="popup"]) [data-pages] {
+  display: none;
+}
+
+body[data-page="tabs"]:not([data-context="popup"]) [data-pages="tabs"],
+body[data-page="rules"]:not([data-context="popup"]) [data-pages="rules"],
+body[data-page="rule"]:not([data-context="popup"]) [data-pages="rule"],
+body[data-page="test"]:not([data-context="popup"]) [data-pages="test"],
+body[data-page="settings"]:not([data-context="popup"]) [data-pages="settings"] {
+  display: block;
+}
+
+body[data-page="settings"]:not([data-context="popup"]) #permission-warning:not([hidden]),
+body[data-page="settings"]:not([data-context="popup"]) .jump {
+  display: flex;
+}
+
+body[data-context="popup"] [data-page-only] {
+  display: none;
+}

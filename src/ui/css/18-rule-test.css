@@ -1,0 +1,118 @@
+/* ---- Rule test ---------------------------------------------------------------- */
+
+.rule-test-input select {
+  flex: 0 1 18em;
+  min-width: 0;
+}
+
+.rule-test-verdict {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--control) 55%, transparent);
+  font-weight: 600;
+}
+
+.rule-test-verdict.is-unmanaged {
+  background: var(--warn-wash);
+}
+
+.rule-test-verdict small {
+  display: block;
+  margin-top: 2px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+/* A caught rule: badge, name, pattern, then what it changes, all one link. */
+.rule-test-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--sp-1) var(--sp-2);
+  width: 100%;
+  min-height: 0;
+  padding: var(--sp-2) var(--sp-2);
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+}
+
+.rule-test-rule:first-of-type {
+  border-top: 0;
+}
+
+.rule-test-rule:hover {
+  background: var(--control);
+}
+
+.rule-test-rule .rule-chips {
+  flex-basis: 100%;
+  padding-left: calc(26px + var(--sp-2));
+}
+
+.rule-test-rule .rule-pattern-static {
+  flex: 0 1 auto;
+  color: var(--ink-2);
+}
+
+.rule-test-rule.is-ignored {
+  opacity: 0.6;
+}
+
+/* The verdict table: setting, value, who decided. */
+.rule-test-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.rule-test-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.rule-test-table td {
+  padding: var(--sp-2) var(--sp-2);
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.rule-test-table tr.is-rule td {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.rule-test-table tr.is-rule td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.rule-test-source {
+  min-height: 0;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+.rule-test-source:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.rule-test-default {
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+
+.rule-test-actions {
+  margin: 0 0 var(--sp-3);
+}

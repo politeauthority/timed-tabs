@@ -1,0 +1,349 @@
+/* ---- Rules page --------------------------------------------------------------- */
+
+.rules {
+  padding: var(--sp-4) var(--gutter) var(--sp-3);
+}
+
+.rules-head-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.rules-filter {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+}
+
+.rules-filter input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-pill);
+}
+
+.rules-empty {
+  margin: var(--sp-2) 0;
+  color: var(--ink-2);
+}
+
+.rules-list {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+/* A feature flag that needs another one on first. */
+.field.flag-dependent {
+  padding-left: var(--sp-4);
+}
+
+/* Site groups: cards like rules, with a name in the head and the patterns below. */
+.site-groups {
+  margin-top: var(--sp-5);
+}
+
+.group-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.group-patterns {
+  width: 100%;
+  min-height: 5em;
+  margin: 0 0 var(--sp-2);
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.group-meta {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+/* A rule's target: an address pattern, or one of the site groups. */
+.rule-target {
+  flex: none;
+  /* The picker repeats on every row, so it is held to what it needs. */
+  max-width: 150px;
+}
+
+.rule-group-note {
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.rule {
+  /* Everything below the head lines up under the pattern, past the chevron
+     and the priority badge. A group head has no badge, so its column starts
+     sooner. */
+  --rule-indent: 70px;
+  padding: 0 var(--sp-3) var(--sp-1);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--r-card);
+  /* Cards sit on the same ground as the Settings page's rows: a soft fill, a
+     quiet line, and the head as the strong row. */
+  background: color-mix(in srgb, var(--control) 35%, transparent);
+  transition: border-color 0.15s ease-out, background 0.15s ease-out;
+}
+
+.rule.group {
+  --rule-indent: 36px;
+}
+
+.rule:hover {
+  border-color: var(--line-strong);
+}
+
+.rule:not(.is-collapsed) {
+  background: color-mix(in srgb, var(--control) 55%, transparent);
+}
+
+.rule.is-target {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* A rule switched off still has to be read and switched back on, so the card
+   keeps its contrast and only what it would have done is greyed. */
+.rule.is-disabled .rule-pattern-mirror,
+.rule.is-disabled .rule-target,
+.rule.is-disabled .rule-summary {
+  opacity: 0.55;
+}
+
+.rule.is-disabled .rule-priority {
+  color: var(--ink-3);
+}
+
+.rule.is-filtered-out {
+  display: none;
+}
+
+.rule-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+}
+
+.rule-pattern-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.rule-pattern {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  padding: 0 10px;
+  /* The mirror behind draws the text; the input keeps only caret and selection. */
+  color: transparent;
+  caret-color: var(--ink);
+}
+
+.rule-pattern-mirror {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: var(--fs-md);
+  color: var(--ink);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rule-pattern-mirror .wildcard {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rule.is-just-added {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  animation: rule-just-added 2.4s ease-out forwards;
+}
+
+@keyframes rule-just-added {
+  0%,
+  60% {
+    box-shadow: 0 0 0 2px var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+    background: transparent;
+  }
+}
+
+.rule-pattern::placeholder {
+  color: var(--ink-2);
+  opacity: 0.8;
+  font-family: var(--font);
+  font-style: italic;
+}
+
+.rule-delete {
+  flex: none;
+  color: var(--ink-2);
+}
+
+.rule-delete:hover {
+  color: var(--danger);
+}
+
+/* Armed, the icon grows the word it needs: an icon alone cannot say "armed". */
+.rule-delete.is-armed {
+  width: auto;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.rule-description-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 10px;
+}
+
+.rule-description {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  border-radius: 0;
+  padding: var(--sp-1) 2px;
+}
+
+.rule-description::placeholder {
+  color: var(--ink-2);
+}
+
+/* The name is the description's bolder sibling: same dashed line, read first. */
+.rule-name {
+  font-weight: 600;
+}
+
+.rule-name::placeholder {
+  font-weight: 400;
+}
+
+/* A named rule leads its collapsed row with the name. */
+.rule-name-text {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rule-description:focus-visible {
+  outline: none;
+  border-bottom-color: var(--focus);
+}
+
+.rule .field {
+  padding: var(--sp-3) 0;
+}
+
+.rule-overrides {
+  border-top: 1px solid var(--line);
+}
+
+.rule-overrides-title {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rule-overrides .field:first-of-type {
+  border-top: 0;
+}
+
+.override .field-label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--sp-2);
+  align-items: start;
+}
+
+.override .field-label input[type="checkbox"] {
+  margin: 3px 0 0;
+}
+
+.override .field-help {
+  grid-column: 2;
+}
+
+.override:not(.is-on) .override-control {
+  display: none;
+}
+
+/* Page settings shows the value whatever its source; that is the point of the
+   section. Editing it is what makes the row an override. */
+.override.is-adopting:not(.is-on) .override-control {
+  display: inline-flex;
+  opacity: 0.75;
+}
+
+.override:not(.is-on) .field-label {
+  color: var(--ink-2);
+}
+
+.override-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Collapsed rule cards. Everything the card holds hangs under the pattern, so
+   a card reads as one column rather than two things stacked. */
+.rule-summary {
+  display: none;
+  width: 100%;
+  min-height: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  padding: 0 2px var(--sp-1) var(--rule-indent);
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  background: none;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  border-radius: var(--r-control);
+}
+
+.rule-summary:hover {
+  background: none;
+  color: var(--ink);
+}
+
+.rule.is-collapsed .rule-summary {
+  display: flex;
+}
+
+.rule.is-collapsed .rule-body {
+  display: none;
+}
+
+.rule.is-collapsed {
+  padding-bottom: 0;
+}
