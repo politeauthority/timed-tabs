@@ -7,7 +7,7 @@ const { DEFAULT_FLAGS } = await import("../src/shared/flags.js");
 
 describe("backup round trip", () => {
   it("exports every setting and survives a parse", () => {
-    const rules = [{ id: "a", description: "", pattern: "x.com/*", match: "prefix", priority: 3, set: { tabLifetimeSeconds: 5, neverExpire: true } }];
+    const rules = [{ id: "a", name: "Short", description: "", pattern: "x.com/*", match: "prefix", priority: 3, set: { tabLifetimeSeconds: 5, manageTabs: false } }];
     const text = exportText({ ...DEFAULTS, tabLifetimeSeconds: 42 }, rules);
     const parsed = parseBundle(text);
     expect(parsed.warnings).toEqual([]);
@@ -147,7 +147,8 @@ describe("validation on import", () => {
   });
   it("keeps only rule fields in a rule's set", () => {
     const { rules } = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [{ id: "a", pattern: "x/*", set: { tabManagement: false, tickSeconds: 1, tabLifetimeSeconds: 60, neverExpire: true } }] }));
-    expect(rules[0].set).toEqual({ tabLifetimeSeconds: 60, neverExpire: true });
+    // An old rule's "Timer off" comes in as "Manage tabs" off.
+    expect(rules[0].set).toEqual({ tabLifetimeSeconds: 60, manageTabs: false });
   });
   it("gives groups without a usable id one, and separates two that share one", () => {
     const { groups, warnings } = parseBundle(JSON.stringify({ timedTabs: 1, settings: {}, rules: [], groups: [{ id: "", name: "a", patterns: [1, null, "ok/*", {}] }, { id: "g", name: "b" }, { id: "g", name: "c" }] }));

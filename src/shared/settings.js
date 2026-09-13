@@ -50,6 +50,12 @@ export const DEFAULTS = Object.freeze({
   faviconStyle: "square",
   /** What to do when a tab expires: "none" | "reload" | "close" | "discard". */
   onExpire: "none",
+  /**
+   * How long an expired tab keeps its place in its window's list on the Tabs
+   * page before it drops out (it is still open; it is listed under Recently
+   * expired instead). At most an hour.
+   */
+  expiredGraceSeconds: 60,
   /** How long closed-by-expiry tabs stay in the "Recently expired" list. */
   recentRetentionSeconds: 24 * 3600,
   /** Show a desktop notification naming each tab we close. Needs the optional `notifications` permission. */
@@ -197,6 +203,16 @@ export const FIELDS = [
       { value: "discard", label: "Unload it" },
       { value: "close", label: "Close it" },
     ],
+  },
+  {
+    key: "expiredGraceSeconds",
+    group: "general",
+    section: "everywhere",
+    type: "duration",
+    label: "Keep expired tabs in their window's list for",
+    help: "An expired tab stays listed under its window on the Tabs page for this long, then drops to Recently expired. The tab itself is not closed. Up to an hour.",
+    min: 5,
+    max: 3600,
   },
   {
     key: "recentRetentionSeconds",
@@ -361,6 +377,12 @@ export function migrateSettingKeys(obj) {
       if (lead) out.quietStart = lead;
     }
     delete out.quietUntilPercent;
+  }
+  // A rule's "Timer off" is now "Manage tabs" off: the tab is left alone
+  // rather than merely exempt from expiry. Only rules ever stored this key.
+  if ("neverExpire" in out) {
+    if (out.neverExpire === true && !("manageTabs" in out)) out.manageTabs = false;
+    delete out.neverExpire;
   }
   if ("flashLeadSeconds" in out) {
     const n = Math.round(Number(out.flashLeadSeconds));

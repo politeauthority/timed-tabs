@@ -47,7 +47,8 @@ Settings go to sync storage, so they travel with a browser account. Rules and si
 groups stay in local storage and do not.
 
 The **recently expired list** is the sensitive one: address, title and icon of each
-tab Timed Tabs closed, capped at 200 and pruned by `recentRetentionSeconds`. It is
+tab that ran out of time — whether or not it was closed, a reload aside — capped at
+200 and pruned by `recentRetentionSeconds`. It is
 never transmitted and is not part of a backup. Users can shorten the retention, drop
 a row, or clear the list; `docs/user-guide/privacy.md` explains how.
 

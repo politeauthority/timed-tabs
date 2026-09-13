@@ -46,6 +46,13 @@ export const FLAGS = [
     requires: "beta-features",
   },
   {
+    id: "rules-appearance",
+    label: "Appearance in rules",
+    help: "Lets a rule change how matching tabs look: which indicators, the favicon style, the quiet period and the flashing. Adds a \"How matching tabs look\" section to every rule. While this is off, those parts of a rule are kept but ignored, and only the timer settings apply.",
+    default: false,
+    requires: "beta-features",
+  },
+  {
     id: "primary-icon-interactive",
     label: "Interactive toolbar clock",
     help: "The toolbar button stops being a ring and becomes a clock face that empties as the tab you are on runs out of time, freezing where it stood and turning slate while the clock is stopped, with a look of its own for a tab that never expires. It follows the tab you are looking at rather than painting every tab.",

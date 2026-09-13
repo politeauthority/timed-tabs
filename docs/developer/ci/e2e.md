@@ -106,7 +106,8 @@ lines the scenarios rely on, all prefixed `[timed-tabs]`, are:
 - `expired <tabId> <url> action=<close|discard|reload|none>` when a tab runs out.
   A tab prints this again when the action changes under it, because the new action
   has yet to be taken -- `action=none` then `action=close` is one tab, not two.
-- `recorded <url> icon=<yes|no>` when a closed tab is added to Recently expired.
+- `recorded <url> icon=<yes|no>` when an expired tab is added to Recently expired.
+  Every expiry but a reload writes one, whether or not the tab was closed.
 - `closed <tabId> <url>` once the tab is really gone. `expired action=close` says only
   that we set out to close it, and `recorded` is written before the tab goes, so this
   is the line to assert when the question is whether the tab survived.

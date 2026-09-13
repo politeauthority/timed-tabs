@@ -1,0 +1,42 @@
+{
+  "runSeconds": 25,
+  "dev": {
+    "openWindows": [
+      [
+        "https://example.org/",
+        "https://example.com/"
+      ]
+    ],
+    "settings": {
+      "tabLifetimeSeconds": 1800,
+      "tickSeconds": 2,
+      "indicators": [
+        "favicon"
+      ]
+    },
+    "rules": [
+      {
+        "id": "r1",
+        "description": "expires but stays open",
+        "pattern": "example.com/*",
+        "match": "wildcard",
+        "priority": 5,
+        "set": {
+          "tabLifetimeSeconds": 5,
+          "onExpire": "none"
+        }
+      }
+    ],
+    "captureAfterMs": 12000,
+    "openUrls": [
+      "ui/panel.html?view=page#tabs"
+    ]
+  },
+  "expect": [
+    "expired \\d+ https://example\\.com/ action=none",
+    "recorded https://example\\.com/ icon=yes"
+  ],
+  "expectNot": [
+    "expired \\d+ https://example\\.org/"
+  ]
+}
