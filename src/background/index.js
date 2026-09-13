@@ -5,7 +5,7 @@
 import { api, isDevBuild, withTimeout } from "../shared/browser.js";
 import { watchGroups, watchRules, watchSettings } from "../shared/settings.js";
 import { featureOn } from "../shared/flags.js";
-import { RULE_FIELDS, applicableRules, applyOverrides, effectiveSettings, wantedIndicatorIds } from "../shared/rules.js";
+import { RULE_FIELDS, applicableRules, applyOverrides, effectiveSettings, managesTab, wantedIndicatorIds } from "../shared/rules.js";
 import { snoozeSeconds } from "../shared/time.js";
 import { grantedOrigins, hasWebAccess } from "../shared/permissions.js";
 import { createTabTracker } from "./tab-tracker.js";
@@ -63,6 +63,11 @@ let active = [];
  * every clock anyway, and the tick works the tabs out again from scratch.
  */
 const expired = new Map();
+/**
+ * Tabs "Only manage tabs a rule matches" is holding back, so the tick can see
+ * the moment a rule takes one in and start its clock from there.
+ */
+const dormant = new Set();
 const diag = { ticks: 0, lastTick: null, lastError: null, lastSnapshot: [] };
 
 /** Tabs that expired, closed or not, newest first, persisted in storage.local and pruned by retention. */
@@ -282,6 +287,7 @@ async function standDown() {
   await Promise.all(active.map((i) => i.stop().catch(() => {})));
   active = [];
   expired.clear();
+  dormant.clear();
   await api.alarms.clear(TICK_ALARM);
 }
 
@@ -342,6 +348,12 @@ function settingsFor(tab, tabState) {
   const eff = effectiveSettings(settings, active, url, groupsInForce);
   eff.allMatched = allMatched;
   eff.ignoredIds = ignoredIds;
+  // "Only manage tabs a rule matches" narrows the master switch to the pages
+  // the user has written a rule for: a tab no rule speaks for is left alone
+  // as completely as the switch leaves every tab. Read off the rules in
+  // force, not the ones that merely match, so a tab that has switched its
+  // rules off has switched itself out with them.
+  eff.unmanaged = !managesTab(settings, active);
   if (tabState?.resetOnActivate !== null && tabState?.resetOnActivate !== undefined) {
     eff.resetOnActivate = tabState.resetOnActivate;
   }
@@ -374,6 +386,7 @@ api.tabs.onCreated.addListener(async (tab) => {
 
 api.tabs.onRemoved.addListener((tabId) => {
   expired.delete(tabId);
+  dormant.delete(tabId);
   tracker.forget(tabId);
 });
 
@@ -497,6 +510,7 @@ async function tabState(tabId, tab) {
     remainingSeconds: Math.max(0, lifetime - elapsed),
     progress: tracker.progressFor(tabId, eff.tabLifetimeSeconds, now),
     paused: s.pausedAt !== null,
+    unmanaged: eff.unmanaged,
     extraSeconds: s.extraSeconds,
     neverExpire: s.neverExpire,
     resetOnActivate: s.resetOnActivate,
@@ -673,7 +687,25 @@ async function tick() {
     for (const tab of tabs) {
       const s = await tracker.track(tab.id, now);
       const eff = settingsFor(tab, s);
-      const exempt = tab.pinned || eff.neverExpire;
+      // A tab a rule has just taken in starts its life from this moment: time
+      // spent on a page nothing was watching is not time the tab sat unread,
+      // and nothing should expire the instant a rule is written. The other
+      // direction needs nothing; a held-back tab's clock is never read.
+      // A tab that falls out of rule coverage drops its expiry with the rest
+      // of its clock. It would otherwise stay held back from the window list
+      // for an expiry that no longer means anything -- the row beside it says
+      // "no rule", and a tab nothing is watching is not one to hide.
+      if (eff.unmanaged) {
+        dormant.add(tab.id);
+        expired.delete(tab.id);
+      }
+      else if (dormant.delete(tab.id)) {
+        await tracker.reset(tab.id, now);
+        expired.delete(tab.id);
+      }
+      // A tab held back by "only manage tabs a rule matches" is exempt like a
+      // pinned one: no clock read, nothing expired, and every mark withheld.
+      const exempt = tab.pinned || eff.neverExpire || eff.unmanaged;
       const progress = exempt ? 0 : tracker.progressFor(tab.id, eff.tabLifetimeSeconds, now);
       const remainingSeconds = Math.max(
         0,
@@ -690,6 +722,9 @@ async function tick() {
       if (isDevBuild) devLogLook(tab, eff, quiet);
       snapshot.push({
         exempt,
+        // Not "nothing to show yet" but "nothing here at all": the toolbar
+        // button has a mark of its own to say so.
+        unmanaged: eff.unmanaged,
         quiet,
         flashing,
         // A stopped clock: the tab you are on while the clock pauses on the

@@ -147,7 +147,9 @@ been. See [privacy.md](privacy.md#-statistics).
 
 A rule changes settings for tabs whose address matches a pattern. Rules are
 re-evaluated whenever a tab navigates, so a tab that moves from one site to another
-picks up the other site's rules.
+picks up the other site's rules. Normally a rule only refines what the global
+settings already say; with **Only manage tabs a rule matches** on, in Settings, the
+rules become the guest list and a page no rule covers is left alone entirely.
 
 - **Patterns** use `*` as a wildcard. A pattern without `https://` matches any scheme.
   Wildcards are shown in colour so they stand out. New rules start with `https://`.
@@ -233,6 +235,14 @@ Settings sync through the browser's extension storage; rules are kept locally.
 - **Manage tabs** is the master switch. Off leaves every tab alone, with no timers,
   no closing and no colours, and undoes every mark already made. Back on, every tab
   starts its life afresh from that moment.
+- **Only manage tabs a rule matches** narrows that switch to the pages you have
+  written a rule for. Every other tab is left alone as completely as the master
+  switch leaves everything: no timer, nothing closed, no colours. The toolbar button
+  shows an empty grey clock on a page nothing is watching, so it is plain at a glance
+  which of the two you are looking at. A tab a rule takes in starts its life from that
+  moment, so writing a rule never closes the tab you wrote it on, and a page whose
+  only rule you have ignored for this tab counts as a page with no rule. With no
+  rules at all, nothing is managed.
 - **Backup**, on its own pill, exports every setting and every rule as one JSON document, plus the
   all-time count of tabs killed, to copy or download, and loads one back. Loading replaces every
   setting and rule; the count only ever goes up. The file records the

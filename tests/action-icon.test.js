@@ -15,6 +15,22 @@ describe("iconKey", () => {
     expect(iconKey({ quiet: true, progress: 0.9 })).toBe(resting);
   });
 
+  it("gives a tab nothing is watching the empty clock, not a reading", () => {
+    // "Only manage tabs a rule matches", on a page no rule matches: there is
+    // no timer here, so any fill at all would be a number made up.
+    expect(iconKey({ unmanaged: true, progress: 0.9 })).toBe("inactive");
+    expect(iconKey({ unmanaged: true, progress: 0.1 })).toBe("inactive");
+    expect(iconKey({ unmanaged: true, progress: 1, flashing: true }, false)).toBe("inactive");
+    // Held back beats every other reason a tab shows nothing.
+    expect(iconKey({ unmanaged: true, quiet: true, exempt: true })).toBe("inactive");
+  });
+
+  it("leaves the button alone for a tab this indicator is not used for", () => {
+    // `hidden` is the tick saying the tab's own settings do not name this
+    // indicator. Marking it would paint a button the user has switched off.
+    expect(iconKey({ unmanaged: true, hidden: true, quiet: true, progress: 0.9 })).not.toBe("inactive");
+  });
+
   it("has one key for expired, whatever else the tab is doing", () => {
     expect(iconKey({ progress: 1 })).toBe("expired");
     expect(iconKey({ progress: 2, flashing: true }, false)).toBe("expired");
@@ -63,8 +79,13 @@ describe("iconKey, interactive", () => {
     expect(live({ progress: 1, paused: true })).toBe("face-expired");
   });
 
+  it("says an untimed tab is untimed, in its own artwork", () => {
+    expect(live({ unmanaged: true, progress: 0.9 })).toBe("face-inactive");
+    expect(live({ unmanaged: true, hidden: true, quiet: true })).toBeNull();
+  });
+
   it("never shares a key with the ring, so one mode cannot serve the other's art", () => {
-    for (const tab of [{ progress: 0.5 }, { progress: 1 }, { quiet: true }, { exempt: true }]) {
+    for (const tab of [{ progress: 0.5 }, { progress: 1 }, { quiet: true }, { exempt: true }, { unmanaged: true }]) {
       expect(live(tab)).not.toBe(iconKey(tab));
     }
   });
@@ -80,6 +101,16 @@ describe("specFor", () => {
   it("takes the states that are not counting down off the ramp", () => {
     expect(specFor("face-paused:30").color).toBe(toHex(STATE_COLORS.paused));
     expect(specFor("face-exempt").color).toBe(toHex(STATE_COLORS.exempt));
+    // Grey, and the same grey either way round: an empty clock is an empty
+    // clock whichever mark the flag has the button drawing.
+    expect(specFor("inactive").color).toBe(toHex(STATE_COLORS.inactive));
+    expect(specFor("face-inactive").color).toBe(toHex(STATE_COLORS.inactive));
+    // Off the ramp, and off the other two, so it cannot be read as either.
+    const [r, g, b] = fromHex(specFor("inactive").color);
+    expect([g, b]).toEqual([r, r]);
+    for (const other of ["face-paused:30", "face-exempt"]) {
+      expect(specFor("inactive").color).not.toBe(specFor(other).color);
+    }
   });
 
   it("keeps a resting tab green however full its face is", () => {
