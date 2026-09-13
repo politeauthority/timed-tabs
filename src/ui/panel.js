@@ -110,6 +110,8 @@ if (
     })
     .catch(() => {});
 }
+// @dev-only-end
+
 /** Per-page setup when a page becomes visible. */
 function onPageShown(page) {
   stopTabsPage();

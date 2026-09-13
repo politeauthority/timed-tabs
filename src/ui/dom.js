@@ -5,7 +5,6 @@
  * Nothing here reads shared state.
  */
 
-// @dev-only-end
 export const $ = (id) => document.getElementById(id);
 
 /** An <svg class="icon"> referencing the sprite in panel.html. */
