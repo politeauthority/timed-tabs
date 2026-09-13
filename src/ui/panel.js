@@ -60,16 +60,20 @@ import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
 import { FLAGS, activeFeatures, featureOn, flagOn, flagRequires } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
 import { mountToasts } from "./toasts.js";
+import { state, draftSettings, context, isPopup, params } from "./state.js";
+import {
+  $,
+  svgIcon,
+  setRevealed,
+  makeSwitch,
+  markSaved,
+  snippet,
+  wildcardSpans,
+  mirrorWildcards,
+  withKey,
+  settingRow,
+} from "./dom.js";
 
-// The same file serves three contexts: the toolbar popup (default), the
-// preferences pane (options.html sets data-context) and a full page
-// (panel.html?view=page). Set the page context before anything renders.
-if (new URLSearchParams(location.search).get("view") === "page") {
-  document.body.dataset.context = "page";
-}
-const context = document.body.dataset.context;
-const isPopup = context === "popup";
-const params = new URLSearchParams(location.search);
 
 // ---- Pages -----------------------------------------------------------------
 // The full page and the preferences pane show one page at a time, chosen by
@@ -144,30 +148,6 @@ if (
     })
     .catch(() => {});
 }
-// @dev-only-end
-const $ = (id) => document.getElementById(id);
-
-/** An <svg class="icon"> referencing the sprite in panel.html. */
-function svgIcon(name) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "icon");
-  svg.setAttribute("aria-hidden", "true");
-  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-  use.setAttribute("href", `#i-${name}`);
-  svg.append(use);
-  return svg;
-}
-
-let settings = { ...DEFAULTS };
-/**
- * Settings changed on the page but not yet stored, by key. The controls show
- * `draftSettings()`, the stored values with these on top; Save writes them
- * and Discard drops them. Nothing else on the page reads the draft: what the
- * background and the popup do follows what is stored.
- */
-let settingsDraft = {};
-const draftSettings = () => ({ ...settings, ...settingsDraft });
-
 // ---- All tabs -------------------------------------------------------------
 
 function renderFields() {
@@ -322,47 +302,6 @@ function renderGroupTabs() {
       return pill;
     }),
   );
-}
-
-/**
- * Show or hide a row that another control governs, sliding it open or shut
- * rather than snapping. The first pass (`animate` false) sets the resting
- * state without motion, so a page does not open with rows sliding about.
- * The row ends with `hidden` set or cleared either way; the animation is
- * only what happens in between, and is skipped when the user asks for less
- * motion.
- */
-const SLIDE_MS = 180;
-const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-function setRevealed(el, show, animate = true, onDone = null) {
-  if (el.hidden === !show && !el.dataset.sliding) {
-    onDone?.();
-    return;
-  }
-  const currentAnim = el.getAnimations?.().find((a) => a.id === "slide");
-  if (currentAnim) currentAnim.cancel();
-  if (!animate || reduceMotion() || !el.animate) {
-    delete el.dataset.sliding;
-    el.hidden = !show;
-    onDone?.();
-    return;
-  }
-  el.hidden = false;
-  el.dataset.sliding = "1";
-  const h = `${el.scrollHeight}px`;
-  const keys = [
-    { height: "0px", opacity: 0, paddingTop: "0px", paddingBottom: "0px", overflow: "hidden" },
-    { height: h, opacity: 1, paddingTop: getComputedStyle(el).paddingTop, paddingBottom: getComputedStyle(el).paddingBottom, overflow: "hidden" },
-  ];
-  const anim = el.animate(show ? keys : keys.slice().reverse(), { duration: SLIDE_MS, easing: "ease-out", id: "slide" });
-  anim.onfinish = () => {
-    delete el.dataset.sliding;
-    el.hidden = !show;
-    onDone?.();
-  };
-  anim.oncancel = () => {
-    delete el.dataset.sliding;
-  };
 }
 
 /**
@@ -627,26 +566,13 @@ function renderField(field) {
   return row;
 }
 
-function makeSwitch(checked, onChange) {
-  const el = document.createElement("label");
-  el.className = "switch";
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.checked = checked;
-  input.addEventListener("change", () => onChange(input.checked));
-  const track = document.createElement("span");
-  track.className = "switch-track";
-  el.append(input, track);
-  return { el, input };
-}
-
 /**
  * Reflect the master switch on the body, which is what hides the readouts and
  * shows the banner. Doing it with a data attribute rather than the `hidden`
  * attribute keeps it clear of the show/hide the popup and the pages already do.
  */
 function applyManagementState() {
-  document.body.dataset.managing = settings.tabManagement === false ? "off" : "on";
+  document.body.dataset.managing = state.settings.tabManagement === false ? "off" : "on";
 }
 
 // ---- Saying whether it worked ----------------------------------------------
@@ -665,8 +591,8 @@ const toasts = mountToasts(document.body, isPopup ? { max: 2 } : {});
  */
 function stage(partial) {
   for (const [key, value] of Object.entries(partial)) {
-    if (JSON.stringify(value) === JSON.stringify(settings[key])) delete settingsDraft[key];
-    else settingsDraft[key] = value;
+    if (JSON.stringify(value) === JSON.stringify(state.settings[key])) delete state.settingsDraft[key];
+    else state.settingsDraft[key] = value;
   }
   updateFieldVisibility();
   refreshSettingsDirty();
@@ -681,7 +607,7 @@ function refreshSettingsDirty() {
   const root = $("fields");
   let n = 0;
   for (const row of root.querySelectorAll(".field[data-key]:not(.field-group)")) {
-    const on = row.dataset.key in settingsDraft;
+    const on = row.dataset.key in state.settingsDraft;
     setRowChanged(row, on);
     if (on && !row.hidden) n += 1;
   }
@@ -690,8 +616,8 @@ function refreshSettingsDirty() {
     const [key, id] = sub.dataset.subKey.split(":");
     const on =
       key === "indicators"
-        ? settings.indicators.includes(id) !== draft.indicators.includes(id)
-        : Boolean(settings.featureFlags?.[id]) !== Boolean(draft.featureFlags?.[id]);
+        ? state.settings.indicators.includes(id) !== draft.indicators.includes(id)
+        : Boolean(state.settings.featureFlags?.[id]) !== Boolean(draft.featureFlags?.[id]);
     setRowChanged(sub, on);
     if (on) n += 1;
   }
@@ -702,15 +628,15 @@ function refreshSettingsDirty() {
 
 /** Store every staged change at once, then redraw from what is stored. */
 async function saveSettingsDraft() {
-  const partial = { ...settingsDraft };
+  const partial = { ...state.settingsDraft };
   const keys = Object.keys(partial);
   if (!keys.length) return;
   const what = keys.length === 1 ? `“${fieldLabel(keys[0])}”` : `${keys.length} settings`;
   const ok = await write(() => saveSettings(partial), { what, key: "settings" });
   if (!ok) return;
-  const before = settings;
-  settings = { ...settings, ...partial };
-  settingsDraft = {};
+  const before = state.settings;
+  state.settings = { ...state.settings, ...partial };
+  state.settingsDraft = {};
   if ("tabManagement" in partial) applyManagementState();
   if ("featureFlags" in partial) renderFlagged();
   renderFields();
@@ -726,7 +652,7 @@ async function saveSettingsDraft() {
 
 $("settings-save").addEventListener("click", saveSettingsDraft);
 $("settings-discard").addEventListener("click", () => {
-  settingsDraft = {};
+  state.settingsDraft = {};
   renderFields();
 });
 
@@ -785,11 +711,11 @@ async function save(partial, label = null) {
   if (!ok) {
     // The write did not land, so the controls are showing something storage
     // does not have. Put them back to what is really there.
-    settings = await getSettings().catch(() => settings);
+    state.settings = await getSettings().catch(() => state.settings);
     renderFields();
     return false;
   }
-  settings = { ...settings, ...partial };
+  state.settings = { ...state.settings, ...partial };
   if ("tabManagement" in partial) applyManagementState();
   // A flag can show or hide whole sections; the rules page depends on site-groups.
   if ("featureFlags" in partial) renderFlagged();
@@ -800,48 +726,17 @@ async function save(partial, label = null) {
   return true;
 }
 
-/**
- * Inline confirmation on the row whose value has just been written to storage.
- *
- * A settings row says nothing, because `save` has already raised a toast
- * naming the setting. Everywhere else the tick stays: on a rule card or a
- * per-tab control it sits on the thing that changed, which a message at the
- * bottom of the window cannot do.
- */
-function markSaved(el, container = null) {
-  if (!el) return;
-  if ($("fields").contains(el)) return;
-  // The rule editor stores nothing until Save, so a row there has nothing to confirm.
-  if ($("rule-editor").contains(el)) return;
-  container ??= el.querySelector(":scope > .field-control") ?? el;
-  let mark = container.querySelector(":scope > .saved-mark");
-  if (!mark) {
-    mark = document.createElement("span");
-    mark.className = "saved-mark";
-    mark.setAttribute("role", "status");
-    mark.textContent = "Saved";
-    container.append(mark);
-  }
-  clearTimeout(mark._timer);
-  mark.classList.remove("is-shown");
-  void mark.offsetWidth; // restart the transition when saving again quickly
-  mark.classList.add("is-shown");
-  mark._timer = setTimeout(() => mark.classList.remove("is-shown"), 1800);
-}
-
 // ---- This tab -------------------------------------------------------------
 
-let currentTab = null;
-let tabState = null;
 let fetchedAt = 0;
 
 async function refreshTab() {
   if (!isPopup) return;
   const [tab] = await api.tabs.query({ active: true, currentWindow: true });
-  currentTab = tab ?? null;
-  if (!currentTab) return;
-  tabState = await api.runtime
-    .sendMessage({ type: "timed-tabs:tab-state", tabId: currentTab.id })
+  state.currentTab = tab ?? null;
+  if (!state.currentTab) return;
+  state.tabState = await api.runtime
+    .sendMessage({ type: "timed-tabs:tab-state", tabId: state.currentTab.id })
     .catch(() => null);
   fetchedAt = Date.now();
   renderTab();
@@ -874,49 +769,49 @@ for (const section of ["settings", "rules"]) {
 function renderTab() {
   // What this tab actually does, rules and overrides included; the globals
   // only until the background has answered for it.
-  const eff = tabState?.effective ?? settings;
+  const eff = state.tabState?.effective ?? state.settings;
   $("tab").hidden = false;
   // A tab that both pauses while you are on it and restarts when you return
   // still has a clock worth seeing and dragging; it just says so.
   $("tab-paused-note").hidden = !(eff.pauseWhileActive && eff.resetOnActivate);
-  if (!currentTab || !tabState) return;
+  if (!state.currentTab || !state.tabState) return;
 
   // The switch reads as "enabled": on while the timer runs, off while the
   // tab never expires. Off, the rest of the popup has nothing to say: the
   // fuse, the actions and the rules go, and the switch stays to bring them back.
   const enabled = $("act-enabled");
-  const unmanaged = Boolean(tabState.unmanaged);
+  const unmanaged = Boolean(state.tabState.unmanaged);
   // A page left alone is not enabled either, whatever its own switch says.
-  enabled.checked = !unmanaged && !tabState.neverExpire;
-  document.body.dataset.never = tabState.neverExpire ? "on" : "off";
+  enabled.checked = !unmanaged && !state.tabState.neverExpire;
+  document.body.dataset.never = state.tabState.neverExpire ? "on" : "off";
   document.body.dataset.unmanaged = unmanaged ? "on" : "off";
   const enabledLabel = enabled.closest("label");
   enabled.disabled = unmanaged;
   enabledLabel.title = unmanaged
     ? "Timed Tabs leaves this page alone, so there is nothing to enable here."
-    : tabState.neverExpire
+    : state.tabState.neverExpire
       ? "Off: this tab never expires. Switch on to time it again."
       : "Enabled on this tab. Switch off and it never expires.";
   enabled.setAttribute("aria-label", enabledLabel.title);
   renderTabWhy();
-  $("act-ignore").checked = Boolean(tabState.ignoreRules);
+  $("act-ignore").checked = Boolean(state.tabState.ignoreRules);
   // Each section starts the way it starts, then stays as this tab last left
   // it: Page settings open, Rules folded until the tab opens it.
-  setSectionFold("settings", tabState.folds?.settings !== false, false);
-  setSectionFold("rules", tabState.folds?.rules === true, false);
+  setSectionFold("settings", state.tabState.folds?.settings !== false, false);
+  setSectionFold("rules", state.tabState.folds?.rules === true, false);
   // The rules section only appears when a rule matches this page, or rules are already ignored.
-  $("tab-rules").hidden = !currentTab;
+  $("tab-rules").hidden = !state.currentTab;
   renderTabRules();
   renderTabSettings();
 
   const icon = $("tab-icon");
-  if (currentTab.favIconUrl) {
-    icon.src = currentTab.favIconUrl;
+  if (state.currentTab.favIconUrl) {
+    icon.src = state.currentTab.favIconUrl;
     icon.hidden = false;
   } else {
     icon.hidden = true;
   }
-  $("tab-title").textContent = currentTab.title || currentTab.url || "";
+  $("tab-title").textContent = state.currentTab.title || state.currentTab.url || "";
   updateReadout();
 }
 
@@ -929,11 +824,11 @@ function renderTab() {
 function renderTabWhy() {
   const why = $("tab-why");
   const go = $("tab-why-go");
-  if (!tabState?.unmanaged || settings.tabManagement === false) {
+  if (!state.tabState?.unmanaged || state.settings.tabManagement === false) {
     why.hidden = true;
     return;
   }
-  const rule = [...(tabState.rules ?? [])]
+  const rule = [...(state.tabState.rules ?? [])]
     .filter((r) => !r.ignored && r.set?.manageTabs === false)
     .sort((a, b) => b.priority - a.priority)[0];
   const ruleRow = $("tab-why-rule");
@@ -979,8 +874,8 @@ function renderTabRules() {
   )) {
     liveMarks.set(mark.parentElement.dataset.savedKey, mark);
   }
-  const matched = tabState?.rules ?? [];
-  const allOff = Boolean(tabState?.ignoreRules);
+  const matched = state.tabState?.rules ?? [];
+  const allOff = Boolean(state.tabState?.ignoreRules);
   // The count in the heading says it all; with none, the section is just the
   // heading, so there is nothing to fold and the chevron goes (see .is-empty).
   $("tab-rules-count").textContent = String(matched.length);
@@ -1069,14 +964,14 @@ function belongsInPageSettings(key, entry) {
 
 /** The tab's own layer: explicit overrides, plus the two older per-tab switches. */
 function tabOverrides() {
-  const out = { ...(tabState?.overrides ?? {}) };
-  if (tabState?.neverExpire && !("neverExpire" in out)) out.neverExpire = true;
+  const out = { ...(state.tabState?.overrides ?? {}) };
+  if (state.tabState?.neverExpire && !("neverExpire" in out)) out.neverExpire = true;
   if (
-    tabState?.resetOnActivate !== null &&
-    tabState?.resetOnActivate !== undefined &&
+    state.tabState?.resetOnActivate !== null &&
+    state.tabState?.resetOnActivate !== undefined &&
     !("resetOnActivate" in out)
   ) {
-    out.resetOnActivate = tabState.resetOnActivate;
+    out.resetOnActivate = state.tabState.resetOnActivate;
   }
   return out;
 }
@@ -1115,23 +1010,23 @@ let pageSettingsKeys = null;
 
 function renderTabSettings() {
   const section = $("tab-settings");
-  if (!tabState || !settings || !featureOn(settings, "mini-ui-page-settings")) {
+  if (!state.tabState || !state.settings || !featureOn(state.settings, "mini-ui-page-settings")) {
     section.hidden = true;
     return;
   }
   section.hidden = false;
   const overrides = tabOverrides();
-  const explained = explainSettings(settings, tabState.rules ?? [], overrides);
+  const explained = explainSettings(state.settings, state.tabState.rules ?? [], overrides);
 
   // The row's checkbox means "this tab sets this". Off, it shows what the
   // rules and globals would give, which is exactly `explained` without the
   // tab layer -- so base() reads from a second pass with no overrides.
-  const inherited = explainSettings(settings, tabState.rules ?? [], {});
+  const inherited = explainSettings(state.settings, state.tabState.rules ?? [], {});
   const store = {
-    set: { ...(tabState.overrides ?? {}) },
+    set: { ...(state.tabState.overrides ?? {}) },
     base: (key) => inherited[key]?.value,
     commit: async (next) => {
-      const before = tabState.overrides ?? {};
+      const before = state.tabState.overrides ?? {};
       const keys = new Set([...Object.keys(before), ...Object.keys(next)]);
       for (const key of keys) {
         if (before[key] === next[key]) continue;
@@ -1161,7 +1056,7 @@ function renderTabSettings() {
     if (entry.from === "tab") {
       // neverExpire and resetOnActivate live in the tab's own state, not in
       // the overrides map; undoing them goes through their own actions.
-      const legacy = !(def.key in (tabState.overrides ?? {}));
+      const legacy = !(def.key in (state.tabState.overrides ?? {}));
       const undo = legacy
         ? () => tabAction(def.key, def.key === "neverExpire" ? false : null)
         : () => tabAction("override", { key: def.key, value: null });
@@ -1237,20 +1132,20 @@ function formatRuleValue(key, v) {
 }
 
 function updateReadout() {
-  if (!tabState) return;
-  const drift = tabState.paused ? 0 : (Date.now() - fetchedAt) / 1000;
-  const remaining = Math.max(0, tabState.remainingSeconds - drift);
+  if (!state.tabState) return;
+  const drift = state.tabState.paused ? 0 : (Date.now() - fetchedAt) / 1000;
+  const remaining = Math.max(0, state.tabState.remainingSeconds - drift);
   const progress = Math.min(
     1,
-    (tabState.elapsedSeconds + drift) / tabState.lifetimeSeconds,
+    (state.tabState.elapsedSeconds + drift) / state.tabState.lifetimeSeconds,
   );
   // Nothing is watching this page, so there is no time left to report: an
   // "expires in" with a number in it would be a promise nothing will keep.
-  const unmanaged = Boolean(tabState.unmanaged);
+  const unmanaged = Boolean(state.tabState.unmanaged);
   const exempt =
     unmanaged ||
-    (tabState.effective?.neverExpire ?? tabState.neverExpire) ||
-    currentTab?.pinned;
+    (state.tabState.effective?.neverExpire ?? state.tabState.neverExpire) ||
+    state.currentTab?.pinned;
 
   const time = $("remaining");
   const note = $("remaining-note");
@@ -1259,17 +1154,17 @@ function updateReadout() {
     note.textContent = "left alone";
   } else if (exempt) {
     time.replaceChildren(svgIcon("infinity"));
-    note.textContent = currentTab?.pinned
+    note.textContent = state.currentTab?.pinned
       ? "pinned tabs never expire"
-      : tabState.neverExpire
+      : state.tabState.neverExpire
         ? "never expires"
         : "never expires (rule)";
   } else {
     time.textContent = formatRemaining(remaining);
     if (remaining <= 0) note.textContent = "";
-    else if (tabState.paused)
+    else if (state.tabState.paused)
       note.textContent = "left, paused while you're here";
-    else note.textContent = tabState.extraSeconds ? "left, snoozed" : "left";
+    else note.textContent = state.tabState.extraSeconds ? "left, snoozed" : "left";
   }
 
   // A drag owns the fuse until it is let go, so the tick must not fight it.
@@ -1284,7 +1179,7 @@ function updateReadout() {
     ? unmanaged
       ? "Snooze (no rule matches this page, so no timer runs)"
       : "Snooze (this tab has no timer running)"
-    : `Snooze — adds ${formatRemaining(snoozeFor(tabState))}`;
+    : `Snooze — adds ${formatRemaining(snoozeFor(state.tabState))}`;
   snooze.title = snoozeLabel;
   snooze.setAttribute("aria-label", snoozeLabel);
 }
@@ -1319,9 +1214,9 @@ function setFuseEnabled(enabled) {
 /** Show what letting go here would leave, without waiting for the background. */
 function previewFuse(pct) {
   paintFuse(pct);
-  if (!tabState?.lifetimeSeconds) return;
+  if (!state.tabState?.lifetimeSeconds) return;
   $("remaining").textContent = formatRemaining(
-    (tabState.lifetimeSeconds * (100 - pct)) / 100,
+    (state.tabState.lifetimeSeconds * (100 - pct)) / 100,
   );
   $("remaining-note").textContent = "left, when you let go";
 }
@@ -1329,22 +1224,22 @@ function previewFuse(pct) {
 /** What one press of Snooze will grant this tab, given its own lifetime. */
 function snoozeFor(t) {
   return snoozeSeconds(
-    t?.effective?.tabLifetimeSeconds ?? settings.tabLifetimeSeconds,
-    settings.snoozePercent,
+    t?.effective?.tabLifetimeSeconds ?? state.settings.tabLifetimeSeconds,
+    state.settings.snoozePercent,
   );
 }
 
 async function tabAction(action, value, sourceEl = null) {
-  if (!currentTab) return;
+  if (!state.currentTab) return;
   const reply = await api.runtime
     .sendMessage({
       type: "timed-tabs:tab-action",
-      tabId: currentTab.id,
+      tabId: state.currentTab.id,
       action,
       value,
     })
     .catch(() => null);
-  if (reply) tabState = reply;
+  if (reply) state.tabState = reply;
   fetchedAt = Date.now();
   renderTab();
   // Confirm on the control that was used, once the background has answered.
@@ -1419,7 +1314,7 @@ async function refreshOverview() {
     const empty = document.createElement("p");
     empty.className = "overview-empty";
     empty.textContent = open
-      ? `Every open tab expired more than ${formatSpan(settings.expiredGraceSeconds)} ago. They are under "Recently expired".`
+      ? `Every open tab expired more than ${formatSpan(state.settings.expiredGraceSeconds)} ago. They are under "Recently expired".`
       : "No tabs are being timed.";
     list.replaceChildren(empty);
     return;
@@ -1427,7 +1322,7 @@ async function refreshOverview() {
   const frag = document.createDocumentFragment();
   groups.forEach((g, i) => {
     // Order within each window; the windows themselves keep their own order.
-    const rows = sortTabs(g.tabs, settings.tabSort).map(renderTabRow);
+    const rows = sortTabs(g.tabs, state.settings.tabSort).map(renderTabRow);
     if (groups.length === 1) {
       frag.append(...rows);
       return;
@@ -1463,7 +1358,7 @@ function countLabel(shown, total) {
 }
 
 function heldBackLabel(n) {
-  return `${n} expired more than ${formatSpan(settings.expiredGraceSeconds)} ago and ${n === 1 ? "is" : "are"} under "Recently expired"`;
+  return `${n} expired more than ${formatSpan(state.settings.expiredGraceSeconds)} ago and ${n === 1 ? "is" : "are"} under "Recently expired"`;
 }
 
 function renderTabRow(t) {
@@ -1562,7 +1457,7 @@ function renderTabRow(t) {
       })
       .catch(() => {});
     refreshOverview();
-    if (currentTab?.id === t.tabId) refreshTab();
+    if (state.currentTab?.id === t.tabId) refreshTab();
   });
   row.append(snooze);
 
@@ -1584,11 +1479,11 @@ function renderTabRow(t) {
       })
       .catch(() => {});
     refreshOverview();
-    if (currentTab?.id === t.tabId) refreshTab();
+    if (state.currentTab?.id === t.tabId) refreshTab();
   });
   row.append(timer);
 
-  const effective = t.resetOnActivate ?? settings.resetOnActivate;
+  const effective = t.resetOnActivate ?? state.settings.resetOnActivate;
   const inherited =
     t.resetOnActivate === null || t.resetOnActivate === undefined;
   const focus = quickToggle(
@@ -1652,7 +1547,7 @@ function renderTabRow(t) {
       })
       .catch(() => {});
     refreshOverview();
-    if (isPopup && currentTab?.id === t.tabId) window.close();
+    if (isPopup && state.currentTab?.id === t.tabId) window.close();
   });
   close.addEventListener("blur", () => {
     if (armed) setTimeout(disarm, 200);
@@ -1680,7 +1575,7 @@ function renderSortControl() {
       ...TAB_SORTS.map((o) => new Option(o.label, o.id)),
     );
   }
-  select.value = settings.tabSort;
+  select.value = state.settings.tabSort;
 }
 
 // `save` persists the choice and redraws the list, so the order survives a
@@ -1801,7 +1696,7 @@ function timeAgo(ts) {
 
 // ---- Statistics ------------------------------------------------------------
 
-const statsOn = () => featureOn(settings, "statistics-panel");
+const statsOn = () => featureOn(state.settings, "statistics-panel");
 
 /**
  * Show or hide the whole section, which is all the flag does.
@@ -2071,14 +1966,11 @@ function onPageShown(page) {
 
 // ---- Rules editor ----------------------------------------------------------
 
-let rules = [];
-/** Site groups (shared/groups.js). Needs its own flag and beta features both on. */
-let groups = [];
-const groupsOn = () => featureOn(settings, "site-groups");
+const groupsOn = () => featureOn(state.settings, "site-groups");
 /** Whether rules may change how tabs look (flag "rules-appearance"). */
-const rulesAppearanceOn = () => featureOn(settings, "rules-appearance");
+const rulesAppearanceOn = () => featureOn(state.settings, "rules-appearance");
 /** The rule overrides worth showing: all, or with appearance off, the rest. */
-const shownOverrides = (set) => Object.entries(set ?? {}).filter(([k]) => ruleFieldsInForce(settings).includes(k));
+const shownOverrides = (set) => Object.entries(set ?? {}).filter(([k]) => ruleFieldsInForce(state.settings).includes(k));
 /**
  * The emoji of the settings group a rule field belongs to, so a rule's chips
  * and its override headings read like the Settings page: ⏳ for timing, 🚪 for
@@ -2090,7 +1982,7 @@ function fieldEmoji(key) {
   return GROUPS.find((g) => g.id === group)?.emoji ?? "";
 }
 
-const activeGroups = () => (groupsOn() ? groups : []);
+const activeGroups = () => (groupsOn() ? state.groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
 /**
  * Edits in progress, by rule id ("new" for a rule not yet stored). A draft
@@ -2112,12 +2004,12 @@ function openRuleEditor(id, focus = null) {
 function draftDirty(id) {
   const draft = ruleDrafts.get(id);
   if (!draft) return false;
-  const saved = rules.find((r) => r.id === id);
+  const saved = state.rules.find((r) => r.id === id);
   return !saved || ruleChanges(saved, draft).length > 0;
 }
 
 window.addEventListener("beforeunload", (e) => {
-  if ([...ruleDrafts.keys()].some(draftDirty) || Object.keys(settingsDraft).length) e.preventDefault();
+  if ([...ruleDrafts.keys()].some(draftDirty) || Object.keys(state.settingsDraft).length) e.preventDefault();
 });
 /**
  * The priority a rule had before its on/off switch zeroed it, so switching it
@@ -2227,7 +2119,7 @@ function isEmptyRule(r) {
 
 /** Rules in display order: alphabetical by pattern, with the ones still being typed first. */
 function sortedRules() {
-  return [...rules].sort((a, b) => {
+  return [...state.rules].sort((a, b) => {
     const ea = isEmptyRule(a);
     const eb = isEmptyRule(b);
     if (ea !== eb) return ea ? -1 : 1;
@@ -2239,7 +2131,7 @@ function sortedRules() {
 function describeGroupTarget(rule) {
   const name = groupNameOf(rule.pattern);
   if (!groupsOn()) return `Targets site group “${name}”, but site groups are off in Settings → Feature flags, so this rule matches nothing`;
-  const g = findGroup(groups, name);
+  const g = findGroup(state.groups, name);
   if (!g) return `Targets site group “${name}”, which does not exist, so this rule matches nothing`;
   const n = g.patterns.length;
   return `Site group “${g.name}”, ${n} site${n === 1 ? "" : "s"}`;
@@ -2250,7 +2142,7 @@ function groupTargetProblem(rule) {
   const name = groupNameOf(rule.pattern);
   if (!groupsOn())
     return "Site groups are off in Settings \u2192 Feature flags, so this rule matches nothing";
-  if (!findGroup(groups, name))
+  if (!findGroup(state.groups, name))
     return `There is no site group \u201c${name}\u201d, so this rule matches nothing`;
   return null;
 }
@@ -2287,16 +2179,14 @@ function ruleChipText(key, value) {
 
 /** Group ids expanded this session. New groups start open. */
 const expandedGroups = new Set();
-let groupsSaving = false;
-
 async function persistGroups() {
-  groupsSaving = true;
-  const ok = await write(() => saveGroups(groups), {
+  state.groupsSaving = true;
+  const ok = await write(() => saveGroups(state.groups), {
     what: "the site groups",
     key: "groups",
   });
-  if (!ok) groups = await getGroups().catch(() => groups);
-  groupsSaving = false;
+  if (!ok) state.groups = await getGroups().catch(() => state.groups);
+  state.groupsSaving = false;
   return ok;
 }
 
@@ -2306,14 +2196,14 @@ function renderGroups() {
   section.hidden = !groupsOn();
   if (section.hidden) return;
   const list = $("groups-list");
-  if (!groups.length) {
+  if (!state.groups.length) {
     const p = document.createElement("p");
     p.className = "rules-empty";
     p.textContent = "No groups yet. Add one, list the sites it covers, then point a rule at it.";
     list.replaceChildren(p);
     return;
   }
-  const sorted = [...groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  const sorted = [...state.groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   list.replaceChildren(...sorted.map(renderGroup));
 }
 
@@ -2323,7 +2213,7 @@ function renderGroup(group) {
   el.dataset.groupId = group.id;
   const open = expandedGroups.has(group.id);
   el.classList.toggle("is-collapsed", !open);
-  const users = rulesUsingGroup(rules, group);
+  const users = rulesUsingGroup(state.rules, group);
 
   const head = document.createElement("div");
   head.className = "rule-head";
@@ -2349,15 +2239,15 @@ function renderGroup(group) {
       name.value = group.name;
       return;
     }
-    if (nameTaken(groups, next, group.id)) {
+    if (nameTaken(state.groups, next, group.id)) {
       name.value = group.name;
       name.title = `There is already a group called “${next}”`;
       return;
     }
     // Renaming repoints every rule that used the old name.
-    const out = renameGroup(groups, rules, group.id, next);
-    groups = out.groups;
-    rules = out.rules;
+    const out = renameGroup(state.groups, state.rules, group.id, next);
+    state.groups = out.groups;
+    state.rules = out.rules;
     await persistGroups();
     await persistRules(false);
     renderGroups();
@@ -2385,7 +2275,7 @@ function renderGroup(group) {
       return;
     }
     clearTimeout(armed);
-    groups = groups.filter((g) => g.id !== group.id);
+    state.groups = state.groups.filter((g) => g.id !== group.id);
     await persistGroups();
     renderGroups();
     renderRules();
@@ -2416,7 +2306,7 @@ function renderGroup(group) {
   patterns.spellcheck = false;
   patterns.addEventListener("change", async () => {
     const next = cleanPatterns(patterns.value);
-    groups = groups.map((g) => (g.id === group.id ? { ...g, patterns: next } : g));
+    state.groups = state.groups.map((g) => (g.id === group.id ? { ...g, patterns: next } : g));
     await persistGroups();
     renderGroups();
     renderRules();
@@ -2434,9 +2324,9 @@ function renderGroup(group) {
 
 $("group-add")?.addEventListener("click", async () => {
   let name = "New group";
-  for (let i = 2; nameTaken(groups, name); i++) name = `New group ${i}`;
+  for (let i = 2; nameTaken(state.groups, name); i++) name = `New group ${i}`;
   const g = newGroup({ name, patterns: [] });
-  groups = [...groups, g];
+  state.groups = [...state.groups, g];
   expandedGroups.add(g.id);
   await persistGroups();
   renderGroups();
@@ -2451,12 +2341,12 @@ $("group-add")?.addEventListener("click", async () => {
 
 function renderRules() {
   const list = $("rules-list");
-  const empties = rules.filter(isEmptyRule).length;
+  const empties = state.rules.filter(isEmptyRule).length;
   const removeBtn = $("rules-remove-empty");
   removeBtn.hidden = empties === 0;
   if (empties)
     removeBtn.textContent = `Remove ${empties} empty rule${empties === 1 ? "" : "s"}`;
-  if (!rules.length) {
+  if (!state.rules.length) {
     const p = document.createElement("p");
     p.className = "rules-empty";
     p.textContent =
@@ -2492,49 +2382,6 @@ function renderNewDraftRow(draft) {
 }
 
 /**
- * Wrap a pattern input so its text is drawn by a mirror span behind it, with
- * every "*" in its own colour. An input cannot colour part of its value, so
- * the input's own text is transparent and only its caret and selection show.
- */
-/** The first `max` characters of a note, with an ellipsis where it was cut. */
-function snippet(text, max) {
-  const t = String(text).trim();
-  if (t.length <= max) return t;
-  const cut = t.slice(0, max);
-  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 20))}…`;
-}
-
-/** A pattern as spans, every "*" in its own so it can be coloured. */
-function wildcardSpans(pattern) {
-  return pattern.split(/(\*)/).filter(Boolean).map((part) => {
-    const s = document.createElement("span");
-    if (part === "*") s.className = "wildcard";
-    s.textContent = part;
-    return s;
-  });
-}
-
-function mirrorWildcards(input) {
-  const wrap = document.createElement("span");
-  wrap.className = "rule-pattern-wrap";
-  const mirror = document.createElement("span");
-  mirror.className = "rule-pattern-mirror";
-  mirror.setAttribute("aria-hidden", "true");
-  const text = document.createElement("span");
-  mirror.append(text);
-  const paint = () => {
-    text.replaceChildren(...wildcardSpans(input.value));
-    text.style.marginLeft = `-${input.scrollLeft}px`;
-  };
-  input.addEventListener("input", paint);
-  input.addEventListener("scroll", paint);
-  input.addEventListener("blur", paint);
-  paint();
-  wrap.append(mirror, input);
-  return wrap;
-}
-
-/**
  * Delete, armed by the first click and fired by the second. The head row has
  * no room for a worded button, so it is an icon that grows the word only once
  * armed; an icon on its own cannot say "armed".
@@ -2566,7 +2413,7 @@ function ruleDeleteButton(rule, after = null) {
       return;
     }
     disarm();
-    rules = rules.filter((r) => r.id !== rule.id);
+    state.rules = state.rules.filter((r) => r.id !== rule.id);
     ruleDrafts.delete(rule.id);
     persistRules().then((ok) => {
       if (ok) after?.();
@@ -2637,7 +2484,7 @@ function ruleHead(rule, targetsGroup) {
   if (targetsGroup) {
     groupCount = document.createElement("span");
     groupCount.className = "rule-group-count";
-    const g = groupsOn() ? findGroup(groups, groupNameOf(rule.pattern)) : null;
+    const g = groupsOn() ? findGroup(state.groups, groupNameOf(rule.pattern)) : null;
     const n = g?.patterns.length ?? 0;
     groupCount.textContent = g ? `${n} site${n === 1 ? "" : "s"}` : "matches nothing";
     groupCount.classList.toggle("is-problem", !g);
@@ -2770,17 +2617,17 @@ function renderRuleTestResult() {
     out.append(p);
     return;
   }
-  const inForce = applicableRules(rules, url, activeGroups());
-  const parked = rules.filter((r) => r.priority === 0 && matchesRule(r, url, activeGroups()));
-  const explained = explainSettings(settings, inForce);
-  const unmanaged = !managesTab(settings, inForce) || explained.manageTabs.value === false;
+  const inForce = applicableRules(state.rules, url, activeGroups());
+  const parked = state.rules.filter((r) => r.priority === 0 && matchesRule(r, url, activeGroups()));
+  const explained = explainSettings(state.settings, inForce);
+  const unmanaged = !managesTab(state.settings, inForce) || explained.manageTabs.value === false;
 
   // The verdict first: is this a tab Timed Tabs acts on at all, and why not.
   const verdict = document.createElement("p");
   verdict.className = "rule-test-verdict";
   verdict.classList.toggle("is-unmanaged", unmanaged);
   const why = document.createElement("small");
-  if (settings.tabManagement === false) {
+  if (state.settings.tabManagement === false) {
     verdict.textContent = "Left alone: Manage tabs is off for every tab.";
   } else if (explained.manageTabs.from === "rule") {
     verdict.textContent = `Left alone: “${ruleName(explained.manageTabs.rule)}” switches Manage tabs off for this address.`;
@@ -2849,7 +2696,7 @@ function renderRuleTestResult() {
   for (const key of keys) {
     const def = RULE_FIELD_DEFS.find((d) => d.key === key);
     // A dependent row (flash lead, favicon style) only means something while its parent is on.
-    if (def?.showWhen && !def.showWhen({ ...settings, ...layered })) continue;
+    if (def?.showWhen && !def.showWhen({ ...state.settings, ...layered })) continue;
     const entry = explained[key];
     const tr = body.insertRow();
     tr.classList.toggle("is-rule", entry.from === "rule");
@@ -2935,7 +2782,7 @@ $("rule-test-tabs").addEventListener("change", () => {
  */
 function renderRuleEditor(id) {
   const isNew = id === "new";
-  const saved = isNew ? null : rules.find((r) => r.id === id);
+  const saved = isNew ? null : state.rules.find((r) => r.id === id);
   if (!isNew && !saved) {
     // A link to a rule that is gone lands on the list rather than a blank page.
     history.replaceState(null, "", "#rules");
@@ -3012,9 +2859,9 @@ function renderRuleEditor(id) {
     targetSelect = document.createElement("select");
     targetSelect.className = "rule-target";
     targetSelect.add(new Option("🔗 Address", ""));
-    for (const g of groups) targetSelect.add(new Option(`🗂️ ${g.name}`, groupRef(g.name)));
+    for (const g of state.groups) targetSelect.add(new Option(`🗂️ ${g.name}`, groupRef(g.name)));
     const current = targetsGroup() ? groupRef(groupNameOf(draft.pattern)) : "";
-    if (targetsGroup() && !findGroup(groups, groupNameOf(draft.pattern))) {
+    if (targetsGroup() && !findGroup(state.groups, groupNameOf(draft.pattern))) {
       targetSelect.add(new Option(`🗂️ ${groupNameOf(draft.pattern)} (missing)`, current));
     }
     targetSelect.value = current;
@@ -3124,7 +2971,7 @@ function renderRuleEditor(id) {
     get set() {
       return draft.set;
     },
-    base: (key) => baseValue(settings, key),
+    base: (key) => baseValue(state.settings, key),
     commit: (set) => {
       draft.set = set;
       refreshEditorDirty();
@@ -3188,7 +3035,7 @@ function renderRuleEditor(id) {
 function refreshEditorDirty() {
   if (!editorState) return;
   const { id, isNew, draft, baseline } = editorState;
-  const saved = isNew ? baseline : (rules.find((r) => r.id === id) ?? baseline);
+  const saved = isNew ? baseline : (state.rules.find((r) => r.id === id) ?? baseline);
   const changed = new Set(ruleChanges(saved, draft));
   const form = $("rule-editor-form");
   for (const r of form.querySelectorAll("[data-row-key]")) {
@@ -3287,11 +3134,11 @@ $("rule-editor-save").addEventListener("click", async () => {
   if (!editorState) return;
   const { id, isNew, draft } = editorState;
   const clean = newRule({ ...draft, set: { ...draft.set } });
-  const before = rules;
-  rules = rules.some((r) => r.id === clean.id) ? rules.map((r) => (r.id === clean.id ? clean : r)) : [...rules, clean];
+  const before = state.rules;
+  state.rules = state.rules.some((r) => r.id === clean.id) ? state.rules.map((r) => (r.id === clean.id ? clean : r)) : [...state.rules, clean];
   const ok = await persistRules(false);
   if (!ok) {
-    rules = before;
+    state.rules = before;
     return;
   }
   ruleDrafts.delete(id);
@@ -3326,50 +3173,13 @@ function renderOverrideGroup(title, defs, store) {
   group.append(heading);
   const rows = defs.map((def) => [def, renderOverride(def, store, () => applyVisibility())]);
   const applyVisibility = () => {
-    const layered = { ...settings, ...store.set };
+    const layered = { ...state.settings, ...store.set };
     for (const key of RULE_VISUAL_FIELDS) if (key in store.set) layered[key] = store.set[key];
     for (const [def, row] of rows) row.hidden = Boolean(def.showWhen && !def.showWhen(layered));
   };
   for (const [, row] of rows) group.append(row);
   applyVisibility();
   return group;
-}
-
-function withKey(key, row) {
-  row.dataset.rowKey = key;
-  return row;
-}
-
-/** A label + help on the left and a control on the right, matching the global settings rows. */
-function settingRow(labelText, helpText, control, { checkbox } = {}) {
-  const row = document.createElement("div");
-  row.className = "field";
-  const label = document.createElement("label");
-  label.className = "field-label";
-  if (checkbox) label.append(checkbox, " ");
-  const text = document.createElement("span");
-  text.className = "field-label-text";
-  text.textContent = labelText;
-  label.append(text);
-  if (helpText) {
-    const help = document.createElement("span");
-    help.className = "field-help";
-    help.textContent = helpText;
-    label.append(help);
-  }
-  const ctl = document.createElement("div");
-  ctl.className = "field-control";
-  if (control) {
-    ctl.append(control);
-    // The label element is not associated with these controls (they are
-    // built apart from it), so each one that has no name yet takes the row's.
-    const inputs = control.matches?.("input,select,textarea") ? [control] : [...control.querySelectorAll("input,select,textarea")];
-    for (const c of inputs) {
-      if (!c.hasAttribute("aria-label") && !c.id) c.setAttribute("aria-label", labelText);
-    }
-  }
-  row.append(label, ctl);
-  return row;
 }
 
 function renderOverride(def, store, onChanged = () => {}, opts = {}) {
@@ -3523,22 +3333,21 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
 }
 
 function updateRule(id, patch, rerender = true, part = null) {
-  rules = rules.map((r) => (r.id === id ? { ...r, ...patch } : r));
+  state.rules = state.rules.map((r) => (r.id === id ? { ...r, ...patch } : r));
   return persistRules(rerender, part ? { id, part } : null);
 }
 
-let rulesSaving = false;
 /** Save all rules; optionally show "Saved" on one part ("head", "match", "priority") of one rule. */
 async function persistRules(rerender = true, saved = null) {
-  rulesSaving = true;
-  const ok = await write(() => saveRules(rules), {
+  state.rulesSaving = true;
+  const ok = await write(() => saveRules(state.rules), {
     what: "the rules",
     key: "rules",
   });
   // Nothing was stored, so what is in memory is an edit that never happened.
   // Redrawing it would leave the page claiming a rule it does not have.
-  if (!ok) rules = await getRules().catch(() => rules);
-  rulesSaving = false;
+  if (!ok) state.rules = await getRules().catch(() => state.rules);
+  state.rulesSaving = false;
   if (rerender || !ok) renderRules();
   if (ok && saved) {
     const card = $("rules-list").querySelector(
@@ -3574,7 +3383,7 @@ $("rules-remove-empty").addEventListener("click", async () => {
   clearTimeout(removeEmptyArmed);
   removeEmptyArmed = null;
   b.classList.remove("is-armed");
-  rules = rules.filter((r) => !isEmptyRule(r));
+  state.rules = state.rules.filter((r) => !isEmptyRule(r));
   await persistRules();
 });
 
@@ -3583,7 +3392,7 @@ $("rule-add").addEventListener("click", () => {
   const site = $("rules-filter").value.trim();
   const pattern = site ? patternForUrl(site) : "";
   // Don't pile up blank rules: open one that is still empty, or one with the same pattern.
-  const existing = rules.find((r) => (pattern ? r.pattern === pattern : isEmptyRule(r)));
+  const existing = state.rules.find((r) => (pattern ? r.pattern === pattern : isEmptyRule(r)));
   if (existing) return openRuleEditor(existing.id);
   // A new rule already on the go keeps its edits; a fresh one starts from the filter.
   if (!ruleDrafts.has("new")) newRuleSeed = pattern;
@@ -3605,7 +3414,7 @@ function applyRulesFilter() {
   // name, description or pattern. Both, when the text could be either.
   let shown = 0;
   for (const el of rows) {
-    const rule = rules.find((r) => r.id === el.dataset.ruleId);
+    const rule = state.rules.find((r) => r.id === el.dataset.ruleId);
     const hit = rule ? matchesRule(rule, url, activeGroups()) || ruleMentions(rule, url) || !rule.pattern.trim() : false;
     el.classList.toggle("is-filtered-out", !hit);
     if (hit) shown += 1;
@@ -3613,7 +3422,7 @@ function applyRulesFilter() {
   const isAddress = isRuleableUrl(url);
   note.hidden = false;
   note.textContent = shown
-    ? `${shown} of ${rules.length} rule${rules.length === 1 ? "" : "s"} ${isAddress ? "catch this address or are named like it" : "are named or patterned like this"}. Disabled rules (priority 0) are included.`
+    ? `${shown} of ${state.rules.length} rule${state.rules.length === 1 ? "" : "s"} ${isAddress ? "catch this address or are named like it" : "are named or patterned like this"}. Disabled rules (priority 0) are included.`
     : isAddress
       ? `No rules catch this address. Add rule starts one for ${patternForUrl(url) || "it"}.`
       : "No rule is named or patterned like this.";
@@ -3628,8 +3437,8 @@ $("rules-filter-clear").addEventListener("click", () => {
 watchRules((next) => {
   // Our own save arrives here too, after an extra async hop that outlives
   // the saving flag; what is in memory already matches it.
-  if (rulesSaving || JSON.stringify(next) === JSON.stringify(rules)) return;
-  rules = next;
+  if (state.rulesSaving || JSON.stringify(next) === JSON.stringify(state.rules)) return;
+  state.rules = next;
   if (!isPopup) renderRules();
   if (!isPopup && document.body.dataset.page === "rule") refreshEditorDirty();
   if (!isPopup && document.body.dataset.page === "test") renderRuleTestResult();
@@ -3643,10 +3452,10 @@ watchRules((next) => {
  * skipped rather than re-rendered under the user's cursor.
  */
 watchSettings((next) => {
-  if (JSON.stringify(next) === JSON.stringify(settings)) return;
-  settings = next;
-  for (const [key, value] of Object.entries(settingsDraft)) {
-    if (JSON.stringify(value) === JSON.stringify(settings[key])) delete settingsDraft[key];
+  if (JSON.stringify(next) === JSON.stringify(state.settings)) return;
+  state.settings = next;
+  for (const [key, value] of Object.entries(state.settingsDraft)) {
+    if (JSON.stringify(value) === JSON.stringify(state.settings[key])) delete state.settingsDraft[key];
   }
   applyManagementState();
   renderFields();
@@ -3672,7 +3481,7 @@ watchSettings((next) => {
  * switch changes nothing you could notice.
  */
 function renderFlagsNote() {
-  const on = activeFeatures(settings);
+  const on = activeFeatures(state.settings);
   const note = $("flags-note");
   note.hidden = on.length === 0;
   if (!on.length) return;
@@ -3697,10 +3506,10 @@ function renderFlagsNote() {
  */
 function renderBetaBadge() {
   const badge = $("beta-badge");
-  const on = flagOn(settings, "beta-features");
+  const on = flagOn(state.settings, "beta-features");
   badge.hidden = !on;
   if (!on) return;
-  const count = activeFeatures(settings).length;
+  const count = activeFeatures(state.settings).length;
   badge.title =
     (count === 0
       ? "Beta features is on, with nothing under it switched on yet."
@@ -3725,8 +3534,8 @@ function renderFlagged() {
 }
 
 watchGroups((next) => {
-  if (groupsSaving || JSON.stringify(next) === JSON.stringify(groups)) return;
-  groups = next;
+  if (state.groupsSaving || JSON.stringify(next) === JSON.stringify(state.groups)) return;
+  state.groups = next;
   if (!isPopup) {
     renderGroups();
     renderRules();
@@ -3752,7 +3561,7 @@ async function showBackup() {
   // not. A background that cannot be reached writes a zero, which a later
   // load can never lower anything with.
   const s = await api.runtime.sendMessage({ type: "timed-tabs:stats" }).catch(() => null);
-  backupText.value = exportText(settings, rules, groups, v?.display ?? "", s);
+  backupText.value = exportText(state.settings, state.rules, state.groups, v?.display ?? "", s);
 }
 
 /**
@@ -3824,9 +3633,9 @@ $("backup-reset").addEventListener("click", async () => {
   b.classList.remove("is-armed");
   await api.storage.sync.clear();
   await api.storage.local.clear();
-  settings = { ...DEFAULTS };
-  rules = [];
-  groups = [];
+  state.settings = { ...DEFAULTS };
+  state.rules = [];
+  state.groups = [];
   renderFields();
   renderFlagged();
   if ($("overview").open) refreshOverview();
@@ -3860,9 +3669,9 @@ async function applyBackup() {
     },
   );
   if (!ok) return;
-  settings = loaded;
-  rules = parsed.rules;
-  groups = parsed.groups ?? [];
+  state.settings = loaded;
+  state.rules = parsed.rules;
+  state.groups = parsed.groups ?? [];
   // Not part of the write above: the tally is the background's, and a count
   // that fails to land is a number, not a setting the user is now looking at.
   if (parsed.stats.killed > 0) {
@@ -3874,7 +3683,7 @@ async function applyBackup() {
   renderFields();
   renderFlagged();
   if ($("overview").open) refreshOverview();
-  const ruleCount = `${rules.length} rule${rules.length === 1 ? "" : "s"}`;
+  const ruleCount = `${state.rules.length} rule${state.rules.length === 1 ? "" : "s"}`;
   // Worth saying only when the bundle came from somewhere else. A file this
   // build wrote itself, or one too old to carry a stamp, says nothing — and
   // one from a later build is left to `parseBundle`, whose warning says both
@@ -4030,7 +3839,7 @@ $("act-reset").addEventListener("click", async () => {
 $("act-snooze").addEventListener("click", async () => {
   // Read the amount before the action lands, so the flash names what was
   // granted rather than whatever the next state happens to say.
-  const added = snoozeFor(tabState);
+  const added = snoozeFor(state.tabState);
   await tabAction("snooze");
   flashAction(`+${formatRemaining(added)}`);
 });
@@ -4039,7 +3848,7 @@ $("act-snooze").addEventListener("click", async () => {
 // The way back to the Rules page for this site. It went with the bottom nav,
 // and this is the place for it: beside the rules it is about.
 $("tab-rules-open").addEventListener("click", () =>
-  openPageView("#rules", currentTab?.url ? { site: currentTab.url } : {}),
+  openPageView("#rules", state.currentTab?.url ? { site: state.currentTab.url } : {}),
 );
 
 $("fuse-range").addEventListener("input", (e) => {
@@ -4078,7 +3887,7 @@ async function requestPermission(requires) {
  * longer happen. Switch those settings back off when their permission goes.
  */
 async function syncPermissionFields() {
-  const gated = FIELDS.filter((f) => f.requires && settings[f.key]);
+  const gated = FIELDS.filter((f) => f.requires && state.settings[f.key]);
   const lost = [];
   for (const field of gated) {
     const held = await api.permissions.contains(field.requires).catch(() => true);
@@ -4189,9 +3998,9 @@ getDisplayVersion().then((v) => {
 
 (async () => {
   applyBrowserTheme();
-  settings = await getSettings();
-  rules = await getRules();
-  groups = await getGroups();
+  state.settings = await getSettings();
+  state.rules = await getRules();
+  state.groups = await getGroups();
   if (!isPopup) {
     renderGroups();
     const site = params.get("site");
@@ -4239,7 +4048,7 @@ getDisplayVersion().then((v) => {
     // A navigation in the current tab can change which rules apply.
     api.tabs.onUpdated?.addListener(
       (tabId, change) => {
-        if (change.url && tabId === currentTab?.id) refreshTab();
+        if (change.url && tabId === state.currentTab?.id) refreshTab();
       },
       { properties: ["url"] },
     );
