@@ -23,6 +23,10 @@
         "at": 12000,
         "set": "#f-onExpire",
         "value": "close"
+      },
+      {
+        "at": 12500,
+        "click": "#settings-save"
       }
     ]
   },

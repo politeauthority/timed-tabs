@@ -1,15 +1,61 @@
 {
   "runSeconds": 20,
   "dev": {
-    "openWindows": [["about:blank", "https://example.com/", "https://example.org/"]],
-    "settings": { "tabLifetimeSeconds": 1800, "tickSeconds": 2, "indicators": ["favicon"], "faviconStyle": "square",
-                  "featureFlags": { "beta-features": true, "site-groups": true } },
-    "groups": [ { "id": "g1", "name": "news", "patterns": ["example.org/*"] } ],
+    "openWindows": [
+      [
+        "about:blank",
+        "https://example.com/",
+        "https://example.org/"
+      ]
+    ],
+    "settings": {
+      "tabLifetimeSeconds": 1800,
+      "tickSeconds": 2,
+      "indicators": [
+        "favicon"
+      ],
+      "faviconStyle": "square",
+      "featureFlags": {
+        "beta-features": true,
+        "site-groups": true,
+        "rules-appearance": true
+      }
+    },
+    "groups": [
+      {
+        "id": "g1",
+        "name": "news",
+        "patterns": [
+          "example.org/*"
+        ]
+      }
+    ],
     "rules": [
-      { "id": "r1", "description": "ring on .com", "pattern": "example.com/*", "match": "wildcard", "priority": 5,
-        "set": { "faviconStyle": "ring" } },
-      { "id": "r2", "description": "group look", "pattern": "@news", "match": "wildcard", "priority": 5,
-        "set": { "indicators": ["favicon", "title-prefix"], "faviconStyle": "dot", "flashBeforeExpiry": false } }
+      {
+        "id": "r1",
+        "description": "ring on .com",
+        "pattern": "example.com/*",
+        "match": "wildcard",
+        "priority": 5,
+        "set": {
+          "faviconStyle": "ring"
+        }
+      },
+      {
+        "id": "r2",
+        "description": "group look",
+        "pattern": "@news",
+        "match": "wildcard",
+        "priority": 5,
+        "set": {
+          "indicators": [
+            "favicon",
+            "title-prefix"
+          ],
+          "faviconStyle": "dot",
+          "flashBeforeExpiry": false
+        }
+      }
     ],
     "captureAfterMs": 9000
   },

@@ -16,7 +16,11 @@
         "favicon",
         "action-icon"
       ],
-      "faviconStyle": "square"
+      "faviconStyle": "square",
+      "featureFlags": {
+        "beta-features": true,
+        "rules-appearance": true
+      }
     },
     "rules": [
       {
