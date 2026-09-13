@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupRecent, iconForRecord, isPrivateTab, recordFor } from "../src/shared/recent.js";
+import { EXPIRED_GRACE_SECONDS, groupRecent, iconForRecord, isPrivateTab, recordFor, recordsExpiry, withinExpiredGrace } from "../src/shared/recent.js";
 
 describe("iconForRecord", () => {
   it("prefers the page's own icon over the browser's and never a painted data: URL", () => {
@@ -80,5 +80,42 @@ describe("recordFor", () => {
   it("stamps the id and the time from the same clock reading", () => {
     const row = recordFor(tab, "close", 4242);
     expect(row.id.endsWith(String(row.expiredAt))).toBe(true);
+  });
+});
+
+describe("withinExpiredGrace", () => {
+  const now = 1_000_000_000;
+  const grace = EXPIRED_GRACE_SECONDS * 1000;
+
+  it("keeps a tab that has not expired at all", () => {
+    expect(withinExpiredGrace(null, now)).toBe(true);
+    expect(withinExpiredGrace(undefined, now)).toBe(true);
+    expect(withinExpiredGrace(0, now)).toBe(true);
+  });
+
+  it("keeps a tab that expired inside the grace and drops one past it", () => {
+    expect(withinExpiredGrace(now, now)).toBe(true);
+    expect(withinExpiredGrace(now - grace + 1000, now)).toBe(true);
+    expect(withinExpiredGrace(now - grace, now)).toBe(false);
+    expect(withinExpiredGrace(now - grace - 1000, now)).toBe(false);
+  });
+
+  it("takes a grace of its own, so the rule can be tested without waiting five minutes", () => {
+    expect(withinExpiredGrace(now - 5000, now, 10)).toBe(true);
+    expect(withinExpiredGrace(now - 5000, now, 1)).toBe(false);
+  });
+
+  it("is five minutes", () => {
+    expect(EXPIRED_GRACE_SECONDS).toBe(300);
+  });
+});
+
+describe("recordsExpiry", () => {
+  it("writes down every expiry but a reload", () => {
+    expect(recordsExpiry("close")).toBe(true);
+    expect(recordsExpiry("none")).toBe(true);
+    expect(recordsExpiry("discard")).toBe(true);
+    // A reloaded tab goes on running, so a row once a lifetime would say nothing.
+    expect(recordsExpiry("reload")).toBe(false);
   });
 });

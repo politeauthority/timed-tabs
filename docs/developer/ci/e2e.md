@@ -104,7 +104,8 @@ lines the scenarios rely on, all prefixed `[timed-tabs]`, are:
   equals the defaults prints no new line when it navigates, so expect a `look` line
   only where a rule changes something.
 - `expired <tabId> <url> action=<close|discard|reload|none>` when a tab runs out.
-- `recorded <url> icon=<yes|no>` when a closed tab is added to Recently expired.
+- `recorded <url> icon=<yes|no>` when an expired tab is added to Recently expired.
+  Every expiry but a reload writes one, whether or not the tab was closed.
 - `navigated <tabId> <url>` after a `navigate` entry in the scenario moved a tab.
 - `painted <tabId> <key>` when the toolbar button's icon changes, where the key is
   the mark and its fill — `running:<n>`, `face-running:<n>`, `face-paused:<n>`,

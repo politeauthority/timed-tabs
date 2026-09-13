@@ -44,7 +44,7 @@ import {
 } from "../shared/rules.js";
 import { exportText, parseBundle } from "../shared/backup.js";
 import { compareVersions, getDisplayVersion } from "../shared/version.js";
-import { groupRecent } from "../shared/recent.js";
+import { EXPIRED_GRACE_SECONDS, groupRecent } from "../shared/recent.js";
 import { formatDuration, formatRemaining, formatSpan, snoozeSeconds, toUnit } from "../shared/time.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
 import { FLAGS, activeFeatures, featureOn, flagOn, flagRequires } from "../shared/flags.js";
@@ -1082,13 +1082,16 @@ async function refreshOverview() {
   if (seq !== overviewSeq) return;
   if (list.querySelector(".is-armed") || list.contains(document.activeElement)) return;
   const total = groups.reduce((n, g) => n + g.tabs.length, 0);
-  $("overview-count").textContent = total
-    ? `${total} tab${total === 1 ? "" : "s"}`
-    : "";
+  const open = groups.reduce((n, g) => n + (g.total ?? g.tabs.length), 0);
+  const count = $("overview-count");
+  count.textContent = open ? countLabel(total, open) : "";
+  count.title = total === open ? "" : heldBackLabel(open - total);
   if (!total) {
     const empty = document.createElement("p");
     empty.className = "overview-empty";
-    empty.textContent = "No tabs are being timed.";
+    empty.textContent = open
+      ? `Every open tab expired more than ${formatSpan(EXPIRED_GRACE_SECONDS)} ago. They are under "Recently expired".`
+      : "No tabs are being timed.";
     list.replaceChildren(empty);
     return;
   }
@@ -1109,13 +1112,29 @@ async function refreshOverview() {
     name.textContent = g.focused ? "Active window" : `Window ${i + 1}`;
     const count = document.createElement("span");
     count.className = "overview-count";
-    count.textContent = `${g.tabs.length} tab${g.tabs.length === 1 ? "" : "s"}`;
+    const inWindow = g.total ?? g.tabs.length;
+    count.textContent = countLabel(g.tabs.length, inWindow);
+    count.title = g.tabs.length === inWindow ? "" : heldBackLabel(inWindow - g.tabs.length);
     sum.append(name, count);
     group.append(sum, ...rows);
     rememberFold(group, `window-${i}`, true);
     frag.append(group);
   });
   list.replaceChildren(frag);
+}
+
+/**
+ * "6 tabs", or "2 of 8 tabs" where some are held back. Both numbers, because
+ * neither on its own is honest: the window really does hold eight tabs, and
+ * the list really does show two of them.
+ */
+function countLabel(shown, total) {
+  const word = `tab${total === 1 ? "" : "s"}`;
+  return shown === total ? `${total} ${word}` : `${shown} of ${total} ${word}`;
+}
+
+function heldBackLabel(n) {
+  return `${n} expired more than ${formatSpan(EXPIRED_GRACE_SECONDS)} ago and ${n === 1 ? "is" : "are"} under "Recently expired"`;
 }
 
 function renderTabRow(t) {
@@ -1379,30 +1398,48 @@ function renderRecentRow(item) {
   const title = document.createElement("span");
   title.className = "trow-title";
   title.textContent = item.title || item.url;
+  // "closed" only where we closed it. A tab left open when it expired is
+  // listed here too, and calling that closed would send the user looking for a
+  // tab that never went anywhere.
+  const verb = item.action === "close" ? "closed" : "expired";
   const when = document.createElement("span");
   when.className = "trow-when";
   if (item.count > 1) {
     const count = document.createElement("span");
     count.className = "trow-count";
     count.textContent = `×${item.count}`;
-    count.title = `Closed ${item.count} times`;
-    when.append(count, `last closed ${timeAgo(item.expiredAt)}`);
+    count.title = `${verb === "closed" ? "Closed" : "Expired"} ${item.count} times`;
+    when.append(count, `last ${verb} ${timeAgo(item.expiredAt)}`);
   } else {
-    when.textContent = `closed ${timeAgo(item.expiredAt)}`;
+    when.textContent = `${verb} ${timeAgo(item.expiredAt)}`;
   }
   const url = document.createElement("span");
   url.className = "trow-url";
   url.textContent = item.url;
   url.title = item.url;
+  // The tab this row names may still be open -- expiring does not always close
+  // one -- and then there is nothing to reopen: take the user to it instead,
+  // rather than leaving them a second copy of a page they already have.
   const reopen = document.createElement("button");
   reopen.type = "button";
   reopen.className = "trow-reopen";
-  reopen.append(svgIcon("reopen"), document.createTextNode("Reopen"));
+  reopen.append(
+    svgIcon(item.open ? "tabs" : "reopen"),
+    document.createTextNode(item.open ? "Go to tab" : "Reopen"),
+  );
+  reopen.title = item.open
+    ? "This tab is still open; go to it"
+    : "Open this address in a new tab";
   reopen.addEventListener("click", async () => {
     await api.runtime
-      .sendMessage({ type: "timed-tabs:recent-reopen", url: item.url })
+      .sendMessage(
+        item.open
+          ? { type: "timed-tabs:tab-action", tabId: item.tabId, action: "focus" }
+          : { type: "timed-tabs:recent-reopen", url: item.url },
+      )
       .catch(() => {});
     if (isPopup) window.close();
+    else setTimeout(refreshRecent, 300);
   });
   const remove = document.createElement("button");
   remove.type = "button";
