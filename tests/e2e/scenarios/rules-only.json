@@ -1,23 +1,50 @@
 {
   "runSeconds": 22,
   "dev": {
-    "openWindows": [["about:blank", "https://example.com/", "https://example.org/"]],
-    "settings": { "tabLifetimeSeconds": 1800, "tickSeconds": 2, "requireRuleMatch": true,
-                  "indicators": ["favicon", "action-icon"], "faviconStyle": "square" },
-    "rules": [
-      { "id": "r1", "description": "the only page a rule speaks for", "pattern": "example.com/*",
-        "match": "wildcard", "priority": 5, "set": { "faviconStyle": "ring" } }
+    "openWindows": [
+      [
+        "about:blank",
+        "https://example.com/",
+        "https://example.org/"
+      ]
     ],
-    "navigate": [{ "at": 10000, "from": "https://example.org/", "to": "https://example.com/x" }]
+    "settings": {
+      "tabLifetimeSeconds": 1800,
+      "tickSeconds": 2,
+      "requireRuleMatch": true,
+      "indicators": [
+        "favicon",
+        "action-icon"
+      ],
+      "faviconStyle": "square"
+    },
+    "rules": [
+      {
+        "id": "r1",
+        "description": "the only page a rule speaks for",
+        "pattern": "example.com/*",
+        "match": "wildcard",
+        "priority": 5,
+        "set": {
+          "faviconStyle": "ring"
+        }
+      }
+    ],
+    "navigate": [
+      {
+        "at": 10000,
+        "from": "https://example.org/",
+        "to": "https://example.com/x"
+      }
+    ]
   },
   "expect": [
     "look \\d+ https://example\\.com/ ind=favicon\\+action-icon style=ring quiet=false",
     "painted \\d+ inactive",
-    "painted (\\d+) inactive[\\s\\S]*painted \\1 running:\\d+",
-    "navigated \\d+ https://example\\.com/x",
+    "painted (\\d+) inactive[\\s\\S]*navigated \\1 https://example\\.com/x[\\s\\S]*painted \\1 running:\\d+",
     "look \\d+ https://example\\.com/x [^\\n]*quiet=false"
   ],
   "expectNot": [
-    "look \\d+ about:blank [^\\n]*quiet=false"
+    "look (\\d+) https://example\\.com/ [^\\n]*[\\s\\S]*painted \\1 inactive"
   ]
 }
