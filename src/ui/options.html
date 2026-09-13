@@ -82,6 +82,13 @@
             aria-label="Share of its life this tab has used" />
         </div>
 
+        <!-- Shown when the timer both pauses here and restarts on return: the
+             clock is still real and still draggable, it just will not move
+             until you leave, and the next visit hands it back full. -->
+        <p id="tab-paused-note" class="tab-paused-note" hidden>
+          This tab's timer only runs while it is in the background, and restarts when you come back.
+        </p>
+
         <div class="tab-actions">
           <!-- Icon-only: the label lives in title/aria-label, and what just
                happened is said once in #act-flash rather than on the button. -->
@@ -122,15 +129,6 @@
           <span>Ignore all rules for this tab</span>
         </label>
         <p id="tab-rules-note" class="tab-rules-note">Changes here last until the tab is closed.</p>
-      </section>
-
-      <section id="tab-paused" class="tab tab-paused" hidden>
-        <p>This tab's timer only runs while it is in the background, and restarts when you come back.</p>
-        <label class="switch">
-          <input type="checkbox" id="act-never-paused" />
-          <span class="switch-track"></span>
-          <span>Never expire this tab</span>
-        </label>
       </section>
 
       <!-- Tabs page -->
