@@ -46,6 +46,7 @@ import { exportText, parseBundle } from "../shared/backup.js";
 import { compareVersions, getDisplayVersion } from "../shared/version.js";
 import { groupRecent } from "../shared/recent.js";
 import { formatDuration, formatRemaining, formatSpan, snoozeSeconds, toUnit } from "../shared/time.js";
+import { formatLead, parseLead } from "../shared/lead.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
 import { FLAGS, activeFeatures, featureOn, flagOn, flagRequires } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
@@ -93,7 +94,9 @@ window.addEventListener("hashchange", route);
 // Dev build only (see background): dev.json may list UI actions to replay,
 // e.g. "uiActions": [{ "at": 3000, "click": "#tab-rules-list input" }] or
 // [{ "at": 3000, "set": "#fuse-range", "value": "80" }] to drive a control
-// that a bare click cannot work, like a slider.
+// that a bare click cannot work, like a slider, or
+// [{ "at": 3000, "scroll": "#group-appearance h3:last-of-type" }] to bring a
+// part of a long page into the capture.
 // The same two marks the background uses, for the same reason: Chrome has no
 // "-dev@" id to recognise a dev build by, so the manifest name carries it.
 if (
@@ -105,10 +108,14 @@ if (
     .then((dev) => {
       for (const a of dev.uiActions ?? []) {
         setTimeout(() => {
-          const selector = a.click ?? a.set;
+          const selector = a.click ?? a.set ?? a.scroll;
           const el = document.querySelector(selector);
           if (!el) {
             console.log("[timed-tabs:ui] uiAction: no element for", selector);
+            return;
+          }
+          if (a.scroll !== undefined) {
+            el.scrollIntoView({ block: "start" });
             return;
           }
           if (a.set === undefined) {
@@ -154,14 +161,37 @@ function renderFields() {
     const help = document.createElement("p");
     help.className = "group-help";
     help.textContent = g.help;
-    const rows = document.createElement("div");
-    rows.className = "group-rows";
-    rows.append(...FIELDS.filter((f) => f.group === g.id).map(renderField));
-    sec.append(h, help, rows);
+    sec.append(h, help);
+    // A group with sections gets a headed block of rows per section; the
+    // rest get one block. Rows in a sectioned group that name no section
+    // land in the first, so a field is never dropped.
+    const fields = FIELDS.filter((f) => f.group === g.id);
+    const sections = g.sections ?? [null];
+    for (const [i, sub] of sections.entries()) {
+      const rows = document.createElement("div");
+      rows.className = "group-rows";
+      const own = sub
+        ? fields.filter((f) => f.section === sub.id || (i === 0 && !sections.some((x) => x.id === f.section)))
+        : fields;
+      rows.append(...own.map(renderField));
+      if (sub) {
+        const sh = document.createElement("h3");
+        sh.className = "group-section-title";
+        sh.textContent = `${sub.emoji ? sub.emoji + " " : ""}${sub.title}`;
+        sec.append(sh);
+        if (sub.help) {
+          const subHelp = document.createElement("p");
+          subHelp.className = "group-help";
+          subHelp.textContent = sub.help;
+          sec.append(subHelp);
+        }
+      }
+      sec.append(rows);
+    }
     return sec;
   });
   root.replaceChildren(...sections);
-  updateFieldVisibility();
+  updateFieldVisibility(false);
   renderGroupTabs();
   showGroup(currentGroup());
 }
@@ -187,11 +217,16 @@ const EXTRA_GROUPS = [
     title: "Diagnostics",
     short: "Diagnostics",
     help: "What the background is doing for each tab.",
-    onShow: () => refreshDiag(),
+    // No pill of its own: it shows at the foot of the Advanced group.
+    under: "advanced",
+    // Folded by default; the fold's own toggle refreshes it when opened.
+    onShow: () => {
+      if ($("diag").open) refreshDiag();
+    },
   },
 ];
-/** Every pill, in order: the settings groups, then the extras. */
-const PILLS = [...GROUPS, ...EXTRA_GROUPS];
+/** Every pill, in order: the settings groups, then the extras with no home elsewhere. */
+const PILLS = [...GROUPS, ...EXTRA_GROUPS.filter((g) => !g.under)];
 
 /** Which group of settings is on show. Remembered like the folds are. */
 const GROUP_KEY = "settings-group";
@@ -219,7 +254,7 @@ function showGroup(id) {
   // would throw away text pasted into it but not yet loaded.
   for (const extra of EXTRA_GROUPS) {
     const sec = $(`group-${extra.id}`);
-    const on = extra.id === id;
+    const on = (extra.under ?? extra.id) === id;
     const arriving = on && sec.hidden;
     sec.hidden = !on;
     if (arriving) extra.onShow();
@@ -267,11 +302,107 @@ function renderGroupTabs() {
   );
 }
 
+/**
+ * Show or hide a row that another control governs, sliding it open or shut
+ * rather than snapping. The first pass (`animate` false) sets the resting
+ * state without motion, so a page does not open with rows sliding about.
+ * The row ends with `hidden` set or cleared either way; the animation is
+ * only what happens in between, and is skipped when the user asks for less
+ * motion.
+ */
+const SLIDE_MS = 180;
+const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+function setRevealed(el, show, animate = true, onDone = null) {
+  if (el.hidden === !show && !el.dataset.sliding) {
+    onDone?.();
+    return;
+  }
+  const currentAnim = el.getAnimations?.().find((a) => a.id === "slide");
+  if (currentAnim) currentAnim.cancel();
+  if (!animate || reduceMotion() || !el.animate) {
+    delete el.dataset.sliding;
+    el.hidden = !show;
+    onDone?.();
+    return;
+  }
+  el.hidden = false;
+  el.dataset.sliding = "1";
+  const h = `${el.scrollHeight}px`;
+  const keys = [
+    { height: "0px", opacity: 0, paddingTop: "0px", paddingBottom: "0px", overflow: "hidden" },
+    { height: h, opacity: 1, paddingTop: getComputedStyle(el).paddingTop, paddingBottom: getComputedStyle(el).paddingBottom, overflow: "hidden" },
+  ];
+  const anim = el.animate(show ? keys : keys.slice().reverse(), { duration: SLIDE_MS, easing: "ease-out", id: "slide" });
+  anim.onfinish = () => {
+    delete el.dataset.sliding;
+    el.hidden = !show;
+    onDone?.();
+  };
+  anim.oncancel = () => {
+    delete el.dataset.sliding;
+  };
+}
+
+/**
+ * A number and a unit for a lead (see shared/lead.js): seconds, minutes and
+ * hours, or a share of the lifetime. `lifetime()` is the ceiling an amount is
+ * clamped to when read, asked for at that moment because a rule can change
+ * it. Returns the two controls and a read/set pair over the stored string.
+ */
+function makeLeadControl(current, lifetime, onChange) {
+  const num = document.createElement("input");
+  num.type = "number";
+  num.min = "1";
+  num.step = "1";
+  const units = document.createElement("select");
+  for (const [label, unit] of [
+    ["sec left", "1"],
+    ["min left", "60"],
+    ["hours left", "3600"],
+    ["% of lifetime left", "%"],
+  ]) {
+    units.add(new Option(label, unit));
+  }
+  const set = (value) => {
+    const lead = parseLead(value) ?? { percent: 60 };
+    if ("percent" in lead) {
+      num.value = String(lead.percent);
+      units.value = "%";
+    } else {
+      const u = toUnit(lead.seconds);
+      num.value = String(u.value);
+      units.value = String(u.unit);
+    }
+    num.max = units.value === "%" ? "99" : "";
+  };
+  const read = () => {
+    const n = Math.round(Number(num.value));
+    if (units.value === "%") {
+      const percent = Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 60;
+      return formatLead({ percent });
+    }
+    const raw = Number.isFinite(n) ? Math.max(1, n) * Number(units.value) : 60;
+    // The lifetime is the ceiling: a longer lead means "from the start", so
+    // it is stored as the lifetime itself rather than a number that would
+    // outlive a later, shorter lifetime unnoticed.
+    const cap = lifetime();
+    return formatLead({ seconds: cap > 0 ? Math.min(raw, cap) : raw });
+  };
+  set(current);
+  const changed = () => {
+    set(read());
+    onChange(read());
+  };
+  num.addEventListener("change", changed);
+  units.addEventListener("change", changed);
+  return { num, units, read, set };
+}
+
 /** Rows with `showWhen` appear only while their condition holds. */
-function updateFieldVisibility() {
+function updateFieldVisibility(animate = true) {
   for (const row of $("fields").querySelectorAll(".field[data-key]")) {
     const field = FIELDS.find((f) => f.key === row.dataset.key);
-    row.hidden = Boolean(field?.showWhen && !field.showWhen(settings));
+    setRevealed(row, !(field?.showWhen && !field.showWhen(settings)), animate);
   }
 }
 
@@ -280,16 +411,20 @@ function renderField(field) {
   row.className = "field";
   row.dataset.key = field.key;
 
+  // A row with no label of its own is all control: the flags list is headed
+  // by its section instead.
   const label = document.createElement("label");
-  label.className = "field-label";
-  label.textContent = field.label;
-  if (field.help) {
-    const help = document.createElement("span");
-    help.className = "field-help";
-    help.textContent = field.help;
-    label.append(help);
+  if (field.label) {
+    label.className = "field-label";
+    label.textContent = field.label;
+    if (field.help) {
+      const help = document.createElement("span");
+      help.className = "field-help";
+      help.textContent = field.help;
+      label.append(help);
+    }
+    row.append(label);
   }
-  row.append(label);
 
   const control = document.createElement("div");
   control.className = "field-control";
@@ -357,6 +492,12 @@ function renderField(field) {
     num.addEventListener("change", commit);
     units.addEventListener("change", commit);
     control.append(num, units);
+  } else if (field.type === "lead") {
+    const lead = makeLeadControl(value, () => settings.tabLifetimeSeconds, (v) => save({ [field.key]: v }));
+    lead.num.id = `f-${field.key}`;
+    label.htmlFor = lead.num.id;
+    lead.units.setAttribute("aria-label", `${field.label} unit`);
+    control.append(lead.num, lead.units);
   } else if (field.type === "percent" && field.slider) {
     const range = document.createElement("input");
     range.type = "range";
@@ -403,12 +544,16 @@ function renderField(field) {
     control.remove();
     const list = document.createElement("div");
     list.className = "field-group-rows";
-    for (const ind of indicators) {
+    // A list may show only some of the indicators; the others keep whatever
+    // the stored list says, so the halves do not overwrite each other.
+    const shown = indicators.filter((ind) => !field.only || field.only.includes(ind.id));
+    for (const ind of shown) {
       const sw = makeSwitch(value.includes(ind.id), async () => {
-        const ids = [...list.querySelectorAll("input:checked")].map(
-          (i) => i.value,
-        );
-        await save({ indicators: ids });
+        const checked = new Set([...list.querySelectorAll("input:checked")].map((i) => i.value));
+        const ids = indicators
+          .map((i) => i.id)
+          .filter((id) => (shown.some((i) => i.id === id) ? checked.has(id) : settings.indicators.includes(id)));
+        await save({ indicators: ids }, ind.label);
         markSaved(sub);
       });
       sw.input.value = ind.id;
@@ -435,10 +580,10 @@ function renderField(field) {
     // master switch off there is nothing to choose, and a list of greyed-out
     // switches only invites reading. Its own value is kept, so turning the
     // parent back on shows the switches exactly as they were left.
-    const syncDependents = () => {
+    const syncDependents = (animate = true) => {
       for (const [id, entry] of switches) {
         const parent = flagRequires(id);
-        entry.row.hidden = Boolean(parent) && !flagOn(settings, parent);
+        setRevealed(entry.row, !(parent && !flagOn(settings, parent)), animate);
       }
     };
     for (const flag of FLAGS) {
@@ -454,7 +599,7 @@ function renderField(field) {
       switches.set(flag.id, { input: sw.input, row: sub });
       list.append(sub);
     }
-    syncDependents();
+    syncDependents(false);
     row.append(list);
   }
   return row;
@@ -494,7 +639,8 @@ const toasts = mountToasts(document.body, isPopup ? { max: 2 } : {});
 
 /** The label of a settings field, for naming what was just saved. */
 function fieldLabel(key) {
-  return FIELDS.find((f) => f.key === key)?.label ?? key;
+  const f = FIELDS.find((f) => f.key === key);
+  return f?.label ?? f?.name ?? key;
 }
 
 /** What a rejected write left behind, in a form worth showing a user. */
@@ -528,10 +674,12 @@ async function write(run, { what, key = null, note = "Nothing was changed." }) {
   }
 }
 
-async function save(partial) {
+async function save(partial, label = null) {
   const keys = Object.keys(partial);
+  // `label` names the row that was touched when the key alone cannot: the
+  // indicators list is shown in halves that share one key.
   const what =
-    keys.length === 1 ? `“${fieldLabel(keys[0])}”` : `${keys.length} settings`;
+    keys.length === 1 ? `“${label ?? fieldLabel(keys[0])}”` : `${keys.length} settings`;
   const ok = await write(() => saveSettings(partial), {
     what,
     key: keys.length === 1 ? keys[0] : "settings",
@@ -727,8 +875,8 @@ function renderTabRules() {
  * here; the rule card below prints what it sets.
  */
 const DEPENDENT_SETTINGS = new Set([
-  "flashLeadSeconds",
-  "quietUntilPercent",
+  "flashLead",
+  "quietStart",
   "faviconStyle",
 ]);
 
@@ -904,12 +1052,20 @@ function ruleFieldLabel(key) {
   return RULE_FIELD_DEFS.find((f) => f.key === key)?.label ?? key;
 }
 
+/** A lead in words: "10 min left" or "40% of the lifetime left". */
+function leadText(v) {
+  const lead = parseLead(v);
+  if (!lead) return String(v);
+  return "percent" in lead ? `${lead.percent}% of the lifetime left` : `${formatDuration(lead.seconds)} left`;
+}
+
 function formatRuleValue(key, v) {
   const def = RULE_FIELD_DEFS.find((f) => f.key === key);
   if (def?.type === "duration") return formatDuration(v);
   if (def?.type === "choice")
     return def.options.find((o) => o.value === v)?.label ?? String(v);
   if (def?.type === "percent") return `${v}%`;
+  if (def?.type === "lead") return leadText(v);
   if (def?.type === "indicators") {
     const names = (Array.isArray(v) ? v : []).map((id) => indicators.find((i) => i.id === id)?.label ?? id);
     return names.length ? names.join(", ") : "nothing";
@@ -1778,22 +1934,22 @@ const RULE_FIELD_TEXT = {
     help: "Where the colour goes on the icon of {tab}.",
   },
   hideWhileGreen: {
-    label: "Leave fresh tabs alone",
+    label: "No display changes until",
     short: "Quiet while fresh",
-    help: "Show nothing on {tab} until part of its lifetime has passed.",
+    help: "Keep every indicator off on {tab} until it is close enough to expiring.",
   },
-  quietUntilPercent: {
-    label: "Show indicators after",
-    short: "Show after",
-    help: "The share of the lifetime of {tab} that must pass before anything is shown.",
+  quietStart: {
+    label: "When to start display updates",
+    short: "Show from",
+    help: "How much time {tab} must have left before anything shows: an amount, or a share of its lifetime.",
   },
   flashBeforeExpiry: {
     label: "Flash before expiry",
     help: "{Tabs} {blink} during the last stretch before {they} {run} out of time.",
   },
-  flashLeadSeconds: {
+  flashLead: {
     label: "Start flashing",
-    help: "How long before expiry {tab} starts flashing.",
+    help: "How much time {tab} must have left before it starts flashing: an amount, or a share of its lifetime.",
   },
 };
 /** Help text placeholders, worded for the tabs a rule matches. */
@@ -1863,7 +2019,7 @@ const RULE_CHIP_TOGGLE_TEXT = {
   resetOnActivate: { on: "Restarts on focus", off: "No restart on focus" },
   pauseWhileActive: { on: "Background time only", off: "Counts time while active" },
   neverExpire: { on: "Timer off", off: "Timer on" },
-  hideWhileGreen: { on: "Leaves fresh tabs alone", off: "Shows from the start" },
+  hideWhileGreen: { on: "Quiet until near expiry", off: "Shows from the start" },
   flashBeforeExpiry: { on: "Flashes before expiry", off: "No flash" },
 };
 
@@ -1872,8 +2028,8 @@ const RULE_CHIP_LABEL = {
   onExpire: "On expiry",
   indicators: "Shows with",
   faviconStyle: "Favicon",
-  quietUntilPercent: "Shows after",
-  flashLeadSeconds: "Flash lead",
+  quietStart: "Shows from",
+  flashLead: "Flashes from",
 };
 
 function ruleChipText(key, value) {
@@ -2516,6 +2672,14 @@ function renderOverride(def, store, onChanged = () => {}, opts = {}) {
       return clamped;
     };
     setValue = (v) => (num.value = String(v ?? 40));
+  } else if (def.type === "lead") {
+    // The ceiling is the lifetime these tabs will have: this rule's, if it
+    // sets one, else what lies underneath.
+    const lifetime = () => Number(store.set.tabLifetimeSeconds ?? store.base("tabLifetimeSeconds") ?? 0);
+    const lead = makeLeadControl(current, lifetime, () => commit(true));
+    control.append(lead.num, lead.units);
+    read = lead.read;
+    setValue = lead.set;
   } else if (def.type === "indicators") {
     const chosen = new Set(Array.isArray(current) ? current : []);
     control.classList.add("override-indicators");
@@ -3302,6 +3466,27 @@ getDisplayVersion().then((v) => {
     rememberFold($("overview"), "overview", true);
     rememberFold($("recent"), "recent", false);
     rememberFold($("stats"), "stats", false);
+    rememberFold($("diag"), "diag", false);
+    // The body slides rather than snapping: the summary click is taken over,
+    // the details opens at once with its body still tucked, and the body
+    // slides down; closing slides it up first and closes the details after.
+    const diag = $("diag");
+    const diagBody = $("diag-body");
+    diagBody.hidden = !diag.open;
+    diag.addEventListener("toggle", () => {
+      if (diag.open) refreshDiag();
+    });
+    diag.querySelector("summary").addEventListener("click", (e) => {
+      e.preventDefault();
+      if (diag.open) {
+        setRevealed(diagBody, false, true, () => {
+          diag.open = false;
+        });
+      } else {
+        diag.open = true;
+        setRevealed(diagBody, true);
+      }
+    });
     // After the fold, so a section remembered open is refreshed on the way in
     // -- and one the flag has off stays hidden whatever the fold said.
     renderStats();

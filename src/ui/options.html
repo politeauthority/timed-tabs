@@ -275,9 +275,13 @@
         </div>
       </section>
 
-      <section id="group-diagnostics" class="diagnostics group" data-pages="settings" data-page-only hidden>
-        <h2 class="settings-title">🩺 Diagnostics</h2>
-        <p class="group-help">What the background is doing for each tab, for when an indicator does not seem to paint.</p>
+      <!-- Diagnostics has no pill: it follows the Advanced group's rows, so it is
+           headed like a section of that group rather than a group of its own. -->
+      <section id="group-diagnostics" class="diagnostics group group-tail" data-pages="settings" data-page-only hidden>
+        <details id="diag" class="diag-fold">
+          <summary class="chev group-section-title">🩺 Diagnostics</summary>
+          <div id="diag-body">
+          <p class="group-help">What the background is doing for each tab, for when an indicator does not seem to paint.</p>
         <p class="diag-actions">
           <button type="button" id="diag-refresh">Refresh</button>
           <button type="button" id="diag-tick">Force tick</button>
@@ -291,6 +295,8 @@
             <tbody></tbody>
           </table>
         </div>
+          </div>
+        </details>
       </section>
 
       <footer class="page-foot" data-page-only>

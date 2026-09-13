@@ -29,8 +29,10 @@ describe("coerceSetting", () => {
     expect(coerceSetting("onExpire", "nuke")).toBeUndefined();
     expect(coerceSetting("onExpire", "close")).toBe("close");
     expect(coerceSetting("tabSort", "x")).toBeUndefined();
-    expect(coerceSetting("quietUntilPercent", 500)).toBeUndefined();
-    expect(coerceSetting("quietUntilPercent", 40)).toBe(40);
+    expect(coerceSetting("quietStart", "500%")).toBeUndefined();
+    expect(coerceSetting("quietStart", "40%")).toBe("40%");
+    expect(coerceSetting("quietStart", " 600s ")).toBe("600s");
+    expect(coerceSetting("quietStart", 40)).toBeUndefined();
     expect(coerceSetting("tickSeconds", 0.001)).toBeUndefined();
     expect(coerceSetting("tabLifetimeSeconds", -5)).toBeUndefined();
   });

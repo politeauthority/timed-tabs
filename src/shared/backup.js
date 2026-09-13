@@ -23,7 +23,7 @@
  * wrote it out that time, so importing one into this build and copying it back
  * out restamps it with this build.
  */
-import { DEFAULTS, coerceSetting } from "./settings.js";
+import { DEFAULTS, coerceSetting, migrateSettingKeys } from "./settings.js";
 import { RULE_FIELDS, clampPriority, newRule } from "./rules.js";
 import { newGroup } from "./groups.js";
 import { compareVersions } from "./version.js";
@@ -95,7 +95,7 @@ export function parseBundle(text, currentVersion = "") {
     warnings.push(`Written by Timed Tabs ${version}, which is newer than this ${currentVersion}.`);
   }
   const settings = {};
-  const src = data.settings && typeof data.settings === "object" ? data.settings : {};
+  const src = migrateSettingKeys(data.settings && typeof data.settings === "object" ? data.settings : {});
   for (const [key, value] of Object.entries(src)) {
     if (!(key in DEFAULTS)) {
       warnings.push(`Ignored unknown setting "${key}".`);
@@ -173,7 +173,7 @@ function cleanRule(r) {
   // Only what a rule can override; anything else would sit in storage
   // invisibly, re-exported for ever and never shown in the editor.
   const set = {};
-  for (const [k, v] of Object.entries(r.set ?? {})) {
+  for (const [k, v] of Object.entries(migrateSettingKeys(r.set ?? {}))) {
     if (!RULE_FIELDS.includes(k)) continue;
     if (k === "neverExpire") {
       if (typeof v === "boolean") set[k] = v;
