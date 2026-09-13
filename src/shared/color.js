@@ -42,13 +42,20 @@ export const VIVID_RAMP = Object.freeze([
 
 /**
  * Colours for marks that are not counting down, and so have no place on the
- * ramp: a clock that is stopped, and a tab that will never expire. Both are
- * deliberately off the green -> red axis, so "not running" cannot be misread
- * as "plenty of time left".
+ * ramp: a clock that is stopped, a tab that will never expire, and a tab
+ * Timed Tabs is not watching at all. All three are deliberately off the
+ * green -> red axis, so "not running" cannot be misread as "plenty of time
+ * left".
+ *
+ * `inactive` is the odd one out twice over: it is the only one with no hue at
+ * all, which is what keeps it from being read as either of the other two, and
+ * the only one that says nothing about a timer because there is no timer to
+ * say anything about.
  */
 export const STATE_COLORS = Object.freeze({
   paused: [0x70, 0x7d, 0x91], // slate
   exempt: [0x4a, 0x9e, 0xda], // blue
+  inactive: [0x8a, 0x8a, 0x8a], // grey, no hue
 });
 
 /**

@@ -199,6 +199,12 @@ async function clearIcon(tabId) {
  * no timer running gets the resting mark, so the button matches the packaged
  * icon rather than going blank.
  *
+ * Both marks key apart the tab Timed Tabs is not watching at all, which is
+ * what "Only manage tabs a rule matches" leaves every page without a rule:
+ * `inactive`, the empty clock in grey. It is the one state where an empty
+ * mark is the honest one -- there is no timer here to read, and the packaged
+ * icon would claim there is.
+ *
  * The interactive clock keys apart two states the ring has no way to show. A
  * tab that can never expire is `exempt` rather than resting, because "nothing
  * is draining" is worth saying; a stopped clock is `paused` at the fill it
@@ -208,6 +214,10 @@ async function clearIcon(tabId) {
  */
 export function iconKey(tab, lit = true, live = false) {
   const prefix = live ? "face-" : "";
+  // Nothing is watching this tab, so nothing is counting: the empty clock.
+  // `hidden` is the tab this indicator is not used for at all, which is a
+  // different silence and keeps the mark off a button the user has turned off.
+  if (tab.unmanaged && !tab.hidden) return `${prefix}inactive`;
   if (live && tab.exempt) return "face-exempt";
   // Null means no mark at all: the icon comes off and the button falls back to
   // the packaged one. The clock has to say nothing rather than say the wrong
@@ -242,6 +252,7 @@ export function specFor(key) {
   const color =
     state === "paused" ? STATE_COLORS.paused
     : state === "exempt" ? STATE_COLORS.exempt
+    : state === "inactive" ? STATE_COLORS.inactive
     : rampColor(state === "idle" ? 0 : progress, "vivid");
   return { live, state, progress, color: toHex(color) };
 }

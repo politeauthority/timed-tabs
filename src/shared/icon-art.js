@@ -60,11 +60,13 @@ function handEnd(turn, len) {
  * The dial as a flat list of shapes, in paint order.
  *
  * `state` is "running" (ring drains as `progress` goes 0 -> 1), "flash" (a
- * solid disc, the loud half of a blink) or "expired" (solid disc with an
- * exclamation knocked out of it). `hands: false` leaves the running ring
- * bare, for a mark that is no longer telling the time; `mutedHands: true`
- * keeps them but paints them like the spent part of the ring, so an empty
- * ring can still carry a faint clock.
+ * solid disc, the loud half of a blink), "expired" (solid disc with an
+ * exclamation knocked out of it) or "inactive" (the empty dial: the track
+ * with nothing filling it and hands as faint, a clock that is not counting
+ * anything). `hands: false` leaves the running ring bare, for a mark that is
+ * no longer telling the time; `mutedHands: true` keeps them but paints them
+ * like the spent part of the ring, so an empty ring can still carry a faint
+ * clock.
  *
  * Every shape takes the one colour it is painted in, except that `trackColor`
  * gives the spent part of the ring a colour of its own instead of the faint
@@ -99,7 +101,12 @@ export function dialShapes({
     return state === "flash" ? disc : [...disc, { kind: "erase", shapes: bangShapes() }];
   }
 
-  const spent = Math.min(1, Math.max(0, progress));
+  // "inactive" is the empty dial: nothing left to fill and nothing to fill it,
+  // which is the whole of what it has to say. It is `progress: 1` with muted
+  // hands, said once here so no caller has to know that.
+  const empty = state === "inactive";
+  const spent = empty ? 1 : Math.min(1, Math.max(0, progress));
+  const faint = mutedHands || empty;
   const track = { kind: "arc", cx: c, cy: c, r: m.radius, width: m.ring, from: 0, to: 1 };
   // A colour of its own is drawn solid; the same colour is drawn faint.
   if (trackColor) track.color = trackColor;
@@ -116,7 +123,7 @@ export function dialShapes({
   const [hx, hy] = handEnd(1 / 3, m.hour);
   // Muted hands borrow the track's look: its own colour if it has one, the
   // same faintness otherwise.
-  const tone = mutedHands ? (trackColor ? { color: trackColor } : { alpha: TRACK_ALPHA }) : {};
+  const tone = faint ? (trackColor ? { color: trackColor } : { alpha: TRACK_ALPHA }) : {};
   shapes.push(
     { kind: "capsule", x1: c, y1: c, x2: mx, y2: my, width: m.hand, ...tone },
     { kind: "capsule", x1: c, y1: c, x2: hx, y2: hy, width: m.hand, ...tone },
@@ -148,7 +155,9 @@ const FACE_ALPHA = 0.16;
  *
  * `state` adds one the ring has no way to say: "exempt" is a tab that will
  * never expire, no face at all, just the rim and the hands, so there is
- * visibly nothing draining.
+ * visibly nothing draining. "inactive" is a drained face that never filled:
+ * the same emptiness the ring shows, and told apart from an expiring tab by
+ * its colour, which is off the ramp entirely.
  *
  * A stopped clock needs no artwork of its own. The face is drawn from
  * `progress`, and a paused tab's progress is what stops advancing, so the mark
@@ -172,7 +181,9 @@ export function faceShapes({ progress = 0, size = GRID, state = "running" } = {}
   }
   if (state === "exempt") return [rim, ...handShapes(m)];
 
-  const spent = Math.min(1, Math.max(0, progress));
+  // Nothing is counting, so nothing fills the face: the rim, the empty face
+  // behind it and the hands cut out of it, exactly as a fully drained one.
+  const spent = state === "inactive" ? 1 : Math.min(1, Math.max(0, progress));
   const shapes = [
     rim,
     { kind: "wedge", cx: c, cy: c, r: m.face, from: 0, to: 1, alpha: FACE_ALPHA },

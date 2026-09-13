@@ -925,13 +925,20 @@ function updateReadout() {
     1,
     (tabState.elapsedSeconds + drift) / tabState.lifetimeSeconds,
   );
+  // Nothing is watching this page, so there is no time left to report: an
+  // "expires in" with a number in it would be a promise nothing will keep.
+  const unmanaged = Boolean(tabState.unmanaged);
   const exempt =
+    unmanaged ||
     (tabState.effective?.neverExpire ?? tabState.neverExpire) ||
     currentTab?.pinned;
 
   const time = $("remaining");
   const note = $("remaining-note");
-  if (exempt) {
+  if (unmanaged) {
+    time.textContent = "—";
+    note.textContent = "no rule matches this page";
+  } else if (exempt) {
     time.replaceChildren(svgIcon("infinity"));
     note.textContent = currentTab?.pinned
       ? "pinned tabs never expire"
@@ -955,7 +962,9 @@ function updateReadout() {
   // The button shows no words, so the tooltip has to carry both what it is
   // and what it will do.
   const snoozeLabel = exempt
-    ? "Snooze (this tab has no timer running)"
+    ? unmanaged
+      ? "Snooze (no rule matches this page, so no timer runs)"
+      : "Snooze (this tab has no timer running)"
     : `Snooze — adds ${formatRemaining(snoozeFor(tabState))}`;
   snooze.title = snoozeLabel;
   snooze.setAttribute("aria-label", snoozeLabel);
@@ -1122,7 +1131,7 @@ function renderTabRow(t) {
   const row = document.createElement("div");
   row.className = "trow";
   const timerOff = t.effective?.neverExpire ?? t.neverExpire;
-  const exempt = timerOff || t.pinned;
+  const exempt = timerOff || t.pinned || t.unmanaged;
   if (t.active) row.classList.add("is-active");
   if (exempt) row.classList.add("is-off");
   if (!exempt && t.progress >= 1) {
@@ -1173,7 +1182,10 @@ function renderTabRow(t) {
 
   const time = document.createElement("span");
   time.className = "trow-time";
-  if (t.pinned) time.textContent = "pinned";
+  if (t.unmanaged) {
+    time.textContent = "no rule";
+    time.title = "Only manage tabs a rule matches is on, and no rule matches this page";
+  } else if (t.pinned) time.textContent = "pinned";
   else if (timerOff)
     time.textContent = t.neverExpire ? "timer off" : "timer off (rule)";
   else if (t.paused)

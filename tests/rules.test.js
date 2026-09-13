@@ -5,6 +5,7 @@ import {
   applyOverrides,
   effectiveSettings,
   explainSettings,
+  managesTab,
   matchesRule,
   newRule,
   patternForUrl,
@@ -256,5 +257,30 @@ describe("wantedIndicatorIds with overrides and inert groups", () => {
     expect(wantedIndicatorIds(base, rules, [], [])).toEqual(["favicon"]);
     const news = { id: "g", name: "news", patterns: ["a.com/*"] };
     expect(wantedIndicatorIds(base, rules, [], [news]).sort()).toEqual(["favicon", "title-prefix"]);
+  });
+});
+
+describe("managesTab", () => {
+  const rule = r("github.com/*");
+
+  it("manages every tab while the setting is off", () => {
+    for (const inForce of [[], [rule]]) {
+      expect(managesTab({}, inForce)).toBe(true);
+      expect(managesTab({ requireRuleMatch: false }, inForce)).toBe(true);
+    }
+  });
+
+  it("manages only the tabs a rule speaks for once it is on", () => {
+    const on = { requireRuleMatch: true };
+    expect(managesTab(on, [rule])).toBe(true);
+    expect(managesTab(on, [])).toBe(false);
+    // Rules the tab has switched off are not in force, so they do not count:
+    // ignoring a page's only rule ignores the page.
+    expect(managesTab(on, undefined)).toBe(false);
+  });
+
+  it("takes anything but a true as off, the way an older profile stores it", () => {
+    expect(managesTab({ requireRuleMatch: undefined }, [])).toBe(true);
+    expect(managesTab(null, [])).toBe(true);
   });
 });
