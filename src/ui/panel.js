@@ -881,12 +881,29 @@ function renderTab() {
   $("tab-paused-note").hidden = !(eff.pauseWhileActive && eff.resetOnActivate);
   if (!currentTab || !tabState) return;
 
-  $("act-never").checked = tabState.neverExpire;
+  // The switch reads as "enabled": on while the timer runs, off while the
+  // tab never expires. Off, the rest of the popup has nothing to say: the
+  // fuse, the actions and the rules go, and the switch stays to bring them back.
+  const enabled = $("act-enabled");
+  const unmanaged = Boolean(tabState.unmanaged);
+  // A page left alone is not enabled either, whatever its own switch says.
+  enabled.checked = !unmanaged && !tabState.neverExpire;
+  document.body.dataset.never = tabState.neverExpire ? "on" : "off";
+  document.body.dataset.unmanaged = unmanaged ? "on" : "off";
+  const enabledLabel = enabled.closest("label");
+  enabled.disabled = unmanaged;
+  enabledLabel.title = unmanaged
+    ? "Timed Tabs leaves this page alone, so there is nothing to enable here."
+    : tabState.neverExpire
+      ? "Off: this tab never expires. Switch on to time it again."
+      : "Enabled on this tab. Switch off and it never expires.";
+  enabled.setAttribute("aria-label", enabledLabel.title);
+  renderTabWhy();
   $("act-ignore").checked = Boolean(tabState.ignoreRules);
-  // The sections the user folded away on this tab stay folded.
-  for (const section of ["settings", "rules"]) {
-    setSectionFold(section, tabState.folds?.[section] !== false, false);
-  }
+  // Each section starts the way it starts, then stays as this tab last left
+  // it: Page settings open, Rules folded until the tab opens it.
+  setSectionFold("settings", tabState.folds?.settings !== false, false);
+  setSectionFold("rules", tabState.folds?.rules === true, false);
   // The rules section only appears when a rule matches this page, or rules are already ignored.
   $("tab-rules").hidden = !currentTab;
   renderTabRules();
@@ -901,6 +918,56 @@ function renderTab() {
   }
   $("tab-title").textContent = currentTab.title || currentTab.url || "";
   updateReadout();
+}
+
+/**
+ * A page Timed Tabs leaves alone says what decided that. A rule that switches
+ * Manage tabs off is named, with a button to its page; otherwise it is the
+ * General setting "Only manage tabs a rule matches" with nothing caught. The
+ * master switch off is the banner's job, so it is not repeated here.
+ */
+function renderTabWhy() {
+  const why = $("tab-why");
+  const go = $("tab-why-go");
+  if (!tabState?.unmanaged || settings.tabManagement === false) {
+    why.hidden = true;
+    return;
+  }
+  const rule = [...(tabState.rules ?? [])]
+    .filter((r) => !r.ignored && r.set?.manageTabs === false)
+    .sort((a, b) => b.priority - a.priority)[0];
+  const ruleRow = $("tab-why-rule");
+  go.onclick = null;
+  ruleRow.onclick = null;
+  ruleRow.hidden = !rule;
+  if (rule) {
+    $("tab-why-text").textContent = "Left alone: this rule switches Manage tabs off for the page.";
+    // The rule, highlighted: badge, name, pattern, and the chip that did it.
+    const prio = document.createElement("span");
+    prio.className = "rule-priority";
+    prio.textContent = String(rule.priority);
+    const name = document.createElement("span");
+    name.className = "rule-name-text";
+    name.textContent = ruleName(rule);
+    const pattern = document.createElement("span");
+    pattern.className = "rule-pattern-static";
+    if (isGroupRef(rule.pattern)) pattern.textContent = `🗂️ ${groupNameOf(rule.pattern)}`;
+    else pattern.append(...wildcardSpans(rule.pattern));
+    const chip = document.createElement("span");
+    chip.className = "rule-chip";
+    chip.textContent = `${fieldEmoji(RULE_MANAGE_FIELD)} ${ruleChipText(RULE_MANAGE_FIELD, false)}`;
+    ruleRow.replaceChildren(prio, name, ...(ruleName(rule) !== rule.pattern ? [pattern] : []), chip);
+    ruleRow.title = `Open “${ruleName(rule)}” to change it`;
+    const open = () => openPageView(`#rule-${rule.id}`);
+    ruleRow.onclick = open;
+    go.textContent = "Edit rule";
+    go.onclick = open;
+  } else {
+    $("tab-why-text").textContent = "Left alone: “Only manage tabs a rule matches” is on in General, and no rule catches this page.";
+    go.textContent = "Settings";
+    go.onclick = () => openPageView("#settings", { group: "general" });
+  }
+  why.hidden = false;
 }
 
 function renderTabRules() {
@@ -945,17 +1012,13 @@ function renderTabRules() {
           ? "Apply this rule again"
           : "Ignore this rule for this tab";
       row.classList.add("tab-rule-switch");
+      // The name and nothing else: the popup is for switching a rule off
+      // here, and the rule's page says the rest.
       const text = document.createElement("span");
       const name = document.createElement("span");
       name.className = "tab-rule-name";
       name.textContent = ruleName(r);
-      const meta = document.createElement("small");
-      meta.textContent = ` · priority ${r.priority}${ruleName(r) !== r.pattern ? ` · ${r.pattern}` : ""}`;
-      name.append(meta);
-      const sets = document.createElement("span");
-      sets.className = "tab-rule-sets";
-      sets.textContent = describeRule(r).replaceAll("\n", " · ");
-      text.append(name, sets);
+      text.append(name);
       row.append(sw.input, sw.el.querySelector(".switch-track"), text);
       // makeSwitch built a <label>; we use its parts inside our own row label.
       row.classList.add("switch");
@@ -1193,7 +1256,7 @@ function updateReadout() {
   const note = $("remaining-note");
   if (unmanaged) {
     time.textContent = "—";
-    note.textContent = "no rule matches this page";
+    note.textContent = "left alone";
   } else if (exempt) {
     time.replaceChildren(svgIcon("infinity"));
     note.textContent = currentTab?.pinned
@@ -3994,8 +4057,8 @@ $("fuse-range").addEventListener("change", async (e) => {
   fuseDrag = null;
 });
 
-$("act-never").addEventListener("change", (e) =>
-  tabAction("neverExpire", e.target.checked, e.target.closest("label")),
+$("act-enabled").addEventListener("change", (e) =>
+  tabAction("neverExpire", !e.target.checked, e.target.closest("label")),
 );
 $("act-ignore").addEventListener("change", (e) =>
   tabAction("ignoreRules", e.target.checked, e.target.closest("label")),

@@ -543,6 +543,7 @@ async function tabState(tabId, tab) {
     effective: Object.fromEntries(RULE_FIELDS.map((k) => [k, eff[k]])),
     rules: eff.allMatched.map((r) => ({
       id: r.id,
+      name: r.name ?? "",
       description: r.description ?? "",
       pattern: r.pattern,
       priority: r.priority,
