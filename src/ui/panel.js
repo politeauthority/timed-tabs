@@ -54,12 +54,11 @@ import {
 import { exportText, parseBundle } from "../shared/backup.js";
 import { compareVersions, getDisplayVersion } from "../shared/version.js";
 import { groupRecent } from "../shared/recent.js";
-import { formatDuration, formatRemaining, formatSpan, snoozeSeconds, toUnit } from "../shared/time.js";
+import { formatRemaining, formatSpan, snoozeSeconds, toUnit } from "../shared/time.js";
 import { formatLead, parseLead } from "../shared/lead.js";
 import { sortTabs, TAB_SORTS } from "../shared/tab-sort.js";
 import { FLAGS, activeFeatures, featureOn, flagOn, flagRequires } from "../shared/flags.js";
 import { indicators } from "../background/indicators/index.js";
-import { mountToasts } from "./toasts.js";
 import { state, draftSettings, context, isPopup, params } from "./state.js";
 import {
   $,
@@ -73,6 +72,11 @@ import {
   withKey,
   settingRow,
 } from "./dom.js";
+import { applyBrowserTheme } from "./theme.js";
+import { refreshDiag } from "./diagnostics.js";
+import { rememberFold } from "./folds.js";
+import { RULE_FIELD_DEFS, THIS_TAB_SUBJECT, defsFor, describeRule, fieldEmoji, formatRuleValue, ruleChipText, ruleFieldLabel } from "./rule-text.js";
+import { toasts, write } from "./feedback.js";
 
 
 // ---- Pages -----------------------------------------------------------------
@@ -581,10 +585,6 @@ function applyManagementState() {
 // control keeps its "Saved" tick instead, since that sits on the thing that
 // changed, which a message at the bottom of the window cannot do.
 
-// The popup is 320px wide and only as tall as its content, so a pile deep
-// enough for the full page would cover most of it.
-const toasts = mountToasts(document.body, isPopup ? { max: 2 } : {});
-
 /**
  * Put a change on the page without storing it. A key set back to its stored
  * value leaves the draft, so undoing an edit by hand is as good as Discard.
@@ -660,37 +660,6 @@ $("settings-discard").addEventListener("click", () => {
 function fieldLabel(key) {
   const f = FIELDS.find((f) => f.key === key);
   return f?.label ?? f?.name ?? key;
-}
-
-/** What a rejected write left behind, in a form worth showing a user. */
-function reasonFor(err) {
-  const text = err?.message ?? String(err ?? "");
-  return text.replace(/^Error:\s*/, "").trim();
-}
-
-/**
- * Run a write and say whether it landed. Returns true on success; on failure
- * it reports and answers false, so the caller can put back what is really in
- * storage rather than leaving a value on screen that was never stored.
- *
- * `note` is what the toast can promise about the damage. One `set` either
- * happened or did not, so the default is safe; a caller writing in several
- * steps has to say something less certain.
- */
-async function write(run, { what, key = null, note = "Nothing was changed." }) {
-  try {
-    await run();
-    return true;
-  } catch (err) {
-    console.warn(`[timed-tabs] could not save ${what}:`, err);
-    const reason = reasonFor(err);
-    toasts.error(
-      `Could not save ${what}`,
-      [reason, note].filter(Boolean).join(" "),
-      key ? `save:${key}` : null,
-    );
-    return false;
-  }
 }
 
 /**
@@ -1099,38 +1068,6 @@ $("tab-settings-clear").addEventListener("click", async () => {
   renderTabSettings();
 });
 
-function describeRule(r) {
-  const parts = Object.entries(r.set ?? {}).map(
-    ([k, v]) => `${ruleFieldLabel(k)}: ${formatRuleValue(k, v)}`,
-  );
-  return parts.length ? parts.join("\n") : "Sets nothing";
-}
-
-function ruleFieldLabel(key) {
-  return RULE_FIELD_DEFS.find((f) => f.key === key)?.label ?? key;
-}
-
-/** A lead in words: "10 min left" or "40% of the lifetime left". */
-function leadText(v) {
-  const lead = parseLead(v);
-  if (!lead) return String(v);
-  return "percent" in lead ? `${lead.percent}% of the lifetime left` : `${formatDuration(lead.seconds)} left`;
-}
-
-function formatRuleValue(key, v) {
-  const def = RULE_FIELD_DEFS.find((f) => f.key === key);
-  if (def?.type === "duration") return formatDuration(v);
-  if (def?.type === "choice")
-    return def.options.find((o) => o.value === v)?.label ?? String(v);
-  if (def?.type === "percent") return `${v}%`;
-  if (def?.type === "lead") return leadText(v);
-  if (def?.type === "indicators") {
-    const names = (Array.isArray(v) ? v : []).map((id) => indicators.find((i) => i.id === id)?.label ?? id);
-    return names.length ? names.join(", ") : "nothing";
-  }
-  return v ? "on" : "off";
-}
-
 function updateReadout() {
   if (!state.tabState) return;
   const drift = state.tabState.paused ? 0 : (Date.now() - fetchedAt) / 1000;
@@ -1265,29 +1202,6 @@ function flashTabError() {
 
 // ---- Fold state, remembered across page opens ------------------------------
 // localStorage on the extension origin; wrapped because it can be unavailable.
-
-function foldGet(key, fallback) {
-  try {
-    const v = localStorage.getItem(`fold:${key}`);
-    return v === null ? fallback : v === "1";
-  } catch {
-    return fallback;
-  }
-}
-
-function foldSet(key, open) {
-  try {
-    localStorage.setItem(`fold:${key}`, open ? "1" : "0");
-  } catch {
-    // ignore
-  }
-}
-
-/** Apply a remembered fold state to a <details> and keep it updated. */
-function rememberFold(details, key, fallbackOpen) {
-  details.open = foldGet(key, fallbackOpen);
-  details.addEventListener("toggle", () => foldSet(key, details.open));
-}
 
 // ---- All open tabs ---------------------------------------------------------
 
@@ -1971,17 +1885,6 @@ const groupsOn = () => featureOn(state.settings, "site-groups");
 const rulesAppearanceOn = () => featureOn(state.settings, "rules-appearance");
 /** The rule overrides worth showing: all, or with appearance off, the rest. */
 const shownOverrides = (set) => Object.entries(set ?? {}).filter(([k]) => ruleFieldsInForce(state.settings).includes(k));
-/**
- * The emoji of the settings group a rule field belongs to, so a rule's chips
- * and its override headings read like the Settings page: ⏳ for timing, 🚪 for
- * expiry, 🎨 for appearance. The rule-only timer switch counts as timing.
- */
-function fieldEmoji(key) {
-  const def = RULE_FIELD_DEFS.find((f) => f.key === key);
-  const group = def?.group ?? (key === "neverExpire" ? "timing" : key === RULE_MANAGE_FIELD ? "general" : "appearance");
-  return GROUPS.find((g) => g.id === group)?.emoji ?? "";
-}
-
 const activeGroups = () => (groupsOn() ? state.groups : []);
 /** Rule ids the user has expanded this session (cards start collapsed). */
 /**
@@ -2031,83 +1934,6 @@ function markJustAdded(id) {
   }, 2600);
 }
 
-/** What a rule may override: the global field definitions, reworded for a rule. */
-const RULE_FIELD_TEXT = {
-  tabLifetimeSeconds: {
-    label: "Lifetime",
-    help: "How long {tabs} may sit before {they} {expire}.",
-  },
-  onExpire: {
-    label: "When a tab expires",
-    short: "On expiry",
-    help: "What to do with {tab} once it runs out of time in the background.",
-  },
-  resetOnActivate: {
-    label: "Restart on focus",
-    help: "Switching to {tab} gives it a full lifetime again.",
-  },
-  pauseWhileActive: {
-    label: "Count background time only",
-    short: "Background time only",
-    help: "The clock stops while you are looking at {tab}.",
-  },
-  manageTabs: {
-    label: "Manage tabs",
-    short: "Managed",
-    help: "Off, Timed Tabs leaves {tabs} alone: no timer, nothing closed, no colours, and an empty clock on the toolbar button. Nothing else in the rule applies.",
-  },
-  neverExpire: {
-    label: "Timer off",
-    help: "{Tabs} never {expire} and {show} no colour.",
-  },
-  indicators: {
-    label: "Show remaining time with",
-    short: "Indicators",
-    help: "Only these indicators are used for {tabs}, whatever the global choice.",
-  },
-  faviconStyle: {
-    label: "Favicon colour style",
-    short: "Favicon style",
-    help: "Where the colour goes on the icon of {tab}.",
-  },
-  hideWhileGreen: {
-    label: "No display changes until",
-    short: "Quiet while fresh",
-    help: "Keep every indicator off on {tab} until it is close enough to expiring.",
-  },
-  quietStart: {
-    label: "When to start display updates",
-    short: "Show from",
-    help: "How much time {tab} must have left before anything shows: an amount, or a share of its lifetime.",
-  },
-  flashBeforeExpiry: {
-    label: "Flash before expiry",
-    help: "{Tabs} {blink} during the last stretch before {they} {run} out of time.",
-  },
-  flashLead: {
-    label: "Start flashing",
-    help: "How much time {tab} must have left before it starts flashing: an amount, or a share of its lifetime.",
-  },
-};
-/** Help text placeholders, worded for the tabs a rule matches. */
-/**
- * Help text is written once with {placeholders} and read in two places: a
- * rule, which speaks about every page it matches, and Page settings, which
- * speaks about the tab in front of you.
- */
-const SUBJECT = { tabs: "matching tabs", Tabs: "Matching tabs", tab: "a matching tab", they: "they", expire: "expire", show: "show", blink: "blink", run: "run" };
-const THIS_TAB_SUBJECT = { tabs: "this tab", Tabs: "This tab", tab: "this tab", they: "it", expire: "expires", show: "shows", blink: "blinks", run: "runs" };
-const wordFor = (text, subject = SUBJECT) =>
-  text.replace(/\{(\w+)\}/g, (_, k) => subject[k] ?? k);
-const RULE_FIELD_DEFS = RULE_FIELDS.map((key) => {
-  const base = FIELDS.find((f) => f.key === key) ?? { key, type: "toggle" };
-  return { ...base, ...RULE_FIELD_TEXT[key] };
-});
-const defsFor = (keys, subject = SUBJECT) =>
-  keys
-    .map((k) => RULE_FIELD_DEFS.find((d) => d.key === k))
-    .map((d) => ({ ...d, help: wordFor(d.help ?? "", subject) }));
-
 /** What a brand-new rule starts with, so the scheme is explicit from the first keystroke. */
 const NEW_RULE_PATTERN = "https://";
 
@@ -2145,36 +1971,6 @@ function groupTargetProblem(rule) {
   if (!findGroup(state.groups, name))
     return `There is no site group \u201c${name}\u201d, so this rule matches nothing`;
   return null;
-}
-
-/**
- * A toggle override worded for a chip. A chip has no room for "Timer off: on",
- * so both readings are written out; every other type reads well enough as
- * "Label: value" and falls through to `ruleFieldLabel`.
- */
-const RULE_CHIP_TOGGLE_TEXT = {
-  resetOnActivate: { on: "Restarts on focus", off: "No restart on focus" },
-  pauseWhileActive: { on: "Background time only", off: "Counts time while active" },
-  neverExpire: { on: "Timer off", off: "Timer on" },
-  manageTabs: { on: "Managed", off: "Left alone" },
-  hideWhileGreen: { on: "Quiet until near expiry", off: "Shows from the start" },
-  flashBeforeExpiry: { on: "Flashes before expiry", off: "No flash" },
-};
-
-/** Field labels that are sentences; a chip has no room for them. */
-const RULE_CHIP_LABEL = {
-  onExpire: "On expiry",
-  indicators: "Shows with",
-  faviconStyle: "Favicon",
-  quietStart: "Shows from",
-  flashLead: "Flashes from",
-};
-
-function ruleChipText(key, value) {
-  const pair = RULE_CHIP_TOGGLE_TEXT[key];
-  if (pair) return value ? pair.on : pair.off;
-  const label = RULE_CHIP_LABEL[key] ?? ruleFieldLabel(key);
-  return `${label}: ${formatRuleValue(key, value)}`;
 }
 
 /** Group ids expanded this session. New groups start open. */
@@ -3716,51 +3512,6 @@ function showBackupSoon() {
 // the page match the chrome around them, including custom themes. Falls
 // back to the prefers-color-scheme palette in panel.css when unavailable.
 
-async function applyBrowserTheme() {
-  if (!api.theme?.getCurrent) return;
-  const theme = await api.theme.getCurrent().catch(() => null);
-  const c = theme?.colors;
-  if (!c) return;
-  // The popup sits in Firefox's panel; the page and preferences views sit on toolbar-like ground.
-  const ground = isPopup
-    ? cssColor(c.popup ?? c.toolbar ?? c.frame)
-    : cssColor(c.toolbar ?? c.popup ?? c.frame);
-  const ink = isPopup
-    ? cssColor(c.popup_text ?? c.toolbar_text ?? c.tab_background_text)
-    : cssColor(c.toolbar_text ?? c.popup_text ?? c.tab_background_text);
-  if (!ground || !ink) return;
-  const root = document.documentElement.style;
-  root.setProperty("--ground", ground);
-  root.setProperty("--ink", ink);
-  const focus = cssColor(c.toolbar_field_border_focus ?? c.button_primary);
-  if (focus) root.setProperty("--focus", focus);
-  // Native controls (selects, number spinners) need to know which side they're on.
-  document.documentElement.style.colorScheme = isDark(ground)
-    ? "dark"
-    : "light";
-}
-
-function cssColor(v) {
-  if (!v) return null;
-  if (Array.isArray(v))
-    return v.length === 4 ? `rgba(${v.join(",")})` : `rgb(${v.join(",")})`;
-  return String(v);
-}
-
-/** Rough luminance test on a CSS colour, via the canvas parser. */
-function isDark(color) {
-  const ctx = document.createElement("canvas").getContext("2d");
-  ctx.fillStyle = "#000";
-  ctx.fillStyle = color;
-  const m = /^#([0-9a-f]{6})$/i.exec(ctx.fillStyle);
-  if (!m) return globalThis.matchMedia("(prefers-color-scheme: dark)").matches;
-  const n = parseInt(m[1], 16);
-  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
-}
-
-api.theme?.onUpdated?.addListener(() => applyBrowserTheme());
-
 // ---- Permissions -----------------------------------------------------------
 
 async function refreshPermissionWarning() {
@@ -3768,50 +3519,6 @@ async function refreshPermissionWarning() {
 }
 
 // ---- Diagnostics -----------------------------------------------------------
-
-async function refreshDiag() {
-  const d = await api.runtime
-    .sendMessage({ type: "timed-tabs:diag" })
-    .catch((e) => ({ error: String(e) }));
-  const summary = $("diag-summary");
-  if (!d || d.error) {
-    summary.textContent = `Background not reachable: ${d?.error ?? "no reply"}`;
-    return;
-  }
-  const v = await getDisplayVersion();
-  summary.textContent = [
-    `version: ${v.display}${v.commit ? ` (${v.commit})` : ""}`,
-    `ticks: ${d.ticks}`,
-    `last tick: ${d.lastTick ? new Date(d.lastTick).toLocaleTimeString() : "never"}`,
-    `last error: ${d.lastError ?? "none"}`,
-    `active indicators: ${d.activeIndicators.join(", ") || "none"}`,
-    `site access granted: ${d.hasHostPermission} (origins: ${(d.origins ?? []).join(", ") || "none"})`,
-    `notifications: ${d.notifications ? `setting ${d.notifications.enabled ? "on" : "off"}, permission ${d.notifications.available ? "granted" : "not granted"}, click handler ${d.notifications.listening ? "armed" : "not armed"}` : "unknown"}`,
-    `lifetime: ${d.settings?.tabLifetimeSeconds}s, tick every ${d.settings?.tickSeconds}s`,
-  ].join("\n");
-  document.querySelector("#diag-tabs tbody").replaceChildren(
-    ...d.lastSnapshot.map((t) => {
-      const tr = document.createElement("tr");
-      const state = t.discarded ? "unloaded" : t.status;
-      const cells = [
-        t.tabId,
-        t.active ? "yes" : "",
-        state,
-        t.progress.toFixed(2),
-        t.favicon,
-        t.iconAdopted ? "yes" : "no",
-        t.url,
-      ];
-      for (const v of cells) {
-        const td = document.createElement("td");
-        td.textContent = String(v ?? "");
-        td.title = String(v ?? "");
-        tr.append(td);
-      }
-      return tr;
-    }),
-  );
-}
 
 // ---- Wire up ---------------------------------------------------------------
 
@@ -3958,11 +3665,6 @@ function showFlagSettings() {
 $("flags-note-manage").addEventListener("click", showFlagSettings);
 $("beta-badge").addEventListener("click", showFlagSettings);
 
-$("diag-refresh").addEventListener("click", refreshDiag);
-$("diag-tick").addEventListener("click", async () => {
-  await api.runtime.sendMessage({ type: "timed-tabs:tick" }).catch(() => {});
-  refreshDiag();
-});
 api.permissions.onAdded?.addListener(refreshPermissionWarning);
 api.permissions.onRemoved?.addListener(() => {
   refreshPermissionWarning();
