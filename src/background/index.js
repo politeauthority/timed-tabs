@@ -42,19 +42,45 @@ let groups = [];
 const activeGroups = () => (featureOn(settings, "site-groups") ? groups : []);
 
 /**
- * Settings, rules and groups changes, and anything that starts or stops
- * indicators, run one at a time. Two overlapping runs used to race on
- * `active`: one could start an indicator twice, or leave a running one
- * untracked so nothing ever stopped it.
+ * A queue that runs its `fn`s one at a time. Overlapping runs used to race:
+ * two could start an indicator twice, or leave a running one untracked so
+ * nothing ever stopped it, and two could read the same list out of storage
+ * and write back two different edits of it.
+ *
+ * Every queue costs whatever is waiting on it the time of everything already
+ * queued, so work goes on the queue that guards what it touches and no wider.
  */
-let chain = Promise.resolve();
-function serial(fn) {
-  const next = chain.then(fn, fn);
-  chain = next.catch((e) => console.warn("[timed-tabs]", String(e)));
-  return next;
+function queue() {
+  let chain = Promise.resolve();
+  return function run(fn) {
+    const next = chain.then(fn, fn);
+    chain = next.catch((e) => console.warn("[timed-tabs]", String(e)));
+    return next;
+  };
 }
+
+/** Settings, rules and groups changes, and anything that starts or stops indicators. */
+const serial = queue();
+
+/**
+ * Every read-modify-write of the lists in storage.local -- the recently-expired
+ * list and the tally -- so that two edits of one list cannot cross. It must
+ * stay a separate queue from `serial`: a settings change runs on `serial` and
+ * waits there for the tick it starts, that tick can expire a tab, and closing
+ * a tab waits for its record to be written. On one shared queue that record
+ * waits behind the settings change that is waiting for it, and the deadlock
+ * leaves the tab open, the tick half-run and every later tick refused.
+ */
+const serialStore = queue();
 let active = [];
-const expired = new Set();
+/**
+ * Tabs whose time is already up, mapped to the action that was taken -- not a
+ * bare set, because "already dealt with" is only true of the action that dealt
+ * with it. A tab that ran out under "Leave it open" must expire again the
+ * moment the action becomes "Close it", or every tab that aged past its
+ * lifetime under the default would be immune to the setting for good.
+ */
+const expired = new Map();
 /**
  * Tabs "Only manage tabs a rule matches" is holding back, so the tick can see
  * the moment a rule takes one in and start its clock from there.
@@ -81,7 +107,7 @@ async function loadRecent() {
   return recent;
 }
 function recordExpired(tab, action) {
-  return serial(() => recordExpiredNow(tab, action));
+  return serialStore(() => recordExpiredNow(tab, action));
 }
 async function recordExpiredNow(tab, action) {
   // `recordFor` returns nothing for a tab from a private window: it is expired
@@ -121,7 +147,7 @@ async function loadStats() {
  * reports the open-tab count from touching the disk on every pass.
  */
 function bumpStats(event) {
-  return serial(async () => {
+  return serialStore(async () => {
     const before = await loadStats();
     const after = recordStat(before, event);
     if (after === before) return;
@@ -425,7 +451,7 @@ api.runtime.onMessage.addListener((msg) => {
     case "timed-tabs:recent-remove": {
       // One entry by id, or every entry in a grouped row by its ids.
       const ids = new Set(Array.isArray(msg.ids) ? msg.ids : [msg.id]);
-      return serial(async () => {
+      return serialStore(async () => {
         const list = await loadRecent();
         recent = list.filter((r) => !ids.has(r.id));
         await api.storage.local.set({ [RECENT_KEY]: recent });
@@ -436,7 +462,7 @@ api.runtime.onMessage.addListener((msg) => {
       return loadStats().then((s) => summarise(s));
     case "timed-tabs:stats-clear":
       // Everything but the lifetime count of tabs killed, which a clear keeps.
-      return serial(async () => {
+      return serialStore(async () => {
         stats = clearStats(await loadStats());
         await api.storage.local.set({ [STATS_KEY]: stats });
         return "ok";
@@ -444,7 +470,7 @@ api.runtime.onMessage.addListener((msg) => {
     case "timed-tabs:stats-restore":
       // A backup being loaded. The count only ever goes up, and an unchanged
       // one costs no write, on the same contract as `bumpStats`.
-      return serial(async () => {
+      return serialStore(async () => {
         const before = await loadStats();
         const after = restoreKilled(before, msg.killed);
         if (after !== before) {
@@ -726,7 +752,7 @@ async function tick() {
 
 const expiring = new Set();
 async function expire(tab, onExpire) {
-  if (expired.has(tab.id) || expiring.has(tab.id)) return;
+  if (expired.get(tab.id) === onExpire || expiring.has(tab.id)) return;
   expiring.add(tab.id);
   if (isDevBuild) console.log(`[timed-tabs] expired ${tab.id} ${tab.url} action=${onExpire}`);
   try {
@@ -741,6 +767,10 @@ async function expire(tab, onExpire) {
       ).catch(() => "");
       await recordExpired({ ...tab, originalIcon }, "close").catch(() => {});
       await api.tabs.remove(tab.id);
+      // Past this line the tab is gone, which is the only thing worth
+      // asserting: deciding to close one and closing it are two events, and
+      // every bug here has lived in the gap between them.
+      if (isDevBuild) console.log(`[timed-tabs] closed ${tab.id} ${tab.url}`);
       // Only once the tab is actually gone, and only for close: unloading and
       // reloading leave the tab where it was.
       notifier.tabClosed(tab);
@@ -755,9 +785,10 @@ async function expire(tab, onExpire) {
     // really happened: a tab that could not be closed is retried next tick and
     // must not be counted twice, nor once for an attempt that failed.
     bumpStats({ type: "expired", action: onExpire });
-    // Done, and not to be done again until the clock restarts. A reload has
-    // just restarted it; the others are marked so the tab is left alone.
-    if (onExpire !== "reload") expired.add(tab.id);
+    // Done, and not to be done again until the clock restarts or the action
+    // changes under it. A reload has just restarted the clock; the others
+    // record what was done so the tab is left alone while the answer holds.
+    if (onExpire !== "reload") expired.set(tab.id, onExpire);
   } catch {
     // Tab may already be gone or not discardable: try again next tick.
   } finally {

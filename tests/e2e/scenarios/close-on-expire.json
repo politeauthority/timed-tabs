@@ -34,7 +34,8 @@
   },
   "expect": [
     "expired \\d+ https://example\\.com/ action=close",
-    "recorded https://example\\.com/ icon=yes"
+    "recorded https://example\\.com/ icon=yes",
+    "closed \\d+ https://example\\.com/"
   ],
   "expectNot": [
     "expired \\d+ https://example\\.org/"

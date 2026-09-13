@@ -1,0 +1,34 @@
+{
+  "runSeconds": 30,
+  "dev": {
+    "openWindows": [
+      [
+        "https://example.org/",
+        "https://example.com/"
+      ]
+    ],
+    "settings": {
+      "tabLifetimeSeconds": 5,
+      "tickSeconds": 2,
+      "onExpire": "none",
+      "indicators": [
+        "favicon"
+      ]
+    },
+    "openUrls": [
+      "ui/panel.html?view=page#settings"
+    ],
+    "uiActions": [
+      {
+        "at": 12000,
+        "set": "#f-onExpire",
+        "value": "close"
+      }
+    ]
+  },
+  "expect": [
+    "expired \\d+ https://example\\.com/ action=none",
+    "expired \\d+ https://example\\.com/ action=close",
+    "closed \\d+ https://example\\.com/"
+  ]
+}
