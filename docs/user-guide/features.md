@@ -94,10 +94,15 @@ The toolbar button opens a small panel for the current tab.
 - **Restart timer** gives the tab a full lifetime.
 - **Snooze** adds a share of the tab's own lifetime, 10% by default, set under
   Settings, Timing, Snooze adds.
-- **Never expire this tab** takes the tab out of the timer for as long as it is open.
-- When rules match the page, they are listed with a switch to ignore each one for
-  this tab, and a switch to ignore all of them. These choices last until the tab is
-  closed.
+- **The switch beside the time** says whether Timed Tabs is enabled on this tab.
+  Switch it off and the tab never expires for as long as it is open; the fuse, the
+  actions and the rules section step aside, and the switch stays to bring them back.
+- A page Timed Tabs leaves alone says why: the rule that switches Manage tabs off
+  for it, with an **Edit rule** button, or the General setting that excludes it.
+- When rules match the page, **Rules for this page** lists them by name, each with
+  a switch to ignore it for this tab, and a switch to ignore all of them. The section
+  starts folded and stays however this tab last left it. These choices last until the
+  tab is closed.
 - **Full page** in the header opens the Tabs, Rules and Settings pages. The footer
   shows the version and links to the source code.
 

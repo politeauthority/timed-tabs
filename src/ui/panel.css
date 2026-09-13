@@ -440,6 +440,12 @@ textarea {
   color: var(--ink-2);
 }
 
+/* The real icon is a picture, not a stroked sprite: no stroke to inherit. */
+.logo-img {
+  stroke: none;
+  border-radius: 50%;
+}
+
 /* Beta and dev builds: a solid badge beside the title, hard to miss in either view. */
 .channel-badge {
   flex: none;
@@ -496,17 +502,20 @@ body[data-channel="dev"] .channel-badge {
    there. Two words of badge push "Timed Tabs" onto two lines, so beside a
    build badge the beta pill keeps its flag and drops its word: the tooltip
    still says what it is, and the page view has room for both. */
+/* Reads as a link, since it is one: the accent, underlined, back to Tabs. */
 .home-link {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  color: inherit;
-  text-decoration: none;
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
   border-radius: var(--r-control);
 }
 
 .home-link:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 
 .home-link:focus-visible {
@@ -1134,7 +1143,26 @@ body:not([data-context="popup"]) .settings-title {
 /* Sits on the action row beside Restart and Snooze. */
 .tab-never {
   flex: none;
-  margin-left: var(--sp-1);
+  margin-left: auto;
+  align-self: center;
+}
+
+/* This tab never expires: nothing else in the popup applies, so only the
+   readout with its switch stays, over the footer. */
+body[data-never="on"] #fuse,
+body[data-never="on"] #tab-paused-note,
+body[data-never="on"] .tab-actions,
+body[data-never="on"] #tab-settings,
+body[data-never="on"] #tab-rules {
+  display: none;
+}
+
+/* A page left alone has no clock to show or act on either; the rules stay,
+   since one of them may be the reason and "Ignore all rules" the way back. */
+body[data-unmanaged="on"] #fuse,
+body[data-unmanaged="on"] #tab-paused-note,
+body[data-unmanaged="on"] .tab-actions {
+  display: none;
 }
 
 .tab-actions .act-flash {
@@ -1172,6 +1200,64 @@ body:not([data-context="popup"]) .settings-title {
   margin: 0 0 var(--sp-3);
   color: var(--ink-2);
   font-size: var(--fs-sm);
+}
+
+/* Why this page is left alone, and the way to what decided it. */
+.tab-why {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-card);
+  background: var(--warn-wash);
+  font-size: var(--fs-sm);
+}
+
+.tab-why-text {
+  margin: 0;
+}
+
+.tab-why > .quiet {
+  min-height: 0;
+  padding: 2px 8px;
+  font-size: var(--fs-sm);
+}
+
+/* The one rule at fault, as a row of its own: badge, name, pattern, and what
+   it sets. The whole row is the way to its page. */
+.tab-why-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--sp-1) var(--sp-2);
+  width: 100%;
+  min-height: 0;
+  padding: var(--sp-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--ink);
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+}
+
+.tab-why-rule:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.tab-why-rule .rule-pattern-static {
+  flex: 0 1 auto;
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+
+/* Left alone, the rules section says nothing the card does not; it goes too. */
+body[data-unmanaged="on"] #tab-rules {
+  display: none;
 }
 
 /* Rules for this page. */
@@ -2241,9 +2327,31 @@ body:not([data-context="popup"]) .field {
 }
 
 .tab-actions button + .saved-mark,
-.tab-never > .saved-mark,
 .tab-rule > .saved-mark {
   margin-left: 6px;
+}
+
+/* The enabled switch keeps the far right of its row; its "Saved" floats up
+   over the head of the section instead of squeezing in beside it. */
+#tab {
+  position: relative;
+}
+
+.tab-never > .saved-mark {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--gutter);
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--green) 18%, var(--ground));
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 18%, transparent);
+  transform: translateY(-4px);
+  z-index: 2;
+}
+
+.tab-never > .saved-mark.is-shown {
+  transform: translateY(0);
 }
 
 .tab-rule > .saved-mark {

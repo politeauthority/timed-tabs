@@ -3,6 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <title>Timed Tabs</title>
+    <!-- The extension's own icon, so the full page and the options pane carry
+         it in the tab strip like any other page. The SVG scales; the PNGs are
+         for browsers that will not take an SVG favicon. -->
+    <link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../icons/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../icons/icon-16.png" />
     <link rel="stylesheet" href="panel.css" />
   </head>
   <body data-context="popup" data-page="tabs">
@@ -26,7 +32,6 @@
       <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.25"/><path d="M8 7.25v4"/><path d="M8 4.75h.01"/></symbol>
       <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.25 14.5 13.5h-13z"/><path d="M8 6.5v3"/><path d="M8 11.75h.01"/></symbol>
       <symbol id="i-flag" viewBox="0 0 16 16"><path d="M3.75 14.25V2.25"/><path d="M3.75 3h8l-1.75 2.75L11.75 8.5h-8z"/></symbol>
-      <symbol id="i-logo" viewBox="0 0 16 16"><path d="M8 2.25A5.75 5.75 0 1 1 2.25 8"/><path d="M8 8V4.75M8 8l2.4 1.4"/></symbol>
     </svg>
 
     <main id="app">
@@ -35,7 +40,9 @@
           <!-- The name is the way home: the Tabs page, in the full page's own
                tab from the popup. -->
           <a href="#tabs" id="home-link" class="home-link" title="Tabs page">
-            <svg class="icon" aria-hidden="true"><use href="#i-logo" /></svg>
+            <!-- The extension's own icon, the one the tab strip shows, at the
+                 sprite icon's size. -->
+            <img class="icon logo-img" src="../icons/icon.svg" alt="" />
             <span>Timed Tabs</span>
           </a>
           <span id="channel-badge" class="channel-badge" hidden></span>
@@ -74,7 +81,23 @@
         <p class="readout">
           <span id="remaining" class="readout-time">–</span>
           <span id="remaining-note" class="readout-note"></span>
+          <!-- Whether Timed Tabs is enabled on this tab: on, the timer runs;
+               off, the tab never expires. No words: the tooltip and the
+               accessible name carry them. -->
+          <label class="switch tab-never" data-saved-key="never" title="Enabled on this tab">
+            <input type="checkbox" id="act-enabled" aria-label="Enabled on this tab" />
+            <span class="switch-track"></span>
+          </label>
         </p>
+
+        <!-- A page Timed Tabs leaves alone says what decided that: the rule,
+             with a way to it, or the General setting. -->
+        <div id="tab-why" class="tab-why" hidden>
+          <p id="tab-why-text" class="tab-why-text"></p>
+          <!-- The rule that decided it, when one did: the row opens its page. -->
+          <button type="button" id="tab-why-rule" class="tab-why-rule" hidden></button>
+          <button type="button" id="tab-why-go" class="quiet"></button>
+        </div>
 
         <div id="fuse" class="fuse">
           <div class="fuse-track"></div>
@@ -98,11 +121,6 @@
                happened is said once in #act-flash rather than on the button. -->
           <button type="button" id="act-reset" class="icon-btn" title="Restart timer" aria-label="Restart timer"><svg class="icon" aria-hidden="true"><use href="#i-restart" /></svg></button>
           <button type="button" id="act-snooze" class="icon-btn" title="Snooze" aria-label="Snooze"><svg class="icon" aria-hidden="true"><use href="#i-snooze" /></svg></button>
-          <label class="switch tab-never" data-saved-key="never">
-            <input type="checkbox" id="act-never" />
-            <span class="switch-track"></span>
-            <span>Never expire</span>
-          </label>
           <span id="act-flash" class="act-flash" role="status" aria-live="polite"></span>
         </div>
       </section>
