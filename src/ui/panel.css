@@ -1142,9 +1142,12 @@ body:not([data-context="popup"]) .settings-title {
   margin-left: auto;
 }
 
-.tab-paused p {
+/* Sits under the fuse, above the actions, only when the timer both pauses
+   here and restarts on return. */
+.tab-paused-note {
   margin: 0 0 var(--sp-3);
   color: var(--ink-2);
+  font-size: var(--fs-sm);
 }
 
 /* Rules for this page. */
