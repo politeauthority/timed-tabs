@@ -61,7 +61,7 @@ is switched on.
 Settings, Appearance, offers five indicators. Use any combination. Colour runs
 green, yellow, red as time runs out.
 
-- **Colour every tab's favicon.** The icon gets a coloured square, ring or dot,
+- **Colour favicon.** The icon gets a coloured square, ring or dot,
   chosen under Favicon colour style. Works on every tab.
 - **Coloured dot in the tab title.** A 🟢 🟡 🟠 🔴 dot in front of the page title.
   History entries show it too.

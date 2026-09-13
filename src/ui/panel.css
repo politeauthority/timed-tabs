@@ -1571,6 +1571,49 @@ body:not([data-context="popup"]) .trow {
   margin: 2px 0 var(--sp-1);
 }
 
+/* A subgroup heading inside a sectioned group: quieter than the group title,
+   set off from the rows above it. */
+.group-section-title {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.group-section-title:first-of-type {
+  margin-top: var(--sp-2);
+}
+
+/* A section written in the HTML that trails a rendered group: it carries on
+   from the rows above rather than starting a page of its own. */
+.group-tail {
+  padding-top: 0;
+}
+
+.group-tail > .group-section-title:first-of-type,
+.group-tail > .diag-fold > summary {
+  margin-top: var(--sp-4);
+}
+
+/* Diagnostics folds away: its heading is the summary, chevron first. */
+.diag-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.diag-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.group-section-title + .group-rows .field:first-child,
+.group-section-title + .group-help + .group-rows .field:first-child {
+  border-top: 0;
+}
+
 .field {
   display: flex;
   flex-wrap: wrap;

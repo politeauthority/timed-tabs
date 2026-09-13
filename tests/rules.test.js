@@ -108,9 +108,9 @@ describe("visual overrides", () => {
     indicators: ["favicon", "theme-tint"],
     faviconStyle: "square",
     hideWhileGreen: false,
-    quietUntilPercent: 40,
+    quietStart: "60%",
     flashBeforeExpiry: true,
-    flashLeadSeconds: 60,
+    flashLead: "60s",
   };
   it("rules override appearance fields per field", () => {
     const rules = [r("github.com/*", { set: { indicators: ["title-prefix"], faviconStyle: "dot", flashBeforeExpiry: false } })];
@@ -119,7 +119,7 @@ describe("visual overrides", () => {
     expect(eff.faviconStyle).toBe("dot");
     expect(eff.flashBeforeExpiry).toBe(false);
     expect(eff.hideWhileGreen).toBe(false);
-    expect(eff.quietUntilPercent).toBe(40);
+    expect(eff.quietStart).toBe("60%");
   });
   it("a rule's indicator list replaces the global one outright", () => {
     const eff = effectiveSettings(base, [r("*", { set: { indicators: [] } })], "https://a.b/");
@@ -128,18 +128,18 @@ describe("visual overrides", () => {
   it("higher priority wins over lower for appearance, globals underneath", () => {
     const rules = [
       r("*", { priority: 8, set: { faviconStyle: "ring" } }),
-      r("*", { priority: 3, set: { faviconStyle: "dot", flashLeadSeconds: 5 } }),
+      r("*", { priority: 3, set: { faviconStyle: "dot", flashLead: "5s" } }),
     ];
     const eff = effectiveSettings(base, rules, "https://a.b/");
     expect(eff.faviconStyle).toBe("ring");
-    expect(eff.flashLeadSeconds).toBe(5);
-    expect(eff.quietUntilPercent).toBe(40);
+    expect(eff.flashLead).toBe("5s");
+    expect(eff.quietStart).toBe("60%");
   });
   it("applyOverrides ignores unknown and unset keys", () => {
     const eff = { ...base };
-    applyOverrides(eff, { faviconStyle: "dot", bogus: 1, flashLeadSeconds: null });
+    applyOverrides(eff, { faviconStyle: "dot", bogus: 1, flashLead: null });
     expect(eff.faviconStyle).toBe("dot");
-    expect(eff.flashLeadSeconds).toBe(60);
+    expect(eff.flashLead).toBe("60s");
     expect(eff.bogus).toBeUndefined();
   });
   it("wantedIndicatorIds unions globals and enabled rules", () => {

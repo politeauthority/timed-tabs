@@ -133,9 +133,9 @@ describe("the tabs killed in a backup", () => {
 
 describe("validation on import", () => {
   it("refuses a choice outside its options and a number outside its range, with a warning each", () => {
-    const { settings, warnings } = parseBundle(JSON.stringify({ timedTabs: 1, settings: { onExpire: "nuke", quietUntilPercent: 500, tabLifetimeSeconds: 600 }, rules: [] }));
+    const { settings, warnings } = parseBundle(JSON.stringify({ timedTabs: 1, settings: { onExpire: "nuke", quietStart: "500%", tabLifetimeSeconds: 600 }, rules: [] }));
     expect(settings.onExpire).toBeUndefined();
-    expect(settings.quietUntilPercent).toBeUndefined();
+    expect(settings.quietStart).toBeUndefined();
     expect(settings.tabLifetimeSeconds).toBe(600);
     expect(warnings.length).toBe(2);
   });

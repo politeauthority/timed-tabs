@@ -3,6 +3,7 @@
  * indicators together. Keep this file thin; logic lives in the modules.
  */
 import { api, isDevBuild, withTimeout } from "../shared/browser.js";
+import { leadReached } from "../shared/lead.js";
 import { watchGroups, watchRules, watchSettings } from "../shared/settings.js";
 import { featureOn } from "../shared/flags.js";
 import { RULE_FIELDS, applicableRules, applyOverrides, effectiveSettings, managesTab, wantedIndicatorIds } from "../shared/rules.js";
@@ -697,10 +698,11 @@ async function tick() {
       // (pinned, timer off), and while still green if the user asked for that.
       // Appearance comes from the tab's effective settings, so rules can
       // change how (and whether) a tab is painted.
-      const quietUntil = Math.min(0.99, Math.max(0.01, (eff.quietUntilPercent ?? 40) / 100));
-      const quiet = exempt || (eff.hideWhileGreen && progress < quietUntil);
+      // The lead is measured back from expiry, against this tab's own
+      // lifetime as its rules and snoozes have left it (see shared/lead.js).
+      const quiet = exempt || (eff.hideWhileGreen && !leadReached(eff.quietStart, progress, remainingSeconds));
       const flashing =
-        eff.flashBeforeExpiry && !quiet && remainingSeconds > 0 && remainingSeconds <= eff.flashLeadSeconds;
+        eff.flashBeforeExpiry && !quiet && remainingSeconds > 0 && leadReached(eff.flashLead, progress, remainingSeconds);
       if (isDevBuild) devLogLook(tab, eff, quiet);
       snapshot.push({
         exempt,

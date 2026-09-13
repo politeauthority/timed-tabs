@@ -12,7 +12,7 @@ import { rampColor, toHex } from "../../shared/color.js";
 import { createInjector } from "./inject.js";
 
 export const id = "favicon";
-export const label = "Colour every tab's favicon";
+export const label = "Colour favicon";
 export const description = "The tab's icon gets a coloured square, ring or dot. Works on every tab.";
 
 /** tabId -> short human-readable outcome of the last attempt, for diagnostics. */

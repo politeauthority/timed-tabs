@@ -29,9 +29,9 @@ export const RULE_VISUAL_FIELDS = [
   "indicators",
   "faviconStyle",
   "hideWhileGreen",
-  "quietUntilPercent",
+  "quietStart",
   "flashBeforeExpiry",
-  "flashLeadSeconds",
+  "flashLead",
 ];
 
 /** Everything a rule may override. */

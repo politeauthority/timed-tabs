@@ -78,7 +78,7 @@ So a Web Store build is expected to tick at 30 seconds while every local test ti
 **This has not been confirmed against a packed install**, and it wants confirming before
 anything is submitted: it is the kind of difference that is invisible right up until it
 is shipped. If it holds, the Chrome build should floor `tickSeconds`, and the badge
-countdown and `flashLeadSeconds` need to say something truthful at that granularity.
+countdown and `flashLead` need to say something truthful at that granularity.
 
 ## Host permissions are granted silently
 

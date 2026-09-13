@@ -1,6 +1,7 @@
 import { api } from "./browser.js";
 import { DEFAULT_TAB_SORT, TAB_SORTS } from "./tab-sort.js";
 import { DEFAULT_FLAGS, mergeFlags } from "./flags.js";
+import { parseLead, formatLead, leadFromElapsedPercent } from "./lead.js";
 
 /**
  * All user-configurable settings live here with their defaults.
@@ -27,14 +28,22 @@ export const DEFAULTS = Object.freeze({
   resetOnActivate: false,
   /** The active tab's clock does not run; time only counts in the background. */
   pauseWhileActive: false,
-  /** Show nothing at all until a tab has used this much of its lifetime. */
+  /** No display changes on a tab until it is close enough to expiring (see quietStart). */
   hideWhileGreen: false,
-  /** Percent of the lifetime that must pass before indicators appear (with hideWhileGreen). */
-  quietUntilPercent: 40,
-  /** Flash the indicators when a tab is about to expire. */
+  /**
+   * With hideWhileGreen, how close: a lead measured back from expiry, either
+   * an amount of time ("600s") or a share of the lifetime ("60%"). See
+   * shared/lead.js. Replaces `quietUntilPercent`, which counted the other way.
+   */
+  quietStart: "60%",
+  /** Flash the indicators before a tab expires. */
   flashBeforeExpiry: true,
-  /** How long before expiry the flashing starts (seconds). */
-  flashLeadSeconds: 60,
+  /**
+   * How far before expiry the flashing starts: a lead like quietStart, an
+   * amount ("60s") or a share of the lifetime ("10%"). Replaces the
+   * seconds-only `flashLeadSeconds`.
+   */
+  flashLead: "60s",
   /** Which indicator strategies signal remaining time. See background/indicators. */
   indicators: ["favicon", "theme-tint", "action-icon"],
   /** How the favicon indicator draws its colour: "square" | "ring" | "dot". */
@@ -56,7 +65,11 @@ export const DEFAULTS = Object.freeze({
   tickSeconds: 5,
 });
 
-/** Settings page sections, in order. Each FIELDS entry names its group. */
+/**
+ * Settings page groups, in order: one pill each. Each FIELDS entry names its
+ * group. A group may split into `sections`, headed subgroups within the one
+ * tab; a FIELDS entry in such a group names its section too.
+ */
 export const GROUPS = [
   {
     id: "general",
@@ -65,27 +78,64 @@ export const GROUPS = [
     // `short` names the pill, where there is no room for a sentence.
     short: "General",
     help: "Whether Timed Tabs does anything to your tabs, and which tabs it does it to.",
+    sections: [
+      { id: "switch", emoji: "⚙️", title: "Managing tabs" },
+      { id: "everywhere", emoji: "🌐", title: "The same everywhere", help: "Rules cannot change these." },
+      { id: "notifications", emoji: "🔔", title: "Notifications" },
+    ],
   },
-  { id: "timing", emoji: "⏳", title: "Timing", short: "Timing", help: "How long tabs live and when the clock runs." },
-  { id: "expiry", emoji: "🚪", title: "When a tab expires", short: "Expiry", help: "What happens to a background tab once its time is up." },
-  { id: "notifications", emoji: "🔔", title: "Notifications", short: "Notifications", help: "What Timed Tabs tells you about, and when." },
-  { id: "appearance", emoji: "🎨", title: "Appearance", short: "Appearance", help: "How remaining time is shown in the browser." },
-  { id: "advanced", emoji: "🔧", title: "Advanced", short: "Advanced", help: "Rarely needed." },
-  { id: "flags", emoji: "🚩", title: "Feature flags", short: "Flags", help: "Work that is not finished enough to be on for everyone." },
+  {
+    id: "timing",
+    emoji: "⏳",
+    title: "Timer defaults",
+    short: "Timers",
+    help: "How long tabs live, and what happens when they run out. These are the defaults: a rule can set every one of them differently for the pages it matches.",
+    sections: [
+      { id: "clock", emoji: "⏳", title: "Timing" },
+      { id: "expiry", emoji: "🚪", title: "When a tab expires" },
+    ],
+  },
+  {
+    id: "appearance",
+    emoji: "🎨",
+    title: "Appearance",
+    short: "Appearance",
+    help: "How remaining time is shown in the browser. Colour runs green, yellow, red as time runs out.",
+    sections: [
+      { id: "tabs", emoji: "🗂️", title: "Tabs", help: "What changes on the tab itself." },
+      { id: "toolbar", emoji: "🔘", title: "Toolbar button", help: "What the Timed Tabs button shows for the tab you are on." },
+      { id: "when", emoji: "⏱️", title: "When indicators show" },
+    ],
+  },
+  {
+    id: "advanced",
+    emoji: "🔧",
+    title: "Advanced",
+    short: "Advanced",
+    help: "Rarely needed.",
+    sections: [
+      { id: "tuning", emoji: "🔧", title: "Tuning" },
+      { id: "flags", emoji: "🚩", title: "Feature flags", help: "Work that is not finished enough to be on for everyone. Expect rough edges." },
+    ],
+  },
 ];
 
 /**
  * How each setting is presented. `type` is one of:
  * duration (seconds), toggle, choice ({ value, label }[]), percent, indicators,
- * flags (the feature-flag switches from shared/flags.js).
+ * flags (the feature-flag switches from shared/flags.js), lead (a time or a
+ * share of the lifetime, see shared/lead.js).
  * A percent field with `slider` is dragged rather than typed.
  * `requires` names optional permissions the panel must obtain before the
  * setting can be switched on; it is turned back off if they are ever revoked.
+ * A field with no `label` is headed by its section; `name` then says what it
+ * is where one word is needed, as in the saved toast.
  */
 export const FIELDS = [
   {
     key: "tabManagement",
     group: "general",
+    section: "switch",
     type: "toggle",
     label: "Manage tabs",
     help: "Turn this off and Timed Tabs leaves your tabs completely alone: no timers, nothing closed, no colours or badges. Turn it back on and every tab starts its life afresh from that moment.",
@@ -93,21 +143,24 @@ export const FIELDS = [
   {
     key: "requireRuleMatch",
     group: "general",
+    section: "switch",
     type: "toggle",
-    label: "Only manage tabs a rule matches",
-    help: "Timed Tabs works on the pages you have written a rule for and leaves every other tab alone: no timer, nothing closed, no colours. The toolbar button shows an empty clock on a page nothing is watching. With no rules at all, nothing is managed.",
+    label: "Only Managed Rule Matching Tabs",
+    help: "Enable this setting to have Timed Tabs only manage tab where the URL matches a rule.",
     showWhen: (s) => s.tabManagement !== false,
   },
   {
     key: "tabLifetimeSeconds",
     group: "timing",
+    section: "clock",
     type: "duration",
     label: "Tab lifetime",
     help: "How long a tab may sit before it counts as expired.",
   },
   {
     key: "snoozePercent",
-    group: "timing",
+    group: "general",
+    section: "everywhere",
     type: "percent",
     slider: true,
     label: "Snooze adds",
@@ -118,6 +171,7 @@ export const FIELDS = [
   {
     key: "resetOnActivate",
     group: "timing",
+    section: "clock",
     type: "toggle",
     label: "Restart the timer when you switch to a tab",
     help: "Every visit gives the tab a full lifetime again. Tabs you keep coming back to never expire.",
@@ -125,13 +179,15 @@ export const FIELDS = [
   {
     key: "pauseWhileActive",
     group: "timing",
+    section: "clock",
     type: "toggle",
     label: "Only count time while a tab is in the background",
     help: "The clock stops while you are looking at a tab and resumes when you leave it.",
   },
   {
     key: "onExpire",
-    group: "expiry",
+    group: "timing",
+    section: "expiry",
     type: "choice",
     label: "Action",
     help: "What happens once a background tab runs out of time. The tab you are viewing is never touched.",
@@ -144,7 +200,8 @@ export const FIELDS = [
   },
   {
     key: "recentRetentionSeconds",
-    group: "expiry",
+    group: "general",
+    section: "everywhere",
     type: "duration",
     label: "Keep recently expired tabs for",
     help: "Tabs that Timed Tabs closed stay listed on the Tabs page for this long, so you can reopen them.",
@@ -152,7 +209,8 @@ export const FIELDS = [
   },
   {
     key: "notifyOnExpire",
-    group: "notifications",
+    group: "general",
+    section: "notifications",
     type: "toggle",
     label: "Tell me when a tab is closed",
     help: "A notification naming the tab, one for each batch we close. Click it to bring the tab back.",
@@ -161,46 +219,18 @@ export const FIELDS = [
   {
     key: "indicators",
     group: "appearance",
+    section: "tabs",
     type: "indicators",
-    label: "Show remaining time with",
-    help: "Any combination. Colour runs green, yellow, red as time runs out.",
-  },
-  {
-    key: "flashBeforeExpiry",
-    group: "appearance",
-    type: "toggle",
-    label: "Flash when a tab is about to expire",
-    help: "Every indicator blinks during the last stretch before a tab runs out of time.",
-  },
-  {
-    key: "flashLeadSeconds",
-    group: "appearance",
-    type: "duration",
-    label: "Start flashing",
-    help: "How long before expiry the flashing begins.",
-    min: 5,
-    showWhen: (s) => s.flashBeforeExpiry,
-  },
-  {
-    key: "hideWhileGreen",
-    group: "appearance",
-    type: "toggle",
-    label: "Leave fresh tabs alone",
-    help: "Show nothing until a tab has used part of its lifetime. Off means indicators show all the time.",
-  },
-  {
-    key: "quietUntilPercent",
-    group: "appearance",
-    type: "percent",
-    label: "Show indicators after",
-    help: "The share of a tab's lifetime that must pass before anything is shown.",
-    min: 1,
-    max: 99,
-    showWhen: (s) => s.hideWhileGreen,
+    // The one list of indicators is shown in parts: the favicon first so its
+    // style can sit right under it, then the other tab-strip marks, then on
+    // the toolbar section the toolbar button's. `only` names each part's ids.
+    only: ["favicon"],
+    name: "Tab indicators",
   },
   {
     key: "faviconStyle",
     group: "appearance",
+    section: "tabs",
     type: "choice",
     label: "Favicon colour style",
     help: "Where the colour goes on the tab's icon.",
@@ -212,15 +242,65 @@ export const FIELDS = [
     showWhen: (s) => s.indicators.includes("favicon"),
   },
   {
+    key: "indicators",
+    group: "appearance",
+    section: "tabs",
+    type: "indicators",
+    only: ["title-prefix", "theme-tint"],
+    name: "Tab indicators",
+  },
+  {
+    key: "indicators",
+    group: "appearance",
+    section: "toolbar",
+    type: "indicators",
+    only: ["action-icon", "badge"],
+    name: "Toolbar indicators",
+  },
+  {
+    key: "flashBeforeExpiry",
+    group: "appearance",
+    section: "when",
+    type: "toggle",
+    label: "Flash before expiry",
+    help: "Every indicator blinks during the last stretch before a tab runs out of time.",
+  },
+  {
+    key: "flashLead",
+    group: "appearance",
+    section: "when",
+    type: "lead",
+    label: "Start flashing",
+    help: "How much time must be left before the flashing begins: an amount, or a share of the tab's lifetime.",
+    showWhen: (s) => s.flashBeforeExpiry,
+  },
+  {
+    key: "hideWhileGreen",
+    group: "appearance",
+    section: "when",
+    type: "toggle",
+    label: "No display changes until",
+    help: "Keep every indicator off on a tab until it is close enough to expiring. Off means indicators show all the time.",
+  },
+  {
+    key: "quietStart",
+    group: "appearance",
+    section: "when",
+    type: "lead",
+    label: "When to start display updates",
+    help: "How much time must be left before anything shows: an amount, or a share of the tab's lifetime. An amount longer than the lifetime shows from the start.",
+    showWhen: (s) => s.hideWhileGreen,
+  },
+  {
     key: "featureFlags",
-    group: "flags",
+    group: "advanced",
+    section: "flags",
     type: "flags",
-    label: "Switches",
-    help: "Expect rough edges.",
   },
   {
     key: "tickSeconds",
     group: "advanced",
+    section: "tuning",
     type: "duration",
     label: "Refresh every",
     help: "How often colours and badges update. Lower is smoother, higher is lighter on the browser.",
@@ -256,14 +336,44 @@ export function coerceSetting(key, value) {
   }
   if (typeof def === "string") {
     if (typeof value !== "string") return undefined;
+    if (field?.type === "lead") {
+      const lead = parseLead(value);
+      return lead ? formatLead(lead) : undefined;
+    }
     const options = key === "tabSort" ? TAB_SORTS.map((s) => s.id) : field?.options?.map((o) => o.value);
     return !options || options.includes(value) ? value : undefined;
   }
   return undefined;
 }
 
+/**
+ * Keys an older build wrote, carried over to what this one reads. Applied to
+ * stored settings, to each rule's `set` and to a backup on the way in, so a
+ * value saved either side of the change lands in the same place. Returns a
+ * copy; the old key is dropped from it.
+ */
+export function migrateSettingKeys(obj) {
+  if (!obj || typeof obj !== "object") return obj;
+  const out = { ...obj };
+  if ("quietUntilPercent" in out) {
+    if (!("quietStart" in out)) {
+      const lead = leadFromElapsedPercent(out.quietUntilPercent);
+      if (lead) out.quietStart = lead;
+    }
+    delete out.quietUntilPercent;
+  }
+  if ("flashLeadSeconds" in out) {
+    const n = Math.round(Number(out.flashLeadSeconds));
+    if (!("flashLead" in out) && Number.isFinite(n) && n >= 1) out.flashLead = `${n}s`;
+    delete out.flashLeadSeconds;
+  }
+  return out;
+}
+
 export async function getSettings() {
-  const stored = await api.storage[STORAGE_AREA].get(Object.keys(DEFAULTS));
+  const stored = migrateSettingKeys(
+    await api.storage[STORAGE_AREA].get([...Object.keys(DEFAULTS), "quietUntilPercent", "flashLeadSeconds"]),
+  );
   const out = { ...DEFAULTS };
   for (const [key, value] of Object.entries(stored)) {
     const v = coerceSetting(key, value);
@@ -295,7 +405,12 @@ const RULES_KEY = "rules";
 
 export async function getRules() {
   const { [RULES_KEY]: rules } = await api.storage.local.get(RULES_KEY);
-  return Array.isArray(rules) ? rules : [];
+  return Array.isArray(rules) ? rules.map(migrateRule) : [];
+}
+
+/** A rule as this build reads it, whichever build wrote it. */
+function migrateRule(rule) {
+  return rule && typeof rule === "object" && rule.set ? { ...rule, set: migrateSettingKeys(rule.set) } : rule;
 }
 
 export async function saveRules(rules) {
