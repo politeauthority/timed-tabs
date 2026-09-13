@@ -627,13 +627,13 @@ function renderTab() {
   // What this tab actually does, rules and overrides included; the globals
   // only until the background has answered for it.
   const eff = tabState?.effective ?? settings;
-  const hideTimer = Boolean(eff.pauseWhileActive && eff.resetOnActivate);
-  $("tab").hidden = hideTimer;
-  $("tab-paused").hidden = !hideTimer;
+  $("tab").hidden = false;
+  // A tab that both pauses while you are on it and restarts when you return
+  // still has a clock worth seeing and dragging; it just says so.
+  $("tab-paused-note").hidden = !(eff.pauseWhileActive && eff.resetOnActivate);
   if (!currentTab || !tabState) return;
 
   $("act-never").checked = tabState.neverExpire;
-  $("act-never-paused").checked = tabState.neverExpire;
   $("act-ignore").checked = Boolean(tabState.ignoreRules);
   // The sections the user folded away on this tab stay folded.
   for (const section of ["settings", "rules"]) {
@@ -643,7 +643,6 @@ function renderTab() {
   $("tab-rules").hidden = !currentTab;
   renderTabRules();
   renderTabSettings();
-  if (hideTimer) return;
 
   const icon = $("tab-icon");
   if (currentTab.favIconUrl) {
@@ -3166,9 +3165,6 @@ $("fuse-range").addEventListener("change", async (e) => {
 });
 
 $("act-never").addEventListener("change", (e) =>
-  tabAction("neverExpire", e.target.checked, e.target.closest("label")),
-);
-$("act-never-paused").addEventListener("change", (e) =>
   tabAction("neverExpire", e.target.checked, e.target.closest("label")),
 );
 $("act-ignore").addEventListener("change", (e) =>
