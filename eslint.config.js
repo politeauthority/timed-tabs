@@ -12,6 +12,8 @@ export default [
       globals: { ...globals.browser, ...globals.webextensions },
     },
     rules: {
+      // A module may not assign another module's binding; shared state lives in ui/state.js.
+      "no-import-assign": "error",
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       "no-undef": "error",
     },
