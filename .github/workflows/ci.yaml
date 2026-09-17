@@ -33,20 +33,12 @@ permissions:
   contents: read
   actions: read        # the step-times action reads this run's job timings
 
-# Cancel superseded runs on a PR, never on main. A PR's older run is answering a
-# question about a commit nobody will merge any more, so killing it is free. On
-# main it is the only run that commit will ever get: branch protection does not
-# require branches to be up to date (`strict: false`), so the merge-ref result
-# from the PR does not cover what actually landed.
-#
-# So main runs share no group at all: each push gets a group of its own, keyed
-# on the run id. Sharing one with cancel-in-progress off was not enough --
-# GitHub keeps a single *pending* run per group and cancels the older pending
-# one when a third arrives, so four PRs merged in three minutes left two of
-# their commits never tested on main, one cancelled and one that never started.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # PRs: one run per branch, newest wins. main: one run at a time, newest wins —
+  # a superseded main build is wasted work. Release commits ("chore(main):
+  # release …") get a group of their own so they never cancel a main build.
+  group: "ci-${{ github.event_name == 'pull_request' && github.ref || (startsWith(github.event.head_commit.message, 'chore(main): release') && github.run_id || 'main') }}"
+  cancel-in-progress: true
 
 jobs:
   lint-test:
