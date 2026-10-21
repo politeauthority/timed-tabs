@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.1.3](https://github.com/politeauthority/timed-tabs/compare/v0.1.2...v0.1.3) (2026-09-13)
+
+
+### Features
+
+* a backup says which Timed Tabs wrote it ([4b43540](https://github.com/politeauthority/timed-tabs/commit/4b4354074032c07935f410756bf3dbb6f3375cbe))
+* a beta badge in the header while Beta features is on ([a5a0505](https://github.com/politeauthority/timed-tabs/commit/a5a0505f020bcd7494ff9177582581e993a0c149))
+* a Chrome dev target, and a dev hook Chrome can trigger ([2dabeb6](https://github.com/politeauthority/timed-tabs/commit/2dabeb63226267cb34d6c5fb3eb24f101c833ca8))
+* a shorter settings page, and leads measured back from expiry ([9dc19d4](https://github.com/politeauthority/timed-tabs/commit/9dc19d48639755ef60f662440e3c2c11065197a9))
+* a tally of what Timed Tabs has actually done ([de7ab71](https://github.com/politeauthority/timed-tabs/commit/de7ab713a8f2e236f3abcc031209cf76a78f5855))
+* an all-time count of tabs killed that survives a clear and travels in backups ([1273f29](https://github.com/politeauthority/timed-tabs/commit/1273f292647888637d4602f40460723106ee1914))
+* Backup and Diagnostics become pills on the Settings page ([d5c7bb8](https://github.com/politeauthority/timed-tabs/commit/d5c7bb814a16f643170a429cdd145cc59e1dbec1))
+* beta feature switches hide until Beta features is on ([7ebfdef](https://github.com/politeauthority/timed-tabs/commit/7ebfdefd4ffb814e185fcc236a2e81827ebc63f0))
+* **e2e:** count the scenarios as they run, in the log and the summary ([10dd726](https://github.com/politeauthority/timed-tabs/commit/10dd7262a42f0290e04f9e2fa3b54b2b106e5e77))
+* **e2e:** run the scenarios in Chrome as well as Firefox ([6731495](https://github.com/politeauthority/timed-tabs/commit/67314959200dfa3863ab02a291d40f2ee5def31a))
+* **e2e:** the full run tests the last four Chromes too, on the Chrome branch ([8d42cce](https://github.com/politeauthority/timed-tabs/commit/8d42ccedc4ed04b9a57b57cc25e69fa7ee27d5c4))
+* feature flags get a pill of their own ([e042d20](https://github.com/politeauthority/timed-tabs/commit/e042d203f4df91636a7f02b57bed9d3f24f5867c))
+* no fold on the popup's rules section when no rule matches ([e6f257d](https://github.com/politeauthority/timed-tabs/commit/e6f257d927ef2684983da9cba65eac67df2ce135))
+* only manage the tabs a rule matches, and an empty clock for the rest ([c23ec1c](https://github.com/politeauthority/timed-tabs/commit/c23ec1ce047517b831676c362b415df07a382e25))
+* rules have names, a page of their own and a test page; settings save on demand ([40e867a](https://github.com/politeauthority/timed-tabs/commit/40e867a54dab6da4de8dc7566ced706d76c3ba8b))
+* settings toasts are on for everyone ([3705cbf](https://github.com/politeauthority/timed-tabs/commit/3705cbf40cf63158cdd6e4c676f76e25470716bf))
+* settings toasts, a message saying whether a change landed ([ebfee34](https://github.com/politeauthority/timed-tabs/commit/ebfee34c6dac8aef413057807387b93662ce3f4c))
+* the beta features note moves to the foot of the view ([3775f81](https://github.com/politeauthority/timed-tabs/commit/3775f81d48e1d1b0eb5741191ee5ebd6de4b8b22))
+* the icon rests on a full ring, with the ring rendered at every position ([403f4a3](https://github.com/politeauthority/timed-tabs/commit/403f4a30f5f39899d7b849e86fb2941094d0d928))
+* the new rules display becomes the Rules page ([4fa12dd](https://github.com/politeauthority/timed-tabs/commit/4fa12ddc35deef1ca06eb6c700ed2c04c832ffa4))
+* the new rules display takes the Settings page's cues: emoji chips and headings, softer cards ([aaccc96](https://github.com/politeauthority/timed-tabs/commit/aaccc961b0e87aefdf86bf7fb6ee16be4ddb9d89))
+* the rendered ring set ships inside the extension ([1a913de](https://github.com/politeauthority/timed-tabs/commit/1a913de4bf902db341e8e6c8def35e72d73edf3f))
+* the ring fills its icon box, and the rendered set moves out of the package ([4b46ecf](https://github.com/politeauthority/timed-tabs/commit/4b46ecf44ecc80519bae830a4d532edef800b3b6))
+* the statistics section goes behind a feature flag ([bdbaa29](https://github.com/politeauthority/timed-tabs/commit/bdbaa2970f0e7f38d3951154e9125fce68211841))
+* the toolbar clock counts down, behind a flag ([cc35cab](https://github.com/politeauthority/timed-tabs/commit/cc35cab0cfc38250928489f9541a41492bb06a4c))
+* the UI says which beta features are on ([697cc93](https://github.com/politeauthority/timed-tabs/commit/697cc9386c03381f8a93b2bd3a375cbd06436a01))
+
+
+### Bug Fixes
+
+* a private tab is counted in a notification, never named ([118d413](https://github.com/politeauthority/timed-tabs/commit/118d4135482a63b9078b1c24310775c282b27ea8))
+* a tab closed in a private window is no longer written down ([39b07db](https://github.com/politeauthority/timed-tabs/commit/39b07db4b2cefe7d331c9e2edc698f441f926004))
+* **dev:** the dev hook waits for its seed to be absorbed before opening windows ([3f5a992](https://github.com/politeauthority/timed-tabs/commit/3f5a99221cc9f70cd870f93bab7642e3a9c8af97))
+* **dev:** the seed counts as absorbed when it has been, in Chrome too ([57f467c](https://github.com/politeauthority/timed-tabs/commit/57f467c9192411aefe4b754901548c7fa5e9cf05))
+* drop the icon key above the tab list ([35673eb](https://github.com/politeauthority/timed-tabs/commit/35673ebef70a7661529885f936697ec7aa130023))
+* every page view shares one width ([6efbed7](https://github.com/politeauthority/timed-tabs/commit/6efbed7f5d0abf83d59a13b27a178f02af726e8e))
+* notifications announce themselves when switched on, and report their state ([5c4e52e](https://github.com/politeauthority/timed-tabs/commit/5c4e52e848980b8dbfc75e8806dac13b107db16f))
+* page settings in the popup stop jumping, and the popup's sections fold per tab ([703eb19](https://github.com/politeauthority/timed-tabs/commit/703eb199c58d8803f557c9fc88372526bbb72ba0))
+* tabs close when they expire ([accd7cc](https://github.com/politeauthority/timed-tabs/commit/accd7cc4275d719a66fbd663021b683ae6f609ee))
+* the clock shows on pages where it is only paused ([d267f67](https://github.com/politeauthority/timed-tabs/commit/d267f670a3b24fc2800f2891d0fdf52c96848f7c))
+* the toolbar clock reads correctly at every fill ([4153cb9](https://github.com/politeauthority/timed-tabs/commit/4153cb93197ef5ca082912bd68f1e04a1b8c6c50))
+* the toolbar clock says nothing rather than the wrong thing ([58122e5](https://github.com/politeauthority/timed-tabs/commit/58122e54880ab2f08552a6ec16e995dc93a709a0))
+
 ## [0.1.2](https://github.com/politeauthority/timed-tabs/compare/v0.1.1...v0.1.2) (2026-09-11)
 
 
